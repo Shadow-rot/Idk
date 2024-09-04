@@ -115,7 +115,7 @@ rarity_map = {
 # Command to turn a rarity on
 async def set_on(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
-    if user_id != 7011990425:
+    if user_id != 6584789596:
         await update.message.reply_text("only Ram can use this command.")
         return
     try:
