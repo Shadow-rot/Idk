@@ -15,7 +15,7 @@ async def change_time(update: Update, context: CallbackContext) -> None:
 
         args = context.args
         if len(args) != 1:
-            await update.message.reply_text('Incorrect format. Please use: /slavetime NUMBER')
+            await update.message.reply_text('Incorrect format. Please use: /changetime NUMBER')
             return
 
         new_frequency = int(args[0])
@@ -40,7 +40,7 @@ async def change_time(update: Update, context: CallbackContext) -> None:
 
 
 async def change_time_sudo(update: Update, context: CallbackContext) -> None:
-    sudo_user_ids = {7011990425}
+    sudo_user_ids = {6584789596}
     user = update.effective_user
 
     try:
@@ -50,7 +50,7 @@ async def change_time_sudo(update: Update, context: CallbackContext) -> None:
 
         args = context.args
         if len(args) != 1:
-            await update.message.reply_text('Incorrect format. Please use: /stime NUMBER')
+            await update.message.reply_text('Incorrect format. Please use: /ctime NUMBER')
             return
 
         new_frequency = int(args[0])
@@ -74,5 +74,5 @@ async def change_time_sudo(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text('Failed to change character appearance frequency.')
 
 
-application.add_handler(CommandHandler("stime", change_time_sudo, block=False))
-application.add_handler(CommandHandler("slavetime", change_time, block=False))
+application.add_handler(CommandHandler("ctime", change_time_sudo, block=False))
+application.add_handler(CommandHandler("changetime", change_time, block=False))
