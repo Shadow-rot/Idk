@@ -354,7 +354,7 @@ def main() -> None:
 
     application.add_handler(CommandHandler('set_on', set_on, block=False))
     application.add_handler(CommandHandler('set_off', set_off, block=False))
- application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
+    application.add_handler(MessageHandler(filters.ALL, message_counter, block=False)) # Indentation fixed here
     application.run_polling(drop_pending_updates=True)
 
 if name == "main":
