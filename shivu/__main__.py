@@ -127,10 +127,9 @@ async def guess(update: Update, context: CallbackContext) -> None:
         return
 
     name_parts = last_characters[chat_id]['name'].lower().split()
-    if sorted(name_parts) == sorted(guess.split()) or any(part == guess for part in name_parts:
-        first_correct_guesses[chat_id] = user_id
-        # Handle user data updates and character additions
-        # ...
+if sorted(name_parts) == sorted(guess.split()) or any(part == guess for part in name_parts):
+    first_correct_guesses[chat_id] = user_id
+    # Handle user data updates and character additions
 
         keyboard = [[InlineKeyboardButton(f"🪼 ʜᴀʀᴇᴍ", switch_inline_query_current_chat=f"collection.{user_id}")]]
         await update.message.reply_text(f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> Congratulations 🎊 You grabbed a new Waifu !!✅\n\n🎀 𝙉𝙖𝙢𝙚: <code>{last_characters[chat_id]["name"]}</code> \n⚡ 𝘼𝙣𝙞𝙢𝙚: <code>{last_characters[chat_id]["anime"]}</code> \n{last_characters[chat_id]["rarity"][0]} 𝙍𝙖𝙧𝙞𝙩𝙮: <code>{last_characters[chat_id]["rarity"][2:]}</code>\n\n✧⁠ Character successfully added in your harem', parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
