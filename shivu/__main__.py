@@ -7,29 +7,18 @@ from html import escape
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters, Application, CallbackQueryHandler
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
-from shivu import collection, top_global_groups_collection, group_user_totals_collection, user_collection, user_totals_collection, shivuu 
-from shivu import LOGGER, set_on_data, set_off_data
-from shivu import application, LOGGER 
+from shivu import collection, user_collection, user_totals_collection, shivuu, LOGGER, set_on_data, set_off_data
 from shivu.modules import ALL_MODULES
 
+# Global variables
 locks = {}
-message_counters = {}
-spam_counters = {}
 last_characters = {}
 sent_characters = {}
 first_correct_guesses = {}
 message_counts = {}
-
-for module_name in ALL_MODULES:
-    importlib.import_module("shivu.modules." + module_name)
-
-last_user = {}
 warned_users = {}
 ran_away_count = {}
-archived_characters = {}
 
 def escape_markdown(text):
     escape_chars = r'\*_`\\~>#+-=|{}.!'
@@ -41,7 +30,7 @@ async def ran_away(update: Update, context: CallbackContext) -> None:
         character_data = last_characters[chat_id]
         character_name = character_data['name']
         ran_away_count[chat_id] = ran_away_count.get(chat_id, 0) + 1
-        
+
         if ran_away_count[chat_id] > 15:
             if chat_id not in first_correct_guesses:
                 message_text = f"Ohh No!! [{character_name}] Has Been Ran Away From Your Chat Store His/Her Name For Next Time"
@@ -53,7 +42,8 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
     chat_id = str(update.effective_chat.id)
     user = update.effective_user
     if user is None or user.is_bot:
-        return  # Skip if the effective user is None or a bot
+        return
+
     user_id = user.id
 
     if chat_id not in locks:
@@ -82,7 +72,7 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
 async def send_image(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
     all_characters = list(await collection.find({}).to_list(length=None))
-    
+
     if chat_id not in sent_characters:
         sent_characters[chat_id] = []
 
@@ -132,8 +122,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
     name_parts = last_characters[chat_id]['name'].lower().split()
     if sorted(name_parts) == sorted(guess.split()) or any(part == guess for part in name_parts):
         first_correct_guesses[chat_id] = user_id
-        # Handle user data updates and character additions
-        
+
         keyboard = [[InlineKeyboardButton(f"🪼 ʜᴀʀᴇᴍ", switch_inline_query_current_chat=f"collection.{user_id}")]]
         await update.message.reply_text(
             f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> Congratulations 🎊 You grabbed a new Waifu !!✅\n\n'
