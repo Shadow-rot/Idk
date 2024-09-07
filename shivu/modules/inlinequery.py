@@ -81,41 +81,80 @@ async def inlinequery(update: Update, context: CallbackContext) -> None:
             if query.startswith('collection.'):
                 user_character_count = sum(1 for c in user['characters'] if isinstance(c, dict) and c.get('id') == character.get('id'))
                 user_anime_characters = sum(1 for c in user['characters'] if isinstance(c, dict) and c.get('anime') == character.get('anime'))
-                caption = (
-                    f"<b>OwO! Check out <a href='tg://user?id={user['id']}'>{escape(user.get('first_name', user['id']))}</a>'s Slave</b>\n\n"
-                    f"{character['id']}: <b>{character['name']} (x{user_character_count})</b>\n"
-                    f"<b>{character['anime']} ({user_anime_characters}/{anime_characters})</b>\n"
-                    f"<b>(𝙍𝘼𝙍𝙄𝙏𝙔: {character['rarity']})</b>"
-                )
-                # Check for tags in character's name
-                if '🐰' in character['name']:
-                    caption += "\n\n🐰 𝓑𝓾𝓷𝓷𝔂 🐰"
-                elif '👩‍🏫' in character['name']:
-                    caption += "\n\n👩‍🏫 𝓣𝓮𝓪𝓬𝓱𝓮𝓻 👩‍🏫"
-                elif '🎒' in character['name']:
-                    caption += "\n\n🎒 𝓢𝓬𝓱𝓸𝓸𝓵 🎒"
-                elif '👘' in character['name']:
-                    caption += "\n\n👘 𝓚𝓲𝓶𝓸𝓷𝓸 👘"
-                elif '🏖' in character['name']:
-                    caption += "\n\n🏖 𝓢𝓤𝓜𝓜𝓔𝓡 🏖"
-            else:
-                caption = (
-                    f"<b>OwO! Check out this Slave !!</b>\n\n"
-                    f"{character['id']}: <b>{character['name']}</b>\n"
-                    f"<b>{character['anime']}</b>\n"
-                    f"<b>(𝙍𝘼𝙍𝙄𝙏𝙔: {character['rarity']})</b>\n"
-                )
-                # Check for tags in character's name
-                if '🐰' in character['name']:
-                    caption += "\n🐰 𝓑𝓾𝓷𝓷𝔂 🐰\n"
-                elif '👩‍🏫' in character['name']:
-                    caption += "\n👩‍🏫 𝓣𝓮𝓪𝓬𝓱𝓮𝓻 👩‍🏫\n"
-                elif '🎒' in character['name']:
-                    caption += "\n🎒 𝓢𝓬𝓱𝓸𝓸𝓵 🎒\n"
-                elif '👘' in character['name']:
-                    caption += "\n👘 𝓚𝓲𝓶𝓸𝓷𝓸 👘\n"
-                elif '🏖' in character['name']:
-                    caption += "\n\n🏖 𝓢𝓤𝓜𝓜𝓔𝓡 🏖\n"
+                capcaption = f"<b> Lᴏᴏᴋ Aᴛ <a href='tg://user?id={user['id']}'>{(escape(user.get('first_name', user['id'])))}</a>'s Wᴀɪғᴜ....!!</b>\n\n <b>{character['id']}:</b> {character['name']} x{user_character_count}\n<b>{character['anime']}</b> {user_anime_characters}/{anime_characters}\n﹙<b>{character['rarity'][0]} 𝙍𝘼𝙍𝙄𝙏𝙔:</b> {character['rarity'][2:]})\n\n" 
+    # Check for tags in character's name
+                if '👘' in character['name']:
+                    caption += "\n\n👘𝑲𝒊𝒎𝒐𝒏𝒐👘 "
+                elif '☃️' in character['name']:
+                    caption += "\n\n☃️𝑾𝒊𝒏𝒕𝒆𝒓☃️"
+                elif '🐰' in character['name']:
+                    caption += "\n\n🐰𝑩𝒖𝒏𝒏𝒚🐰"
+                elif '🎮' in character['name']:
+                    caption += "\n\n 🎮𝑮𝒂𝒎𝒆🎮 "
+                elif '🎄' in character['name']:
+                    caption += "\n\n🎄𝑪𝒓𝒊𝒔𝒕𝒎𝒂𝒔🎄"
+                elif '🎃' in character['name']:
+                    caption += "\n\n🎃𝑯𝒆𝒍𝒍𝒐𝒘𝒆𝒆𝒏🎃"
+                elif '🏖️' in character['name']:
+                    caption += "\n\n🏖️𝑺𝒖𝒎𝒎𝒆𝒓🏖️ "
+                elif '🧹' in character['name']:
+                    caption += "\n\n🧹𝑴𝒂𝒅𝒆🧹"
+                elif '🥻' in character['name']:
+                    caption += "\n\n🥻𝑺𝒂𝒓𝒆𝒆🥻"
+                elif ''☔ in character['name']:
+                    caption += "\n\n☔𝑴𝒐𝒏𝒔𝒐𝒐𝒏☔"
+                elif '🎒' in character['name']:
+                    caption += "\n\n🎒𝑺𝒄𝒉𝒐𝒐𝒍🎒"
+                elif '🎩' in character['name']:
+                    caption += "\n\n🎩𝑻𝒖𝒙𝒆𝒅𝒐🎩"
+                elif '👥' in character['name']:
+                    caption += "\n\n👥𝐃𝐮𝐨👥"
+                elif '🤝🏻' in character['name']:
+                    caption += "\n\n🤝🏻𝐆𝐫𝐨𝐮𝐩🤝🏻"
+                elif '👑' in character['name']:
+                    caption += "\n\👑𝑳𝒐𝒓𝒅👑n"
+                elif '💞' in character['name']:
+                    caption += "\n\n💞𝑽𝒂𝒍𝒆𝒏𝒕𝒊𝒏𝒆💞\n"
+        else:
+            caption = (
+            f"<b>Lᴏᴏᴋ Aᴛ Tʜɪs Wᴀɪғᴜ....!!</b>\n\n"
+            f"<b>{character['id']}:</b> {character['name']}\n"
+            f"<b>{character['anime']}</b>\n"
+            f"﹙<b>{character['rarity'][0]} 𝙍𝘼𝙍𝙄𝙏𝙔:</b> {character['rarity'][2:]})"
+        )
+    # Check for tags in character's name
+                if '👘' in character['name']:
+                    caption += "\n\n👘𝑲𝒊𝒎𝒐𝒏𝒐👘 "
+                elif '☃️' in character['name']:
+                    caption += "\n\n☃️𝑾𝒊𝒏𝒕𝒆𝒓☃️"
+                elif '🐰' in character['name']:
+                    caption += "\n\n🐰𝑩𝒖𝒏𝒏𝒚🐰"
+                elif '🎮' in character['name']:
+                    caption += "\n\n 🎮𝑮𝒂𝒎𝒆🎮 "
+                elif '🎄' in character['name']:
+                    caption += "\n\n🎄𝑪𝒓𝒊𝒔𝒕𝒎𝒂𝒔🎄"
+                elif '🎃' in character['name']:
+                    caption += "\n\n🎃𝑯𝒆𝒍𝒍𝒐𝒘𝒆𝒆𝒏🎃"
+                elif '🏖️' in character['name']:
+                    caption += "\n\n🏖️𝑺𝒖𝒎𝒎𝒆𝒓🏖️ "
+                elif '🧹' in character['name']:
+                    caption += "\n\n🧹𝑴𝒂𝒅𝒆🧹"
+                elif '🥻' in character['name']:
+                    caption += "\n\n🥻𝑺𝒂𝒓𝒆𝒆🥻"
+                elif ''☔ in character['name']:
+                    caption += "\n\n☔𝑴𝒐𝒏𝒔𝒐𝒐𝒏☔"
+                elif '🎒' in character['name']:
+                    caption += "\n\n🎒𝑺𝒄𝒉𝒐𝒐𝒍🎒"
+                elif '🎩' in character['name']:
+                    caption += "\n\n🎩𝑻𝒖𝒙𝒆𝒅𝒐🎩"
+                elif '👥' in character['name']:
+                    caption += "\n\n👥𝐃𝐮𝐨👥"
+                elif '🤝🏻' in character['name']:
+                    caption += "\n\n🤝🏻𝐆𝐫𝐨𝐮𝐩🤝🏻"
+                elif '👑' in character['name']:
+                    caption += "\n\👑𝑳𝒐𝒓𝒅👑n"
+                elif '💞' in character['name']:
+                    caption += "\n\n💞𝑽𝒂𝒍𝒆𝒏𝒕𝒊𝒏𝒆💞\n"
             results.append(
                 InlineQueryResultPhoto(
                     thumbnail_url=character['img_url'],
