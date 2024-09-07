@@ -131,8 +131,15 @@ if sorted(name_parts) == sorted(guess.split()) or any(part == guess for part in 
     first_correct_guesses[chat_id] = user_id
     # Handle user data updates and character additions
 
-        keyboard = [[InlineKeyboardButton(f"🪼 ʜᴀʀᴇᴍ", switch_inline_query_current_chat=f"collection.{user_id}")]]
-        await update.message.reply_text(f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> Congratulations 🎊 You grabbed a new Waifu !!✅\n\n🎀 𝙉𝙖𝙢𝙚: <code>{last_characters[chat_id]["name"]}</code> \n⚡ 𝘼𝙣𝙞𝙢𝙚: <code>{last_characters[chat_id]["anime"]}</code> \n{last_characters[chat_id]["rarity"][0]} 𝙍𝙖𝙧𝙞𝙩𝙮: <code>{last_characters[chat_id]["rarity"][2:]}</code>\n\n✧⁠ Character successfully added in your harem', parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
+    keyboard = [[InlineKeyboardButton(f"🪼 ʜᴀʀᴇᴍ", switch_inline_query_current_chat=f"collection.{user_id}")]]
+    await update.message.reply_text(
+        f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> Congratulations 🎊 You grabbed a new Waifu !!✅\n\n'
+        f'🎀 𝙉𝙖𝙢𝙚: <code>{last_characters[chat_id]["name"]}</code> \n'
+        f'⚡ 𝘼𝙣𝙞𝙢𝙚: <code>{last_characters[chat_id]["anime"]}</code> \n'
+        f'{last_characters[chat_id]["rarity"][0]} 𝙍𝙖𝙧𝙞𝙩𝙮: <code>{last_characters[chat_id]["rarity"][2:]}</code>\n\n'
+        f'✧⁠ Character successfully added in your harem',
+        parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard)
+    )
     else:
         await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙒𝙧𝙞𝙩𝙚 𝘾𝙤𝙧𝙧𝙚𝙘𝙩 𝙉𝙖𝙢𝙚... ❌️')
 
