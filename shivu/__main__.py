@@ -40,7 +40,7 @@ async def ran_away(update: Update, context: CallbackContext) -> None:
             del ran_away_count[chat_id]
             del last_characters[chat_id]
 
-asasync def message_counter(update: Update, context: CallbackContext) -> None:
+async def message_counter(update: Update, context: CallbackContext) -> None:
     chat_id = str(update.effective_chat.id)
     user = update.effective_user
     if user is None or user.is_bot:
