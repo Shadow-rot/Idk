@@ -11,17 +11,17 @@ async def check_character(update: Update, context: CallbackContext) -> None:
     try:
         args = context.args
         if len(args) != 1:
-            await update.message.reply_text('Incorrect format. Please use: /s slave_id')
+            await update.message.reply_text('Incorrect format. Please use: /check character_id')
             return
         character_id = args[0]
         character = await collection.find_one({'id': character_id})
         if character:
             global_count = await user_collection.count_documents({'characters.id': character['id']})
             response_message = (
-                f"<b>OwO! Check out this Slave !!</b>\n\n"
-                f"{character['id']}: <b>{character['name']}</b>\n"
-                f"<b>{character['anime']}</b>\n"
-                f"(𝙍𝘼𝙍𝙄𝙏𝙔: {character['rarity']})"
+                f"<b>Lᴏᴏᴋ Aᴛ Tʜɪs Wᴀɪғᴜ....!!</b>\n\n"
+    f"<b>{character['id']}:</b> {character['name']}\n"
+    f"<b>{character['anime']}</b>\n"
+    f"﹙<b>{character['rarity'][0]} 𝙍𝘼𝙍𝙄𝙏𝙔:</b> {character['rarity'][2:]})"
             )
 
             # The `if` and following `elif` blocks need to be indented at the same level
@@ -83,7 +83,7 @@ async def handle_callback_query(update: Update, context: CallbackContext) -> Non
         global_count = data[2]
         await query.answer(f"⚡️ Globally Slaved : {global_count}x.", show_alert=True)
 
-CHECK_HANDLER = CommandHandler('s', check_character, block=False)
+CHECK_HANDLER = CommandHandler('check', check_character, block=False)
 application.add_handler(CallbackQueryHandler(handle_callback_query, pattern='slaves_', block=False))
 application.add_handler(CHECK_HANDLER)
 
@@ -112,7 +112,7 @@ from pyrogram import Client, filters
 from shivu import user_collection
 from shivu import shivuu as app
 
-OWNER_ID = 7011990425  # Replace with the actual owner ID
+OWNER_ID = 6584789596  # Replace with the actual owner ID
 
 async def get_users_by_character(character_id):
     try:
