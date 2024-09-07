@@ -59,17 +59,80 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
             if last_user[chat_id]['count'] >= 10:
                 if user_id in warned_users and time.time() - warned_users[user_id] < 600:
                     return
-                await update.message.reply_text(f"ᴅᴏɴ'ᴛ 𝗌ᴘᴀᴍ {update.effective_user.first_name}...\n *ʏᴏᴜʀ ᴍᴇꜱꜱᴀɢᴇꜱ ᴡɪʟʟ ʙᴇ ɪɢɴᴏʀᴇᴅ ғᴏʀ 𝟷𝟶 ᴍɪɴᴜᴛᴇs.. ....!!*", parse_mode="Markdown")
-                warned_users[user_id] = time.time()
-                return
+                await update.message.reply_text(f"ᴅᴏɴ'ᴛ 𝗌ᴘᴀᴍ {update.effective_user.first_name}...\n *ʏᴏᴜʀ ᴍᴇꜱꜱᴀɢᴇꜱ ᴡɪʟʟ ʙᴇ ɪɢɴᴏʀᴇᴅ ғᴏʀ 𝟷𝟶 ᴍɪɴᴜᴛᴇස.. ....!!*", parse_mode="Markdown")
+                    warned_users[user_id] = time.time()
+                    return
         else:
             last_user[chat_id] = {'user_id': user_id, 'count': 1}
 
-        message_counts[chat_id] = message_counts.get(chat_id, 0) + 1
+        if chat_id in message_counts:
+            message_counts[chat_id] += 1
+        else:
+            message_counts[chat_id] = 1
 
         if message_counts[chat_id] % message_frequency == 0:
             await send_image(update, context)
             message_counts[chat_id] = 0
+
+async def set_rarity_percentages(chat_id, percentages):
+    group_rarity_percentages[chat_id] = percentages
+
+
+rarity_active = {
+    "🟢 Common": True,
+    "🟣 Rare": True,
+    "🟡 Legendary": True,
+    "💮 Special Edition": True,
+    "🔮 Premium Edition": True,
+    "🎗️ Supreme": True,
+}
+# Map numbers to rarity strings
+rarity_map = {
+    1: "🟢 Common",
+    2: "🟣 Rare",
+    3: "🟡 Legendary",
+    4: "💮 Special Edition",
+    5: "🔮 Premium Edition",
+    6: "🎗️ Supreme",
+}
+# Command to turn a rarity on
+async def set_on(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+    if user_id != 6584789596:
+        await update.message.reply_text("only Ram can use this command.")
+        return
+    try:
+        rarity_number = int(context.args[0])
+        rarity = rarity_map.get(rarity_number)
+        if rarity and rarity in rarity_active:
+            if not rarity_active[rarity]:
+                rarity_active[rarity] = True
+                await update.message.reply_text(f'Rarity {rarity} is now ON and will spawn from now on.')
+            else:
+                await update.message.reply_text(f'Rarity {rarity} is already ON.')
+        else:
+            await update.message.reply_text('Invalid rarity number.')
+    except (IndexError, ValueError):
+        await update.message.reply_text('Please provide a valid rarity number.')
+# Command to turn a rarity off
+async def set_off(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+    if user_id != 7011990425:
+        await update.message.reply_text("Only Ram Can use this command.")
+        return
+    try:
+        rarity_number = int(context.args[0])
+        rarity = rarity_map.get(rarity_number)
+        if rarity and rarity in rarity_active:
+            if rarity_active[rarity]:
+                rarity_active[rarity] = False
+                await update.message.reply_text(f'Rarity {rarity} is now OFF and will not spawn from now on.')
+            else:
+                await update.message.reply_text(f'Rarity {rarity} is already OFF.')
+        else:
+            await update.message.reply_text('Invalid rarity number.')
+    except (IndexError, ValueError):
+        await update.message.reply_text('Please provide a valid rarity number.')
 
 async def send_image(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
@@ -78,18 +141,33 @@ async def send_image(update: Update, context: CallbackContext) -> None:
     if chat_id not in sent_characters:
         sent_characters[chat_id] = []
 
-    rarity_percentages = {
-        "🟢 Common": 50,
-        "🟣 Rare": 30,
-        "🟡 Legendary": 10,
-        "💮 Special Edition": 0.5,
-        "🔮 Premium Edition": 0.2,
-        "🎗️ Supreme": 0.1,
-    }
+    if len(sent_characters[chat_id]) == len(all_characters):
+        sent_characters[chat_id] = []
 
+    # Set rarity percentages based on chat ID
+    if chat_id == -1002000314620:
+        rarity_percentages = {
+            "🟢 Common": 50,
+            "🟣 Rare": 30,
+            "🟡 Legendary": 10,
+            "💮 Special Edition": 0.5,
+            "🔮 Premium Edition": 0.2,
+            "🎗️ Supreme": 0.1,
+        }
+    else:
+        rarity_percentages = {
+            "🟢 Common": 50,
+            "🟣 Rare": 30,
+            "🟡 Legendary": 10,
+            "💮 Special Edition": 0.5,
+            "🔮 Premium Edition": 0.2,
+            "🎗️ Supreme": 0.1,
+        }
+
+    multiplier = 100
     weighted_characters = [
         c for c in all_characters if 'rarity' in c and rarity_active.get(c['rarity'], False)
-        for _ in range(int(100 * rarity_percentages.get(c['rarity'], 0)))
+        for _ in range(int(multiplier * rarity_percentages.get(c['rarity'], 0)))
     ]
 
     if not weighted_characters:
