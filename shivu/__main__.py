@@ -200,7 +200,7 @@ application.add_handler(CommandHandler('set_on', set_on))
 application.add_handler(CommandHandler('set_off', set_off))
 application.add_handler(MessageHandler(filters.ALL, message_counter))
 
-await application.run_polling(drop_pending_updates=True)
+application.run_polling(drop_pending_updates=True)
 
 # Fix the block below
 if __name__ == "__main__":
