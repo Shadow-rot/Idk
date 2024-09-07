@@ -117,7 +117,7 @@ elif '👑' in character['name']:
 elif '💞' in character['name']:
     caption += "\n\n💞𝑽𝒂𝒍𝒆𝒏𝒕𝒊𝒏𝒆💞\n"
 else:
-    ccaption = (
+    caption = (
     f"<b>Lᴏᴏᴋ Aᴛ Tʜɪs Wᴀɪғᴜ....!!</b>\n\n"
     f"<b>{character['id']}:</b> {character['name']}\n"
     f"<b>{character['anime']}</b>\n"
