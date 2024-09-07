@@ -40,7 +40,7 @@ async def ran_away(update: Update, context: CallbackContext) -> None:
             del ran_away_count[chat_id]
             del last_characters[chat_id]
 
-async def message_counter(update: Update, context: CallbackContext) -> None:
+asasync def message_counter(update: Update, context: CallbackContext) -> None:
     chat_id = str(update.effective_chat.id)
     user = update.effective_user
     if user is None or user.is_bot:
@@ -59,16 +59,16 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
             if last_user[chat_id]['count'] >= 10:
                 if user_id in warned_users and time.time() - warned_users[user_id] < 600:
                     return
-                await update.message.reply_text(f"ᴅᴏɴ'ᴛ 𝗌ᴘᴀᴍ {update.effective_user.first_name}...\n *ʏᴏᴜʀ ᴍᴇꜱꜱᴀɢᴇꜱ ᴡɪʟʟ ʙᴇ ɪɢɴᴏʀᴇᴅ ғᴏʀ 𝟷𝟶 ᴍɪɴᴜᴛᴇස.. ....!!*", parse_mode="Markdown")
-                    warned_users[user_id] = time.time()
-                    return
+                await update.message.reply_text(
+                    f"**ᴅᴏɴ'ᴛ 𝗌ᴘᴀᴍ** {update.effective_user.first_name}...\n **ʏᴏᴜʀ ᴍᴇꜱꜱᴀɢᴇꜱ ᴡɪʟʟ ʙᴇ ɪɢɴᴏʀᴇᴅ ғᴏʀ 𝟷𝟶 ᴍɪɴᴜᴛᴇs.. ....!!*",
+                    parse_mode="Markdown"
+                )
+                warned_users[user_id] = time.time()
+                return
         else:
             last_user[chat_id] = {'user_id': user_id, 'count': 1}
 
-        if chat_id in message_counts:
-            message_counts[chat_id] += 1
-        else:
-            message_counts[chat_id] = 1
+        message_counts[chat_id] = message_counts.get(chat_id, 0) + 1
 
         if message_counts[chat_id] % message_frequency == 0:
             await send_image(update, context)
