@@ -86,4 +86,4 @@ async def transfer_confirm(update, context):
 
 # Register the handlers 
 application.add_handler(CommandHandler("transfer", transfer))
-application.add_handler(CallbackQueryHandler(handle_transfer_confirmation, pattern='^confirm_transfer|^cancel_transfer$'))
+application.add_handler(CallbackQueryHandler(transfer_confirm, pattern='^confirm_transfer|^cancel_transfer$')) # Register with correct function name
