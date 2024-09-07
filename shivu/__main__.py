@@ -140,8 +140,8 @@ if sorted(name_parts) == sorted(guess.split()) or any(part == guess for part in 
         f'✧⁠ Character successfully added in your harem',
         parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard)
     )
-    else:
-        await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙒𝙧𝙞𝙩𝙚 𝘾𝙤𝙧𝙧𝙚𝙘𝙩 𝙉𝙖𝙢𝙚... ❌️')
+else:  # Ensure this is aligned with the 'if' statement
+    await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙒𝙧𝙞𝙩𝙚 𝘾𝙤𝙧𝙧𝙚𝙘𝙩 𝙉𝙖𝙢𝙚... ❌️')
 
 async def fav(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
