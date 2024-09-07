@@ -23,38 +23,41 @@ async def check_character(update: Update, context: CallbackContext) -> None:
                 f"<b>{character['anime']}</b>\n"
                 f"(𝙍𝘼𝙍𝙄𝙏𝙔: {character['rarity']})"
             )
+
+            # The `if` and following `elif` blocks need to be indented at the same level
             if '👘' in character['name']:
-                    caption += "\n\n👘𝑲𝒊𝒎𝒐𝒏𝒐👘 "
-                elif '☃️' in character['name']:
-                    caption += "\n\n☃️𝑾𝒊𝒏𝒕𝒆𝒓☃️"
-                elif '🐰' in character['name']:
-                    caption += "\n\n🐰𝑩𝒖𝒏𝒏𝒚🐰"
-                elif '🎮' in character['name']:
-                    caption += "\n\n 🎮𝑮𝒂𝒎𝒆🎮 "
-                elif '🎄' in character['name']:
-                    caption += "\n\n🎄𝑪𝒓𝒊𝒔𝒕𝒎𝒂𝒔🎄"
-                elif '🎃' in character['name']:
-                    caption += "\n\n🎃𝑯𝒆𝒍𝒍𝒐𝒘𝒆𝒆𝒏🎃"
-                elif '🏖️' in character['name']:
-                    caption += "\n\n🏖️𝑺𝒖𝒎𝒎𝒆𝒓🏖️ "
-                elif '🧹' in character['name']:
-                    caption += "\n\n🧹𝑴𝒂𝒅𝒆🧹"
-                elif '🥻' in character['name']:
-                    caption += "\n\n🥻𝑺𝒂𝒓𝒆𝒆🥻"
-                elif ''☔ in character['name']:
-                    caption += "\n\n☔𝑴𝒐𝒏𝒔𝒐𝒐𝒏☔"
-                elif '🎒' in character['name']:
-                    caption += "\n\n🎒𝑺𝒄𝒉𝒐𝒐𝒍🎒"
-                elif '🎩' in character['name']:
-                    caption += "\n\n🎩𝑻𝒖𝒙𝒆𝒅𝒐🎩"
-                elif '👥' in character['name']:
-                    caption += "\n\n👥𝐃𝐮𝐨👥"
-                elif '🤝🏻' in character['name']:
-                    caption += "\n\n🤝🏻𝐆𝐫𝐨𝐮𝐩🤝🏻"
-                elif '👑' in character['name']:
-                    caption += "\n\👑𝑳𝒐𝒓𝒅👑n"
-                elif '💞' in character['name']:
-                    caption += "\n\n💞𝑽𝒂𝒍𝒆𝒏𝒕𝒊𝒏𝒆💞"
+                response_message += "\n\n👘𝑲𝒊𝒎𝒐𝒏𝒐👘 " 
+            elif '☃️' in character['name']:
+                response_message += "\n\n☃️𝑾𝒊𝒏𝒕𝒆𝒓☃️"
+            elif '🐰' in character['name']:
+                response_message += "\n\n🐰𝑩𝒖𝒏𝒏𝒚🐰"
+            elif '🎮' in character['name']:
+                response_message += "\n\n 🎮𝑮𝒂𝒎𝒆🎮 "
+            elif '🎄' in character['name']:
+                response_message += "\n\n🎄𝑪𝒓𝒊𝒔𝒕𝒎𝒂𝒔🎄"
+            elif '🎃' in character['name']:
+                response_message += "\n\n🎃𝑯𝒆𝒍𝒍𝒐𝒘𝒆𝒆𝒏🎃"
+            elif '🏖️' in character['name']:
+                response_message += "\n\n🏖️𝑺𝒖𝒎𝒎𝒆𝒓🏖️ "
+            elif '🧹' in character['name']:
+                response_message += "\n\n🧹𝑴𝒂𝒅𝒆🧹"
+            elif '🥻' in character['name']:
+                response_message += "\n\n🥻𝑺𝒂𝒓𝒆𝒆🥻"
+            elif '☔' in character['name']: # Removed extra quote here
+                response_message += "\n\n☔𝑴𝒐𝒏𝒔𝒐𝒐𝒏☔"
+            elif '🎒' in character['name']:
+                response_message += "\n\n🎒𝑺𝒄𝒉𝒐𝒐𝒍🎒"
+            elif '🎩' in character['name']:
+                response_message += "\n\n🎩𝑻𝒖𝒙𝒆𝒅𝒐🎩"
+            elif '👥' in character['name']:
+                response_message += "\n\n👥𝐃𝐮𝐨👥"
+            elif '🤝🏻' in character['name']:
+                response_message += "\n\n🤝🏻𝐆𝐫𝐨𝐮𝐩🤝🏻"
+            elif '👑' in character['name']:
+                response_message += "\n\👑𝑳𝒐𝒓𝒅👑n"
+            elif '💞' in character['name']:
+                response_message += "\n\n💞𝑽𝒂𝒍𝒆𝒏𝒕𝒊𝒏𝒆💞"
+
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("Globally Grabbed", callback_data=f"slaves_{character['id']}_{global_count}")]
             ])
