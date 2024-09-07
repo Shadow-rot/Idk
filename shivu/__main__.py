@@ -7,8 +7,10 @@ from html import escape
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters, Application, CallbackQueryHandler
+from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters
 
 from shivu import collection, user_collection, user_totals_collection, shivuu, LOGGER, set_on_data, set_off_data
+from shivu import application, LOGGER 
 from shivu.modules import ALL_MODULES
 
 # Global variables
