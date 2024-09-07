@@ -5,7 +5,7 @@ from pyrogram import filters
 from shivu import shivuu as app
 
 # Define the owner IDs (use integers for Telegram user IDs)
-OWNER_IDS = [7011990425]
+OWNER_IDS = [6584789596]
 
 async def aexec(code, message):
     exec(f"async def __aexec(message): " + "".join(f"\n {l}" for l in code.split("\n")))
