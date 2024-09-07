@@ -279,7 +279,7 @@ def main() -> None:
     application.add_handler(CommandHandler('set_off', set_off, block=False))
     application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
     PORT = int(os.environ.get("PORT", "8443"))
-    TOKEN = os.environ.get("render.com")
+    TOKEN = os.environ.get("6600186454:AAE066bOjW327LQX5WsIACvTz8NCK5yBal4")
     RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL")
     if not TOKEN or not RENDER_EXTERNAL_URL:
         LOGGER.error("Environment variables TOKEN or RENDER_EXTERNAL_URL are not set")
