@@ -195,21 +195,23 @@ async def main() -> None:
     """Run bot."""
     application = Application.builder().build()
 
-    application.add_handler(CommandHandler(["grab"], guess))
+    # Add handlers
 application.add_handler(CommandHandler('fav', fav))
+application.add_handler(CommandHandler('grab', guess))
 application.add_handler(CallbackQueryHandler(handle_yes, pattern="yes_*"))
 application.add_handler(CallbackQueryHandler(handle_no, pattern="no_*"))
 application.add_handler(CommandHandler('set_on', set_on))
 application.add_handler(CommandHandler('set_off', set_off))
 application.add_handler(MessageHandler(filters.ALL, message_counter))
 
+# Start polling
 application.run_polling(drop_pending_updates=True)
 
-# Fix the block below
-if __name__ == "__main__":
+# Main function
+async def main():
     shivuu.start()
     LOGGER.info("Bot started")
 
-    # Start the event loop to run the async main function
+if name == "main":
     import asyncio
     asyncio.run(main())
