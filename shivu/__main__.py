@@ -127,21 +127,21 @@ async def guess(update: Update, context: CallbackContext) -> None:
         return
 
     name_parts = last_characters[chat_id]['name'].lower().split()
-if sorted(name_parts) == sorted(guess.split()) or any(part == guess for part in name_parts):
-    first_correct_guesses[chat_id] = user_id
-    # Handle user data updates and character additions
-
-    keyboard = [[InlineKeyboardButton(f"🪼 ʜᴀʀᴇᴍ", switch_inline_query_current_chat=f"collection.{user_id}")]]
-    await update.message.reply_text(
-        f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> Congratulations 🎊 You grabbed a new Waifu !!✅\n\n'
-        f'🎀 𝙉𝙖𝙢𝙚: <code>{last_characters[chat_id]["name"]}</code> \n'
-        f'⚡ 𝘼𝙣𝙞𝙢𝙚: <code>{last_characters[chat_id]["anime"]}</code> \n'
-        f'{last_characters[chat_id]["rarity"][0]} 𝙍𝙖𝙧𝙞𝙩𝙮: <code>{last_characters[chat_id]["rarity"][2:]}</code>\n\n'
-        f'✧⁠ Character successfully added in your harem',
-        parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-else:  # Ensure this is aligned with the 'if' statement
-    await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙒𝙧𝙞𝙩𝙚 𝘾𝙤𝙧𝙧𝙚𝙘𝙩 𝙉𝙖𝙢𝙚... ❌️')
+    if sorted(name_parts) == sorted(guess.split()) or any(part == guess for part in name_parts):
+        first_correct_guesses[chat_id] = user_id
+        # Handle user data updates and character additions
+        
+        keyboard = [[InlineKeyboardButton(f"🪼 ʜᴀʀᴇᴍ", switch_inline_query_current_chat=f"collection.{user_id}")]]
+        await update.message.reply_text(
+            f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> Congratulations 🎊 You grabbed a new Waifu !!✅\n\n'
+            f'🎀 𝙉𝙖𝙢𝙚: <code>{last_characters[chat_id]["name"]}</code> \n'
+            f'⚡ 𝘼𝙣𝙞𝙢𝙚: <code>{last_characters[chat_id]["anime"]}</code> \n'
+            f'{last_characters[chat_id]["rarity"][0]} 𝙍𝙖𝙧𝙞𝙩𝙮: <code>{last_characters[chat_id]["rarity"][2:]}</code>\n\n'
+            f'✧⁠ Character successfully added in your harem',
+            parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    else:
+        await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙒𝙧𝙞𝙩𝙚 𝘾𝙤𝙧𝙧𝙚𝙘𝙩 𝙉𝙖𝙢𝙚... ❌️')
 
 async def fav(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
@@ -168,7 +168,7 @@ async def fav(update: Update, context: CallbackContext) -> None:
 
     await update.message.reply_photo(
         photo=character["img_url"],
-        caption=f"<b>Do you want to make this waifu your favorite..!</b>\n↬ <code>{character['name']}</code> <code>({character['anime']})</code>",
+        caption=f"<b>Do you want to make this waifu your favorite..!</b>\n↬ <code>{character['name']}</code> <code><b>(</b>{character['anime']}<b>)</b></code>",
         reply_markup=reply_markup,
         parse_mode='HTML'
     )
@@ -176,7 +176,7 @@ async def fav(update: Update, context: CallbackContext) -> None:
 async def handle_yes(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()
-    
+
     user_id = query.from_user.id
     character_id = query.data.split('_')[1]
 
@@ -188,18 +188,25 @@ async def handle_no(update: Update, context: CallbackContext) -> None:
     await query.answer("Okay, no worries!")
     await query.edit_message_caption(caption="Action canceled.")
 
-def main() -> None:
+async def main() -> None:
     """Run bot."""
-    application.add_handler(CommandHandler(["grab"], guess, block=False))
-    application.add_handler(CommandHandler('fav', fav))
-    application.add_handler(CallbackQueryHandler(handle_yes, pattern="yes_*"))
-    application.add_handler(CallbackQueryHandler(handle_no, pattern="no_*"))
-    application.add_handler(CommandHandler('set_on', set_on, block=False))
-    application.add_handler(CommandHandler('set_off', set_off, block=False))
-    application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
-    application.run_polling(drop_pending_updates=True)
+    application = Application.builder().build()
 
+    application.add_handler(CommandHandler(["grab"], guess))
+application.add_handler(CommandHandler('fav', fav))
+application.add_handler(CallbackQueryHandler(handle_yes, pattern="yes_*"))
+application.add_handler(CallbackQueryHandler(handle_no, pattern="no_*"))
+application.add_handler(CommandHandler('set_on', set_on))
+application.add_handler(CommandHandler('set_off', set_off))
+application.add_handler(MessageHandler(filters.ALL, message_counter))
+
+await application.run_polling(drop_pending_updates=True)
+
+# Fix the block below
 if __name__ == "__main__":
     shivuu.start()
     LOGGER.info("Bot started")
-    main()
+
+    # Start the event loop to run the async main function
+    import asyncio
+    asyncio.run(main())
