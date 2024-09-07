@@ -10,7 +10,7 @@ class Config(object):
     PHOTO_URL = ["https://telegra.ph//file/e64337bbc6cdac7e6b178.jpg", "https://telegra.ph/file/ed23556d07d33db18402d.jpg", "https://telegra.ph//file/32556c77847dff110577c.jpg", "https://telegra.ph//file/0650844fc5db4049959bc.jpg"]
     SUPPORT_CHAT = "Grabbing_Your_WH_Group"
     UPDATE_CHAT = "FLEX_BOTS_NEWS"
-    BOT_USERNAME = Grabbing_Your_Waifu_Bot"
+    BOT_USERNAME = "Grabbing_Your_Waifu_Bot"
     CHARA_CHANNEL_ID = "-1002009998662"
     api_id = "20533795"
     api_hash = "f6cadf28523943f525e706e6ace8a250"
