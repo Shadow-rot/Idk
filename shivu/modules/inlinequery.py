@@ -117,7 +117,7 @@ elif '👑' in character['name']:
 elif '💞' in character['name']:
     caption += "\n\n💞𝑽𝒂𝒍𝒆𝒏𝒕𝒊𝒏𝒆💞\n"
 else:
-    caption = (
+    ccaption = (
     f"<b>Lᴏᴏᴋ Aᴛ Tʜɪs Wᴀɪғᴜ....!!</b>\n\n"
     f"<b>{character['id']}:</b> {character['name']}\n"
     f"<b>{character['anime']}</b>\n"
@@ -157,26 +157,29 @@ elif '👑' in character['name']:
     caption += "\n\n👑𝑳𝒐𝒓𝒅👑"
 elif '💞' in character['name']:
     caption += "\n\n💞𝑽𝒂𝒍𝒆𝒏𝒕𝒊𝒏𝒆💞\n"
-            results.append(
-                InlineQueryResultPhoto(
-                    thumbnail_url=character['img_url'],
-                    id=f"{character['id']}_{time.time()}",
-                    photo_url=character['img_url'],
-                    caption=caption,
-                    parse_mode='HTML',
-                    photo_width=300,  # Adjust the width as needed
-                    photo_height=300,  # Adjust the height as neede
-                )
-            )
-        # Add a fallback result if no characters are found
-        if not results:
-            results.append(
-                InlineQueryResultArticle(
-                    id='no_results',
-                    title="No Slave Found",
-                    input_message_content=InputTextMessageContent("No Slave Found"),
-                    description="No matching Slave were found."
-                )
-            )
-        await update.inline_query.answer(results, next_offset=next_offset, cache_time=5)
+
+results.append(
+    InlineQueryResultPhoto(
+        thumbnail_url=character['img_url'],
+        id=f"{character['id']}_{time.time()}",
+        photo_url=character['img_url'],
+        caption=caption,
+        parse_mode='HTML',
+        photo_width=300,  # Adjust the width as needed
+        photo_height=300,  # Adjust the height as needed
+    )
+)
+
+# Add a fallback result if no characters are found
+if not results:
+    results.append(
+        InlineQueryResultArticle(
+            id='no_results',
+            title="No Slave Found",
+            input_message_content=InputTextMessageContent("No Slave Found"),
+            description="No matching Slave were found."
+        )
+    )
+
+await update.inline_query.answer(results, next_offset=next_offset, cache_time=5)
 application.add_handler(InlineQueryHandler(inlinequery, block=False))
