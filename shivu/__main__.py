@@ -348,16 +348,16 @@ def main() -> None:
     """Run bot."""
 
     application.add_handler(CommandHandler(["grab"], guess, block=False))
-    application.add_handler(CommandHandler('fav', fav))
-    application.add_handler(CallbackQueryHandler(handle_yes, pattern="yes_*"))
-    application.add_handler(CallbackQueryHandler(handle_no, pattern="no_*"))
+application.add_handler(CommandHandler('fav', fav))
+application.add_handler(CallbackQueryHandler(handle_yes, pattern="yes_*"))
+application.add_handler(CallbackQueryHandler(handle_no, pattern="no_*"))
 
-    application.add_handler(CommandHandler('set_on', set_on, block=False))
-    application.add_handler(CommandHandler('set_off', set_off, block=False))
-    application.add_handler(MessageHandler(filters.ALL, message_counter, block=False)) # Indentation fixed here
-    application.run_polling(drop_pending_updates=True)
+application.add_handler(CommandHandler('set_on', set_on, block=False))
+application.add_handler(CommandHandler('set_off', set_off, block=False))
+application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))  # Indentation fixed here
+application.run_polling(drop_pending_updates=True)
 
-if name == "main":
+if __name__ == "__main__":
     shivuu.start()
     LOGGER.info("Bot started")
     main()
