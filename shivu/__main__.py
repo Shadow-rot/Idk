@@ -2,17 +2,22 @@ import importlib
 import time
 import random
 import re
-import os
 import asyncio
 from html import escape 
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters
-from shivu import collection, top_global_groups_collection, group_user_totals_collection, user_collection, user_totals_collection, shivuu
-from shivu import application, LOGGER, TOKEN 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+
+from shivu import collection, top_global_groups_collection, group_user_totals_collection, user_collection, user_totals_collection, shivuu 
+from shivu import application, LOGGER 
 from shivu import set_on_data, set_off_data
 from shivu.modules import ALL_MODULES
+
+
 locks = {}
 message_counters = {}
 spam_counters = {}
@@ -20,16 +25,18 @@ last_characters = {}
 sent_characters = {}
 first_correct_guesses = {}
 message_counts = {}
-group_rarity_percentages = {}
+
+
 for module_name in ALL_MODULES:
     imported_module = importlib.import_module("shivu.modules." + module_name)
-    
+
+
 last_user = {}
 warned_users = {}
 def escape_markdown(text):
     escape_chars = r'\*_`\\~>#+-=|{}.!'
     return re.sub(r'([%s])' % re.escape(escape_chars), r'\\\1', text)
-  
+
 archived_characters = {}
 ran_away_count = {}
 async def ran_away(update: Update, context: CallbackContext) -> None:
@@ -71,7 +78,7 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
         if chat_id in last_user and last_user[chat_id]['user_id'] == user_id:
             last_user[chat_id]['count'] += 1
             if last_user[chat_id]['count'] >= 10:
-            
+
                 if user_id in warned_users and time.time() - warned_users[user_id] < 600:
                     return
                 else:
@@ -157,7 +164,7 @@ async def send_image(update: Update, context: CallbackContext) -> None:
 
     if chat_id not in sent_characters:
         sent_characters[chat_id] = []
-    
+
     if len(sent_characters[chat_id]) == len(all_characters):
         sent_characters[chat_id] = []
 
@@ -268,18 +275,89 @@ async def guess(update: Update, context: CallbackContext) -> None:
                 'group_name': update.effective_chat.title,
                 'count': 1,
             })
-        keyboard = [[InlineKeyboardButton(f"𝙎𝙇𝘼𝙑𝙀𝙎 🔥", switch_inline_query_current_chat=f"collection.{user_id}")]]
-        await update.message.reply_text(f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> 𝙔𝙤𝙪 𝙂𝙤𝙩 𝙉𝙚𝙬 𝙎𝙇𝘼𝙑𝙀🫧 \n🌸𝗡𝗔𝗠𝗘: <b>{last_characters[chat_id]["name"]}</b> \n🖼𝗔𝗡𝗜𝗠𝗘: <b>{last_characters[chat_id]["anime"]}</b> \n𝙍𝘼𝙍𝙄𝙏𝙔: <b>{last_characters[chat_id]["rarity"]}</b>\n\n⛩ 𝘾𝙝𝙚𝙘𝙠 𝙮𝙤𝙪𝙧 /slaves 𝙉𝙤𝙬', parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+
+        keyboard = [[InlineKeyboardButton(f"🪼 ʜᴀʀᴇᴍ", switch_inline_query_current_chat=f"collection.{user_id}")]]
+
+
+        await update.message.reply_text(f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> Congratulations 🎊 You grabbed a new Waifu !!✅\n\n🎀 𝙉𝙖𝙢𝙚: <code>{last_characters[chat_id]["name"]}</code> \n⚡ 𝘼𝙣𝙞𝙢𝙚: <code>{last_characters[chat_id]["anime"]}</code> \n{last_characters[chat_id]["rarity"][0]} 𝙍𝙖𝙧𝙞𝙩𝙮: <code>{last_characters[chat_id]["rarity"][2:]}</code>\n\n✧⁠ Character successfully added in your harem', parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
+
     else:
         await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙒𝙧𝙞𝙩𝙚 𝘾𝙤𝙧𝙧𝙚𝙘𝙩 𝙉𝙖𝙢𝙚... ❌️')
+async def fav(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+
+    if not context.args:
+        await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙥𝙧𝙤𝙫𝙞𝙙𝙚 𝙒𝘼𝙄𝙁𝙐 𝙞𝙙...')
+        return
+
+    character_id = context.args[0]
+
+    # Find the user in the database
+    user = await user_collection.find_one({'id': user_id})
+    if not user:
+        await update.message.reply_text('𝙔𝙤𝙪 𝙝𝙖𝙫𝙚 𝙣𝙤𝙩 𝙂𝙤𝙩 𝘼𝙣𝙮 𝙒𝘼𝙄𝙁𝙐 𝙮𝙚𝙩...')
+        return
+
+    # Find the waifu in the user's character list
+    character = next((c for c in user['characters'] if c['id'] == character_id), None)
+    if not character:
+        await update.message.reply_text('𝙏𝙝𝙞𝙨 𝙒𝘼𝙄𝙁𝙐 𝙞𝙨 𝙉𝙤𝙩 𝙄𝙣 𝙮𝙤𝙪𝙧 𝙒𝘼𝙄𝙁𝙐 𝙡𝙞𝙨𝙩')
+        return
+
+    # Create inline buttons for confirmation
+    buttons = [
+        [InlineKeyboardButton("Yes", callback_data=f"yes_{character_id}"), 
+         InlineKeyboardButton("No", callback_data=f"no_{character_id}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(buttons)
+
+    # Send message with buttons and waifu details
+    await update.message.reply_photo(
+        photo=character["img_url"],
+        caption=f"<b>Do you want to make this waifu your favorite..!</b>\n↬ <code>{character['name']}</code> <code>({character['anime']})</code>",
+        reply_markup=reply_markup,
+        parse_mode='HTML'
+    )
+
+
+# Callback handler for when the user clicks 'Yes'
+async def handle_yes(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    user_id = query.from_user.id
+    character_id = query.data.split('_')[1]
+
+    # Update the user's favorites with the selected waifu
+    await user_collection.update_one({'id': user_id}, {'$set': {'favorites': [character_id]}})
+
+    await query.edit_message_caption(caption="Waifu marked as favorite!")
+
+
+# Callback handler for when the user clicks 'No'
+async def handle_no(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer("Okay, no worries!")
+    await query.edit_message_caption(caption="Action canceled.")
+
+
+
 def main() -> None:
     """Run bot."""
-    application.add_handler(CommandHandler(["slave"], guess, block=False))
+
+    application.add_handler(CommandHandler(["grab"], guess, block=False))
+    application.add_handler(CommandHandler('fav', fav))
+    application.add_handler(CallbackQueryHandler(handle_yes, pattern="yes_*"))
+    application.add_handler(CallbackQueryHandler(handle_no, pattern="no_*"))
+
     application.add_handler(CommandHandler('set_on', set_on, block=False))
     application.add_handler(CommandHandler('set_off', set_off, block=False))
-    application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
-    
-if __name__ == "__main__":
+ application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
+    application.run_polling(drop_pending_updates=True)
+
+if name == "main":
     shivuu.start()
     LOGGER.info("Bot started")
     main()
