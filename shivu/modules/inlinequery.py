@@ -81,7 +81,7 @@ async def inlinequery(update: Update, context: CallbackContext) -> None:
             if query.startswith('collection.'):
                 user_character_count = sum(1 for c in user['characters'] if isinstance(c, dict) and c.get('id') == character.get('id'))
                 user_anime_characters = sum(1 for c in user['characters'] if isinstance(c, dict) and c.get('anime') == character.get('anime'))
-                capcaption = f"<b> Lᴏᴏᴋ Aᴛ <a href='tg://user?id={user['id']}'>{(escape(user.get('first_name', user['id'])))}</a>'s Wᴀɪғᴜ....!!</b>\n\n <b>{character['id']}:</b> {character['name']} x{user_character_count}\n<b>{character['anime']}</b> {user_anime_characters}/{anime_characters}\n﹙<b>{character['rarity'][0]} 𝙍𝘼𝙍𝙄𝙏𝙔:</b> {character['rarity'][2:]})\n\n" 
+                caption = f"<b> Lᴏᴏᴋ Aᴛ <a href='tg://user?id={user['id']}'>{(escape(user.get('first_name', user['id'])))}</a>'s Wᴀɪғᴜ....!!</b>\n\n <b>{character['id']}:</b> {character['name']} x{user_character_count}\n<b>{character['anime']}</b> {user_anime_characters}/{anime_characters}\n﹙<b>{character['rarity'][0]} 𝙍𝘼𝙍𝙄𝙏𝙔:</b> {character['rarity'][2:]})\n\n" 
     # Check for tags in character's name
                 if '👘' in character['name']:
                     caption += "\n\n👘𝑲𝒊𝒎𝒐𝒏𝒐👘 "
