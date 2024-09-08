@@ -126,6 +126,7 @@ async def inlinequery(update: Update, context: CallbackContext) -> None:
             f"<b>{character['id']}:</b> {character['name']}\n"
             f"<b>{character['anime']}</b>\n"
             f"﹙<b>{character['rarity'][0]} 𝙍𝘼𝙍𝙄𝙏𝙔:</b> {character['rarity'][2:]})"
+            f"\n\n<b>Gʟᴏʙᴀʟʟʏ Gʀᴀʙ {global_count} Times...</b>"
         )
     # Check for tags in character's name
                 if '👘' in character['name']:
@@ -161,14 +162,6 @@ async def inlinequery(update: Update, context: CallbackContext) -> None:
                 elif '💞' in character['name']:
                     caption += "\n\n💞𝑽𝒂𝒍𝒆𝒏𝒕𝒊𝒏𝒆💞"
 
-        # Initialize event_details as an empty string
-        event_details = "" 
-
-        if 'event' in character and character['event']:
-            event_details = f"\n\n{character['event']['sign']} {character['event']['name']} {character['event']['sign']}"
-
-        caption += f"\n\n<b>Gʟᴏʙᴀʟʟʏ Gʀᴀʙ {global_count} Times...</b>"
-        caption += event_details # Now event_details is guaranteed to be defined
 
         # Add inline button for showing smashers
         button = InlineKeyboardMarkup(
