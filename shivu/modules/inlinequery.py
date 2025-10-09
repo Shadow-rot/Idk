@@ -89,7 +89,8 @@ async def inlinequery(update: Update, context: CallbackContext) -> None:
             ccaption = f"<b> Lᴏᴏᴋ Aᴛ <a href='tg://user?id={user['id']}'>{(escape(user.get('first_name', user['id'])))}</a>'s Wᴀɪғᴜ....!!</b>\n\n <b>{character['id']}:</b> {character['name']} x{user_character_count}\n<b>{character['anime']}</b> {user_anime_characters}/{anime_characters}\n﹙<b>{character['rarity'][0]} 𝙍𝘼𝙍𝙄𝙏𝙔:</b> {character['rarity'][2:]})\n\n" 
    
 
-         elif '👘' in character['name']:
+        
+ elif '👘' in character['name']:
             caption += "\n\n👘𝑲𝒊𝒎𝒐𝒏𝒐👘"
          elif '☃️' in character['name']:
             caption += "\n\n☃️𝑾𝒊𝒏𝒕𝒆𝒓☃️"
