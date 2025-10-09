@@ -103,7 +103,12 @@ async def inlinequery(update: Update, context) -> None:
 
     results = []
     for character in characters:
-        global_count = await user_collection.count_documents({'characters.id': character['id']})
+        char_id = character.get('id')
+if not char_id:
+    print("Character missing 'id':", character)
+    return  # or skip this character, depending on your logic
+
+global_count = await user_collection.count_documents({'characters.id': char_id})
         anime_characters = await collection.count_documents({'anime': character['anime']})
 
         if query.startswith('collection.') and user_id.isdigit() and user:
