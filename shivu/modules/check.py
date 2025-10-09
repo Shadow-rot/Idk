@@ -112,7 +112,7 @@ from pyrogram import Client, filters
 from shivu import user_collection
 from shivu import shivuu as app
 
-OWNER_ID = 6584789596  # Replace with the actual owner ID
+OWNER_ID = 5147822244  # Replace with the actual owner ID
 
 async def get_users_by_character(character_id):
     try:
