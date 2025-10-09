@@ -4,7 +4,7 @@ from pymongo import ReturnDocument
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 from shivu.modules.database.sudo import is_user_sudo
-from shivu import application, collection, db, CHARA_CHANNEL_ID, SUPPORT_CHAT
+from shivu import application, collection, db, CHARA_CHANNEL_ID, SUPPORT_CHAT, sudo_users
 
 
 WRONG_FORMAT_TEXT = """Wrong ❌️ format...  eg. /upload Img_url muzan-kibutsuji Demon-slayer 3 1
