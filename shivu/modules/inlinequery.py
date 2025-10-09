@@ -109,6 +109,7 @@ if not char_id:
     return  # or skip this character, depending on your logic
 
 global_count = await user_collection.count_documents({'characters.id': char_id})
+
         anime_characters = await collection.count_documents({'anime': character['anime']})
 
         if query.startswith('collection.') and user_id.isdigit() and user:
