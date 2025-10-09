@@ -113,6 +113,7 @@ anime_characters = await collection.count_documents({'anime': character['anime']
 if query.startswith('collection.') and user_id.isdigit() and user:
     user_character_count = sum(c['id'] == character['id'] for c in user['characters'])
     user_anime_count = sum(c['anime'] == character['anime'] for c in user['characters'])
+
             caption = (
                 f"<b>Look at <a href='tg://user?id={user['id']}'>{escape(user.get('first_name', user['id']))}</a>'s Waifu!</b>\n\n"
                 f"<b>{character['id']}:</b> {character['name']} x{user_character_count}\n"
