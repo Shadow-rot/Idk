@@ -108,47 +108,48 @@ if not char_id:
     print("Character missing 'id':", character)
     return
 global_count = await user_collection.count_documents({'characters.id': char_id})
-anime_characters = await collection.count_documents({'anime': character['anime']})
+anime_characters = await collection.count_documents({'anime': character.get('anime', '')})
 
 if query.startswith('collection.') and user_id.isdigit() and user:
-    user_character_count = sum(c['id'] == character['id'] for c in user['characters'])
-    user_anime_count = sum(c['anime'] == character['anime'] for c in user['characters'])
+    user_character_count = sum(c.get('id') == character.get('id') for c in user.get('characters', []))
+    user_anime_count = sum(c.get('anime') == character.get('anime') for c in user.get('characters', []))
 
     caption = (
         f"<b>Look at <a href='tg://user?id={user['id']}'>{escape(user.get('first_name', user['id']))}</a>'s Waifu!</b>\n\n"
-        f"<b>{character['id']}:</b> {character['name']} x{user_character_count}\n"
-        f"<b>{character['anime']}</b> {user_anime_count}/{anime_characters}\n"
-        f"﹙<b>{character['rarity'][0]} RARITY:</b> {character['rarity'][2:]})\n\n"
+        f"<b>{character.get('id', 'Unknown')}:</b> {character.get('name', 'Unknown')} x{user_character_count}\n"
+        f"<b>{character.get('anime', 'Unknown')}</b> {user_anime_count}/{anime_characters}\n"
+        f"﹙<b>{character.get('rarity', ['?'])[0]} RARITY:</b> {character.get('rarity', ['?','?','?'])[2:]})\n\n"
     )
-        else:
-            caption = (
-                f"<b>Look at this Waifu!</b>\n\n"
-                f"<b>{character['id']}:</b> {character['name']}\n"
-                f"<b>{character['anime']}</b>\n"
-                f"﹙<b>{character['rarity'][0]} RARITY:</b> {character['rarity'][2:]})\n\n"
-                f"<b>Globally grabbed {global_count} times...</b>"
-            )
+else:
+    caption = (
+        f"<b>Look at this Waifu!</b>\n\n"
+        f"<b>{character.get('id', 'Unknown')}:</b> {character.get('name', 'Unknown')}\n"
+        f"<b>{character.get('anime', 'Unknown')}</b>\n"
+        f"﹙<b>{character.get('rarity', ['?'])[0]} RARITY:</b> {character.get('rarity', ['?','?','?'])[2:]})\n\n"
+        f"<b>Globally grabbed {global_count} times...</b>"
+    )
 
-        # Add emoji caption
-        caption = add_emoji_caption(character['name'], caption)
+# Add emoji caption
+caption = add_emoji_caption(character.get('name', ''), caption)
 
-        # Inline button
-        button = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("Top Grabbers", callback_data=f"show_smashers_{character['id']}")]]
-        )
+# Inline button
+button = InlineKeyboardMarkup(
+    [[InlineKeyboardButton("Top Grabbers", callback_data=f"show_smashers_{character.get('id', '')}")]]
+)
 
-        results.append(
-            InlineQueryResultPhoto(
-                id=f"{character['id']}_{time.time()}",
-                photo_url=character['img_url'],
-                thumbnail_url=character['img_url'],
-                caption=caption,
-                parse_mode='HTML',
-                reply_markup=button
-            )
-        )
+results.append(
+    InlineQueryResultPhoto(
+        id=f"{character.get('id', '')}_{time.time()}",
+        photo_url=character.get('img_url', ''),
+        thumbnail_url=character.get('img_url', ''),
+        caption=caption,
+        parse_mode='HTML',
+        reply_markup=button
+    )
+)
 
-    await update.inline_query.answer(results, next_offset=next_offset, cache_time=5)
+await update.inline_query.answer(results, next_offset=next_offset, cache_time=5)
+
 
 # Callback to show top grabbers
 async def show_smashers_callback(update: Update, context) -> None:
