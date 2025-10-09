@@ -2,7 +2,7 @@ import re
 import time
 from html import escape
 from cachetools import TTLCache
-from pymongo import MongoClient, ASCENDING
+from pymongo import ASCENDING
 
 # Telegram imports
 from telegram import (
@@ -10,40 +10,65 @@ from telegram import (
     InlineQueryResultPhoto, 
     InlineKeyboardButton, 
     InlineKeyboardMarkup,
-    InlineQueryResultArticle, 
-    InputTextMessageContent,
 )
 from telegram.ext import (
-    Updater, 
     InlineQueryHandler, 
-    CallbackQueryHandler, 
-    CommandHandler, 
-    CallbackContext
+    CallbackQueryHandler
 )
 
 # Your own imports
-from shivu import user_collection, collection, application, db 
+from shivu import user_collection, collection, application, db
 
-
-# collection
+# Create indexes
 db.characters.create_index([('id', ASCENDING)])
 db.characters.create_index([('anime', ASCENDING)])
 db.characters.create_index([('img_url', ASCENDING)])
 
-# user_collection
 db.user_collection.create_index([('characters.id', ASCENDING)])
 db.user_collection.create_index([('characters.name', ASCENDING)])
 db.user_collection.create_index([('characters.img_url', ASCENDING)])
 
+# Caches
 all_characters_cache = TTLCache(maxsize=10000, ttl=36000)
 user_collection_cache = TTLCache(maxsize=10000, ttl=60)
 
-async def inlinequery(update: Update, context: CallbackContext) -> None:
+# Helper function for emoji captions
+def add_emoji_caption(character_name: str, base_caption: str) -> str:
+    emoji_map = {
+        '🎃': "🎃𝑯𝒆𝒍𝒍𝒐𝒘𝒆𝒆𝒏🎃",
+        '👘': "👘𝑲𝒊𝒎𝒐𝒏𝒐👘",
+        '☃️': "☃️𝑾𝒊𝒏𝒕𝒆𝒓☃️",
+        '🐰': "🐰𝑩𝒖𝒏𝒏𝒚🐰",
+        '🎮': "🎮𝑮𝒂𝒎𝒆🎮",
+        '🎄': "🎄𝑪𝒓𝒊𝒔𝒕𝒎𝒂𝒔🎄",
+        '🏖️': "🏖️𝑺𝒖𝒎𝒎𝒆𝒓🏖️",
+        '🧹': "🧹𝑴𝒂𝒅𝒆🧹",
+        '🥻': "🥻𝑺𝒂𝒓𝒆𝒆🥻",
+        '☔': "☔𝑴𝒐𝒏𝒔𝒐𝒐𝒏☔",
+        '🎒': "🎒𝑺𝒄𝒉𝒐𝒐𝒍🎒",
+        '🎩': "🎩𝑻𝒖𝒙𝒆𝒅𝒐🎩",
+        '👥': "👥𝐃𝐮𝐨👥",
+        '🤝🏻': "🤝🏻𝐆𝐫𝐨𝐮𝐩🤝🏻",
+        '👑': "👑𝑳𝒐𝒓𝒅👑",
+        '💞': "💞𝑽𝒂𝒍𝒆𝒏𝒕𝒊𝒏𝒆💞",
+    }
+    for key, value in emoji_map.items():
+        if key in character_name:
+            return base_caption + f"\n\n{value}"
+    return base_caption
+
+# Inline query handler
+async def inlinequery(update: Update, context) -> None:
     query = update.inline_query.query
     offset = int(update.inline_query.offset) if update.inline_query.offset else 0
 
+    # Determine which characters to fetch
+    all_characters = []
     if query.startswith('collection.'):
-        user_id, *search_terms = query.split(' ')[0].split('.')[1], ' '.join(query.split(' ')[1:])
+        parts = query.split(' ')
+        user_id = parts[0].split('.')[1]
+        search_terms = ' '.join(parts[1:]) if len(parts) > 1 else ''
+
         if user_id.isdigit():
             if user_id in user_collection_cache:
                 user = user_collection_cache[user_id]
@@ -52,18 +77,19 @@ async def inlinequery(update: Update, context: CallbackContext) -> None:
                 user_collection_cache[user_id] = user
 
             if user:
-                all_characters = list({v['id']:v for v in user['characters']}.values())
+                all_characters = list({v['id']: v for v in user['characters']}.values())
                 if search_terms:
-                    regex = re.compile(' '.join(search_terms), re.IGNORECASE)
-                    all_characters = [character for character in all_characters if regex.search(character['name']) or regex.search(character['rarity']) or regex.search(character['id']) or regex.search(character['anime'])]
-            else:
-                all_characters = []
-        else:
-            all_characters = []
+                    regex = re.compile(search_terms, re.IGNORECASE)
+                    all_characters = [
+                        c for c in all_characters 
+                        if regex.search(c['name']) or regex.search(c['rarity']) or regex.search(c['id']) or regex.search(c['anime'])
+                    ]
     else:
         if query:
             regex = re.compile(query, re.IGNORECASE)
-            all_characters = list(await collection.find({"$or": [{"name": regex}, {"rarity": regex}, {"id": regex}, {"anime": regex}]}).to_list(length=None))
+            all_characters = list(await collection.find({
+                "$or": [{"name": regex}, {"rarity": regex}, {"id": regex}, {"anime": regex}]
+            }).to_list(length=None))
         else:
             if 'all_characters' in all_characters_cache:
                 all_characters = all_characters_cache['all_characters']
@@ -71,109 +97,46 @@ async def inlinequery(update: Update, context: CallbackContext) -> None:
                 all_characters = list(await collection.find({}).to_list(length=None))
                 all_characters_cache['all_characters'] = all_characters
 
+    # Pagination
     characters = all_characters[offset:offset+50]
-    if len(characters) > 50:
-        characters = characters[:50]
-        next_offset = str(offset + 50)
-    else:
-        next_offset = str(offset + len(characters))
+    next_offset = str(offset + len(characters)) if len(characters) < 50 else str(offset + 50)
 
     results = []
     for character in characters:
         global_count = await user_collection.count_documents({'characters.id': character['id']})
         anime_characters = await collection.count_documents({'anime': character['anime']})
 
-        if query.startswith('collection.'):
+        if query.startswith('collection.') and user_id.isdigit() and user:
             user_character_count = sum(c['id'] == character['id'] for c in user['characters'])
-            user_anime_characters = sum(c['anime'] == character['anime'] for c in user['characters'])
-            ccaption = f"<b> Lᴏᴏᴋ Aᴛ <a href='tg://user?id={user['id']}'>{(escape(user.get('first_name', user['id'])))}</a>'s Wᴀɪғᴜ....!!</b>\n\n <b>{character['id']}:</b> {character['name']} x{user_character_count}\n<b>{character['anime']}</b> {user_anime_characters}/{anime_characters}\n﹙<b>{character['rarity'][0]} 𝙍𝘼𝙍𝙄𝙏𝙔:</b> {character['rarity'][2:]})\n\n"         
-
-  if '🎃' in character['name']:
-    caption += "\n\n🎃𝑯𝒆𝒍𝒍𝒐𝒘𝒆𝒆𝒏🎃"
-elif '👘' in character['name']:
-    caption += "\n\n👘𝑲𝒊𝒎𝒐𝒏𝒐👘"
-elif '☃️' in character['name']:
-    caption += "\n\n☃️𝑾𝒊𝒏𝒕𝒆𝒓☃️"
-elif '🐰' in character['name']:
-    caption += "\n\n🐰𝑩𝒖𝒏𝒏𝒚🐰"
-elif '🎮' in character['name']:
-    caption += "\n\n🎮𝑮𝒂𝒎𝒆🎮"
-elif '🎄' in character['name']:
-    caption += "\n\n🎄𝑪𝒓𝒊𝒔𝒕𝒎𝒂𝒔🎄"
-elif '🏖️' in character['name']:
-    caption += "\n\n🏖️𝑺𝒖𝒎𝒎𝒆𝒓🏖️"
-elif '🧹' in character['name']:
-    caption += "\n\n🧹𝑴𝒂𝒅𝒆🧹"
-elif '🥻' in character['name']:
-    caption += "\n\n🥻𝑺𝒂𝒓𝒆𝒆🥻"
-elif '☔' in character['name']:
-    caption += "\n\n☔𝑴𝒐𝒏𝒔𝒐𝒐𝒏☔"
-elif '🎒' in character['name']:
-    caption += "\n\n🎒𝑺𝒄𝒉𝒐𝒐𝒍🎒"
-elif '🎩' in character['name']:
-    caption += "\n\n🎩𝑻𝒖𝒙𝒆𝒅𝒐🎩"
-elif '👥' in character['name']:
-    caption += "\n\n👥𝐃𝐮𝐨👥"
-elif '🤝🏻' in character['name']:
-    caption += "\n\n🤝🏻𝐆𝐫𝐨𝐮𝐩🤝🏻"
-elif '👑' in character['name']:
-    caption += "\n\n👑𝑳𝒐𝒓𝒅👑"
-elif '💞' in character['name']:
-    caption += "\n\n💞𝑽𝒂𝒍𝒆𝒏𝒕𝒊𝒏𝒆💞"
+            user_anime_count = sum(c['anime'] == character['anime'] for c in user['characters'])
+            caption = (
+                f"<b>Look at <a href='tg://user?id={user['id']}'>{escape(user.get('first_name', user['id']))}</a>'s Waifu!</b>\n\n"
+                f"<b>{character['id']}:</b> {character['name']} x{user_character_count}\n"
+                f"<b>{character['anime']}</b> {user_anime_count}/{anime_characters}\n"
+                f"﹙<b>{character['rarity'][0]} RARITY:</b> {character['rarity'][2:]})\n\n"
+            )
         else:
             caption = (
-            f"<b>Lᴏᴏᴋ Aᴛ Tʜɪs Wᴀɪғᴜ....!!</b>\n\n"
-            f"<b>{character['id']}:</b> {character['name']}\n"
-            f"<b>{character['anime']}</b>\n"
-            f"﹙<b>{character['rarity'][0]} 𝙍𝘼𝙍𝙄𝙏𝙔:</b> {character['rarity'][2:]})"
-            f"\n\n<b>Gʟᴏʙᴀʟʟʏ Gʀᴀʙ {global_count} Times...</b>"
-        )
-    
+                f"<b>Look at this Waifu!</b>\n\n"
+                f"<b>{character['id']}:</b> {character['name']}\n"
+                f"<b>{character['anime']}</b>\n"
+                f"﹙<b>{character['rarity'][0]} RARITY:</b> {character['rarity'][2:]})\n\n"
+                f"<b>Globally grabbed {global_count} times...</b>"
+            )
 
-        if '👘' in character['name']:
-            caption += "\n\n👘𝑲𝒊𝒎𝒐𝒏𝒐👘"
-         elif '☃️' in character['name']:
-            caption += "\n\n☃️𝑾𝒊𝒏𝒕𝒆𝒓☃️"
-         elif '🐰' in character['name']:
-            caption += "\n\n🐰𝑩𝒖𝒏𝒏𝒚🐰"
-         elif '🎮' in character['name']:
-            caption += "\n\n🎮𝑮𝒂𝒎𝒆🎮"
-         elif '🎄' in character['name']:
-            caption += "\n\n🎄𝑪𝒓𝒊𝒔𝒕𝒎𝒂𝒔🎄"
-         elif '🎃' in character['name']:
-            caption += "\n\n🎃𝑯𝒆𝒍𝒍𝒐𝒘𝒆𝒆𝒏🎃"
-         elif '🏖️' in character['name']:
-            caption += "\n\n🏖️𝑺𝒖𝒎𝒎𝒆𝒓🏖️"
-         elif '🧹' in character['name']:
-            caption += "\n\n🧹𝑴𝒂𝒅𝒆🧹"
-         elif '🥻' in character['name']:
-            caption += "\n\n🥻𝑺𝒂𝒓𝒆𝒆🥻"
-         elif '☔' in character['name']:
-            caption += "\n\n☔𝑴𝒐𝒏𝒔𝒐𝒐𝒏☔"
-         elif '🎒' in character['name']:
-            caption += "\n\n🎒𝑺𝒄𝒉𝒐𝒐𝒍🎒"
-         elif '🎩' in character['name']:
-            caption += "\n\n🎩𝑻𝒖𝒙𝒆𝒅𝒐🎩"
-         elif '👥' in character['name']:
-            caption += "\n\n👥𝐃𝐮𝐨👥"
-         elif '🤝🏻' in character['name']:
-            caption += "\n\n🤝🏻𝐆𝐫𝐨𝐮𝐩🤝🏻"
-         elif '👑' in character['name']:
-            caption += "\n\n👑𝑳𝒐𝒓𝒅👑"
-         elif '💞' in character['name']:
-            caption += "\n\n💞𝑽𝒂𝒍𝒆𝒏𝒕𝒊𝒏𝒆💞"
+        # Add emoji caption
+        caption = add_emoji_caption(character['name'], caption)
 
-
-        # Add inline button for showing smashers
+        # Inline button
         button = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("Top Grabbes", callback_data=f"show_smashers_{character['id']}")]]
-        ) 
+            [[InlineKeyboardButton("Top Grabbers", callback_data=f"show_smashers_{character['id']}")]]
+        )
 
         results.append(
             InlineQueryResultPhoto(
-                thumbnail_url=character['img_url'],
                 id=f"{character['id']}_{time.time()}",
                 photo_url=character['img_url'],
+                thumbnail_url=character['img_url'],
                 caption=caption,
                 parse_mode='HTML',
                 reply_markup=button
@@ -182,12 +145,11 @@ elif '💞' in character['name']:
 
     await update.inline_query.answer(results, next_offset=next_offset, cache_time=5)
 
-
-async def show_smashers_callback(update: Update, context: CallbackContext) -> None:
+# Callback to show top grabbers
+async def show_smashers_callback(update: Update, context) -> None:
     query = update.callback_query
     character_id = query.data.split('_')[2]
 
-    # Find the top 10 users who have the specified character
     top_users = await user_collection.aggregate([
         {'$match': {'characters.id': character_id}},
         {'$unwind': '$characters'},
@@ -197,37 +159,26 @@ async def show_smashers_callback(update: Update, context: CallbackContext) -> No
         {'$limit': 10}
     ]).to_list(length=10)
 
-    # Get usernames for each user in the top 10
     usernames = []
-    for user_info in top_users:
-        user_id = user_info['_id']
+    for u in top_users:
+        user_id = u['_id']
         try:
             user = await context.bot.get_chat(user_id)
             first_name = user.first_name
             usernames.append(user.username if user.username else f"➥ <a href='tg://user?id={user_id}'>{escape(first_name)}</a>")
-        except Exception as e:
-            # Log the exception if needed
-            print(f"Error fetching user data for ID {user_id}: {e}")
+        except:
             usernames.append(f"➥ <a href='tg://user?id={user_id}'>User {user_id}</a>")
 
-    # Construct the top 10 grabbers list
     smasher_text = "\n\n🏅 <b>Top 10 Grabbers</b>\n\n" + "\n".join(
-        [f"{i + 1}. {usernames[i]} x{top_users[i]['count']}" for i in range(len(top_users))]
+        [f"{i+1}. {usernames[i]} x{top_users[i]['count']}" for i in range(len(top_users))]
     )
 
-    # Check if the message is a media message with a caption or a text message
-    if query.message.caption is not None:
-        # Media message with caption
-        current_caption = query.message.caption or ""
-        new_caption = current_caption + smasher_text
-        await query.edit_message_caption(caption=new_caption, parse_mode='HTML')
+    if query.message.caption:
+        await query.edit_message_caption(caption=query.message.caption + smasher_text, parse_mode='HTML')
     else:
-        # Text message, no caption
-        current_text = query.message.text or ""
-        new_text = current_text + smasher_text
-        await query.edit_message_text(text=new_text, parse_mode='HTML')
+        await query.edit_message_text(text=query.message.text + smasher_text, parse_mode='HTML')
 
 
-# Adding handlers to the application
-application.add_handler(CallbackQueryHandler(show_smashers_callback, pattern=r'^show_smashers_'))
+# Add handlers
 application.add_handler(InlineQueryHandler(inlinequery, block=False))
+application.add_handler(CallbackQueryHandler(show_smashers_callback, pattern=r'^show_smashers_'))
