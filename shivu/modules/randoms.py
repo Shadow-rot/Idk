@@ -3,7 +3,7 @@ from random import choices
 from shivu import application, user_collection, collection
 
 # Replace OWNER_ID with the actual owner's user ID
-OWNER_ID = 7011990425
+OWNER_ID = 5147822244
 
 # Rarity percentages
 rarity_percentages = {
