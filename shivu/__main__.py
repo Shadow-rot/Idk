@@ -95,7 +95,10 @@ async def send_image(update: Update, context: CallbackContext) -> None:
         sent_characters[chat_id] = []
 
 
-    character = random.choice([c for c in all_characters if c['id'] not in sent_characters[chat_id]])
+    character = random.choice([
+    c for c in all_characters 
+    if 'id' in c and c['id'] not in sent_characters.get(chat_id, [])
+])
 
 
     sent_characters[chat_id].append(character['id'])
