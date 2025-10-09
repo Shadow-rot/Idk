@@ -57,6 +57,7 @@ def add_emoji_caption(character_name: str, base_caption: str) -> str:
             return base_caption + f"\n\n{value}"
     return base_caption
 
+
 # Inline query handler
 async def inlinequery(update: Update, context) -> None:
     query = update.inline_query.query
@@ -69,6 +70,7 @@ async def inlinequery(update: Update, context) -> None:
         user_id = parts[0].split('.')[1]
         search_terms = ' '.join(parts[1:]) if len(parts) > 1 else ''
 
+        user = None
         if user_id.isdigit():
             if user_id in user_collection_cache:
                 user = user_collection_cache[user_id]
@@ -77,12 +79,13 @@ async def inlinequery(update: Update, context) -> None:
                 user_collection_cache[user_id] = user
 
             if user:
-                all_characters = list({v['id']: v for v in user['characters']}.values())
+                all_characters = list({v.get('id'): v for v in user.get('characters', [])}.values())
                 if search_terms:
                     regex = re.compile(search_terms, re.IGNORECASE)
                     all_characters = [
                         c for c in all_characters 
-                        if regex.search(c['name']) or regex.search(c['rarity']) or regex.search(c['id']) or regex.search(c['anime'])
+                        if regex.search(c.get('name', '')) or regex.search(c.get('rarity', '')) 
+                        or regex.search(c.get('id', '')) or regex.search(c.get('anime', ''))
                     ]
     else:
         if query:
@@ -104,51 +107,52 @@ async def inlinequery(update: Update, context) -> None:
     results = []
     for character in characters:
         char_id = character.get('id')
-if not char_id:
-    print("Character missing 'id':", character)
-    return
-global_count = await user_collection.count_documents({'characters.id': char_id})
-anime_characters = await collection.count_documents({'anime': character.get('anime', '')})
+        if not char_id:
+            print("Character missing 'id':", character)
+            continue  # skip this character
 
-if query.startswith('collection.') and user_id.isdigit() and user:
-    user_character_count = sum(c.get('id') == character.get('id') for c in user.get('characters', []))
-    user_anime_count = sum(c.get('anime') == character.get('anime') for c in user.get('characters', []))
+        global_count = await user_collection.count_documents({'characters.id': char_id})
+        anime_characters = await collection.count_documents({'anime': character.get('anime', '')})
 
-    caption = (
-        f"<b>Look at <a href='tg://user?id={user['id']}'>{escape(user.get('first_name', user['id']))}</a>'s Waifu!</b>\n\n"
-        f"<b>{character.get('id', 'Unknown')}:</b> {character.get('name', 'Unknown')} x{user_character_count}\n"
-        f"<b>{character.get('anime', 'Unknown')}</b> {user_anime_count}/{anime_characters}\n"
-        f"﹙<b>{character.get('rarity', ['?'])[0]} RARITY:</b> {character.get('rarity', ['?','?','?'])[2:]})\n\n"
-    )
-else:
-    caption = (
-        f"<b>Look at this Waifu!</b>\n\n"
-        f"<b>{character.get('id', 'Unknown')}:</b> {character.get('name', 'Unknown')}\n"
-        f"<b>{character.get('anime', 'Unknown')}</b>\n"
-        f"﹙<b>{character.get('rarity', ['?'])[0]} RARITY:</b> {character.get('rarity', ['?','?','?'])[2:]})\n\n"
-        f"<b>Globally grabbed {global_count} times...</b>"
-    )
+        if query.startswith('collection.') and user_id.isdigit() and user:
+            user_character_count = sum(c.get('id') == char_id for c in user.get('characters', []))
+            user_anime_count = sum(c.get('anime') == character.get('anime') for c in user.get('characters', []))
 
-# Add emoji caption
-caption = add_emoji_caption(character.get('name', ''), caption)
+            caption = (
+                f"<b>Look at <a href='tg://user?id={user['id']}'>{escape(user.get('first_name', user['id']))}</a>'s Waifu!</b>\n\n"
+                f"<b>{char_id}:</b> {character.get('name', 'Unknown')} x{user_character_count}\n"
+                f"<b>{character.get('anime', 'Unknown')}</b> {user_anime_count}/{anime_characters}\n"
+                f"﹙<b>{character.get('rarity', ['?'])[0]} RARITY:</b> {character.get('rarity', ['?','?','?'])[2:]})\n\n"
+            )
+        else:
+            caption = (
+                f"<b>Look at this Waifu!</b>\n\n"
+                f"<b>{char_id}:</b> {character.get('name', 'Unknown')}\n"
+                f"<b>{character.get('anime', 'Unknown')}</b>\n"
+                f"﹙<b>{character.get('rarity', ['?'])[0]} RARITY:</b> {character.get('rarity', ['?','?','?'])[2:]})\n\n"
+                f"<b>Globally grabbed {global_count} times...</b>"
+            )
 
-# Inline button
-button = InlineKeyboardMarkup(
-    [[InlineKeyboardButton("Top Grabbers", callback_data=f"show_smashers_{character.get('id', '')}")]]
-)
+        # Add emoji caption
+        caption = add_emoji_caption(character.get('name', ''), caption)
 
-results.append(
-    InlineQueryResultPhoto(
-        id=f"{character.get('id', '')}_{time.time()}",
-        photo_url=character.get('img_url', ''),
-        thumbnail_url=character.get('img_url', ''),
-        caption=caption,
-        parse_mode='HTML',
-        reply_markup=button
-    )
-)
+        # Inline button
+        button = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("Top Grabbers", callback_data=f"show_smashers_{char_id}")]]
+        )
 
-await update.inline_query.answer(results, next_offset=next_offset, cache_time=5)
+        results.append(
+            InlineQueryResultPhoto(
+                id=f"{char_id}_{time.time()}",
+                photo_url=character.get('img_url', ''),
+                thumbnail_url=character.get('img_url', ''),
+                caption=caption,
+                parse_mode='HTML',
+                reply_markup=button
+            )
+        )
+
+    await update.inline_query.answer(results, next_offset=next_offset, cache_time=5)
 
 
 # Callback to show top grabbers
