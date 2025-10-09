@@ -5,7 +5,7 @@ from shivu import shivuu as bot
 @bot.on_message(filters.command(["solve"]))
 async def update_names(client, message):
     # Check if the user is authorized
-    if message.from_user.id == 7011990425:
+    if message.from_user.id == 5147822244:
         print("Starting the update process...")
 
         try:
