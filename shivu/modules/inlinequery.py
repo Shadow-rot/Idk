@@ -131,7 +131,7 @@ async def inlinequery(update: Update, context: CallbackContext) -> None:
         )
     
 
-        elif '👘' in character['name']:
+        if '👘' in character['name']:
             caption += "\n\n👘𝑲𝒊𝒎𝒐𝒏𝒐👘"
          elif '☃️' in character['name']:
             caption += "\n\n☃️𝑾𝒊𝒏𝒕𝒆𝒓☃️"
