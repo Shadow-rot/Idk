@@ -129,12 +129,12 @@ async def inlinequery(update: Update, context: CallbackContext) -> None:
             f"﹙<b>{character['rarity'][0]} 𝙍𝘼𝙍𝙄𝙏𝙔:</b> {character['rarity'][2:]})"
             f"\n\n<b>Gʟᴏʙᴀʟʟʏ Gʀᴀʙ {global_count} Times...</b>"
         )
-    # Check for tags in character's name
-                elif '👘' in character['name']:
+    
+                  elif '👘' in character['name']:
                     caption += "\n\n👘𝑲𝒊𝒎𝒐𝒏𝒐👘 "
-                elif '☃️' in character['name']:
+                  elif '☃️' in character['name']:
                     caption += "\n\n☃️𝑾𝒊𝒏𝒕𝒆𝒓☃️"
-                elif '🐰' in character['name']:
+                  elif '🐰' in character['name']:
                     caption += "\n\n🐰𝑩𝒖𝒏𝒏𝒚🐰"
                 elif '🎮' in character['name']:
                     caption += "\n\n 🎮𝑮𝒂𝒎𝒆🎮 "
