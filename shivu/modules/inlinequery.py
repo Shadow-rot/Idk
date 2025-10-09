@@ -108,7 +108,7 @@ if not char_id:
     print("Character missing 'id':", character)
     return
 global_count = await user_collection.count_documents({'characters.id': char_id})
-       anime_characters = await collection.count_documents({'anime': character['anime']})
+         anime_characters = await collection.count_documents({'anime': character['anime']})
 
         if query.startswith('collection.') and user_id.isdigit() and user:
             user_character_count = sum(c['id'] == character['id'] for c in user['characters'])
