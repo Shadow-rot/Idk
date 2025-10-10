@@ -71,24 +71,31 @@ def build_caption(waifu, price):
 
 
 # --- /store Command ---
-async def store(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    active_event = get_active_rarity()
+async def store(update, context):
+    user_id = update.effective_user.id
+    characters = db.characters
 
-    query = {"rarity": {"$exists": True}}
-    waifus = list(characters.find(query))
+    query = {}  # or filter by event/rarity
+    waifus = await characters.find(query).to_list(length=50)  # fetch up to 50 waifus
+
     if not waifus:
-        await update.message.reply_text("❌ No waifus found in the shop.")
+        await update.message.reply_text("No waifus found in the store.")
         return
 
-    if active_event:
-        event_waifus = list(characters.find({"rarity": active_event}))
-        if event_waifus:
-            waifus = event_waifus
+    for waifu in waifus:
+        price = waifu.get("price", 1000)  # default price
+        caption = build_caption(waifu, price)
+        buttons = [
+            [InlineKeyboardButton("💳 Buy", callback_data=f"buy_{waifu['id']}")]
+        ]
+        markup = InlineKeyboardMarkup(buttons)
 
-    context.user_data["waifus"] = waifus
-    context.user_data["index"] = 0
-
-    await show_waifu(update, context)
+        await update.message.reply_photo(
+            photo=waifu["img_url"],
+            caption=caption,
+            parse_mode="HTML",
+            reply_markup=markup
+        )
 
 
 # --- Show Waifu Function ---
