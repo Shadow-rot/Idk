@@ -7,79 +7,79 @@ import math
 import random
 import time
 
+pay_cooldown = {}
+
+
 async def balance(update, context):
     user_id = update.effective_user.id
 
     user_data = await user_collection.find_one({'id': user_id})
 
     if user_data:
-        balance_amount = user_data.get('balance', 0)
-        bank_balance = math.floor(bank_balance)
-        balance_message = f"Your Current Balance Is :  $ `{balance_amount}` Gold coins!!"    
+        # Safely fetch balance and bank values
+        balance_amount = math.floor(user_data.get('balance', 0))
+        bank_balance = math.floor(user_data.get('bank', 0))
+
+        balance_message = (
+            f"🏦 **Hunter Balance Report** 🏦\n\n"
+            f"💰 Wallet: `{balance_amount}` Gold Coins\n"
+            f"💳 Bank: `{bank_balance}` Gold Coins\n\n"
+            f"Keep hunting, warrior! 🍂"
+        )
     else:
-        balance_message = "You are not eligible To be a Hunter 🍂"
+        balance_message = "You are not eligible to be a Hunter 🍂"
 
-    await update.message.reply_text(balance_message)
+    await update.message.reply_markdown(balance_message)
 
-pay_cooldown = {}
 
 async def pay(update, context):
     sender_id = update.effective_user.id
 
     if not update.message.reply_to_message:
-        await update.message.reply_text("Please reply To a Hunter to /pay.")
+        await update.message.reply_text("Please reply to a Hunter to /pay.")
         return
 
-    if update.message.reply_to_message.from_user and update.message.reply_to_message.from_user.id == sender_id:
-        await update.message.reply_text("You can't give $ Gold coins To Yourself!")
+    recipient = update.message.reply_to_message.from_user
+
+    if recipient.id == sender_id:
+        await update.message.reply_text("You can't give Gold coins to yourself!")
         return
 
-    # Check if the user has executed /pay recently and enforce cooldown
+    # Cooldown check
     if sender_id in pay_cooldown:
-        last_execution_time = pay_cooldown[sender_id]
-        if (datetime.utcnow() - last_execution_time) < timedelta(minutes=30):
-            await update.message.reply_text("You can pay /pay again after 30 Minutes!!...")
+        last_time = pay_cooldown[sender_id]
+        if (datetime.utcnow() - last_time) < timedelta(minutes=30):
+            await update.message.reply_text("You can use /pay again after 30 minutes.")
             return
 
-    if not update.message.reply_to_message:
-        await update.message.reply_text("Please reply a Hunter to /pay.")
-        return
-
-    recipient_id = update.message.reply_to_message.from_user.id
-    recipient_first_name = update.message.reply_to_message.from_user.first_name
-    recipient_username = update.message.reply_to_message.from_user.username
-
+    # Amount validation
     try:
         amount = int(context.args[0])
     except (IndexError, ValueError):
-        await update.message.reply_text("Invaild amount, use /pay <amount>")
+        await update.message.reply_text("Invalid amount. Usage: `/pay <amount>`", parse_mode="Markdown")
         return
 
-    if amount < 0:
-        await update.message.reply_text("Amount must be positive BKL !!!")
+    if amount <= 0:
+        await update.message.reply_text("Amount must be positive.")
         return
-    elif amount > 1000000:
-        await update.message.reply_text("You can pay upto $ `10,00,000` Gold coins in one payment !!")
+    elif amount > 1_000_000:
+        await update.message.reply_text("You can only pay up to `1,000,000` Gold coins at once.", parse_mode="Markdown")
         return
 
+    # Database checks
     sender_data = await user_collection.find_one({'id': sender_id})
     if not sender_data or sender_data.get('balance', 0) < amount:
-        await update.message.reply_text("insufficient amount to pay !!.")
+        await update.message.reply_text("Insufficient funds.")
         return
 
-    await user_collection.update_one(
-        {'id': sender_id},
-        {'$inc': {'balance': -amount}}
-    )
-    await user_collection.update_one(
-        {'id': recipient_id},
-        {'$inc': {'balance': amount}}
-    )
+    # Perform transaction
+    await user_collection.update_one({'id': sender_id}, {'$inc': {'balance': -amount}})
+    await user_collection.update_one({'id': recipient.id}, {'$inc': {'balance': amount}})
 
     pay_cooldown[sender_id] = datetime.utcnow()
 
-    recipient_link = f"https://t.me/{recipient_username}" if recipient_username else f"https://t.me/user{recipient_id}"
-    success_message = f"success ! You paid $ `{amount}` Gold coins to [{recipient_first_name}]!"
+    recipient_link = f"[{recipient.first_name}](https://t.me/{recipient.username})" if recipient.username else recipient.first_name
+    success_message = f"✅ You paid **${amount}** Gold coins to {recipient_link}!"
 
     await update.message.reply_markdown(success_message)
 
