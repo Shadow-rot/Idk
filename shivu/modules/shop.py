@@ -55,14 +55,14 @@ def build_caption(waifu: dict, price: int) -> str:
         event_text = f"{event.get('sign', '')} {event.get('name')}"
     
     caption = (
-        f"<b>{name}</b>\n"
-        f"🎌 <b>Anime:</b> {anime}\n"
-        f"💠 <b>Rarity:</b> {rarity}\n"
-        f"{('🎉 <b>Event:</b> ' + event_text + '\\n') if event_text else ''}"
-        f"🆔 <b>ID:</b> <code>{wid}</code>\n"
-        f"💰 <b>Price:</b> {price} Gold\n\n"
-        "Tap <b>Buy → Confirm</b> to purchase. Use /bal to check your balance."
-    )
+    f"<b>{name}</b>\n"
+    f"🎌 <b>Anime:</b> {anime}\n"
+    f"💠 <b>Rarity:</b> {rarity}\n"
+    + (f"🎉 <b>Event:</b> {event_text}\n" if event_text else "")
+    + f"🆔 <b>ID:</b> <code>{wid}</code>\n"
+    f"💰 <b>Price:</b> {price} Gold\n\n"
+    "Tap <b>Buy → Confirm</b> to purchase. Use /bal to check your balance."
+)
     return caption
 
 async def store(update: Update, context: CallbackContext):
