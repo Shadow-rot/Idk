@@ -119,11 +119,15 @@ def waifu_caption(waifu: dict, price: int) -> str:
         event_text = f"{event.get('sign', '')} {event.get('name')}"
     elif isinstance(event, str):
         event_text = event
+
+    # ✅ Fix: build event_line separately to avoid backslash inside f-string
+    event_line = f"🎉 <b>Event:</b> {event_text}\n" if event_text else ""
+
     caption = (
         f"<b>{name}</b>\n"
         f"🎌 <b>Anime:</b> {anime}\n"
         f"💠 <b>Rarity:</b> {rarity}\n"
-        f"{('🎉 <b>Event:</b> ' + event_text + '\\n') if event_text else ''}"
+        f"{event_line}"
         f"🆔 <b>ID:</b> <code>{wid}</code>\n"
         f"{fmt_price(price)}\n\n"
         "Tap Buy → Confirm to purchase. Use /bal to check your gold balance."
