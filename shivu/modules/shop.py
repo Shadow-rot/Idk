@@ -9,7 +9,7 @@ from telegram.ext import (
 from shivu import application, user_collection
 
 # ===================== DB CONNECTION ===================== #
-MONGO_URI = "mongodb+srv://Epic2:w85NP8dEHmQxA5s7@cluster0.tttvsf9.mongodb.net/?retryWrites=true&w=majority"
+MONGO_URI = "mongodb+srv://tiwarireeta004:peqxLEd36RAg7ors@cluster0.furypd3.mongodb.net/?retryWrites=true&w=majority"
 DB_NAME = "GRABBING_YOUR_WAIFU"
 COLLECTION_NAME = "users"
 
