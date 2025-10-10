@@ -55,11 +55,14 @@ def build_caption(waifu, price):
     anime = waifu.get("anime", "Unknown")
     rarity = waifu.get("rarity", "Unknown")
     event = waifu.get("event", "")
+
+    event_text = f"🎉 <b>Event:</b> {event}\n" if event else ""
+
     caption = (
         f"<b>{name}</b>\n"
         f"🎌 <b>Anime:</b> {anime}\n"
         f"💠 <b>Rarity:</b> {rarity}\n"
-        f"{f'🎉 <b>Event:</b> {event}\\n' if event else ''}"
+        f"{event_text}"
         f"🆔 <b>ID:</b> <code>{wid}</code>\n"
         f"💰 <b>Price:</b> Ŧ{price:,} Gold\n\n"
         "Tap <b>Buy → Confirm</b> to purchase. Use /bal to check your balance."
