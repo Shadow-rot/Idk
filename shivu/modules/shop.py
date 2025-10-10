@@ -1,95 +1,105 @@
 import random
-import datetime
-from pymongo import ASCENDING
-from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    InputMediaPhoto,
-)
-from telegram.ext import (
-    CommandHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-)
-from shivu import application, db, user_collection, collection
+from datetime import datetime
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import CallbackContext, CommandHandler, CallbackQueryHandler
 
+from shivu import application, db, user_collection
 
-# --- Database Collections ---
-characters = db.characters
-users = db.user_collection
-
-
-# --- Seasonal Rarity Activation ---
-def get_active_rarity():
-    month = datetime.datetime.now().month
-    # Winter (Dec-Feb)
-    if month in [12, 1, 2]:
-        return "❄️ Winter"
-    # Halloween (October)
-    elif month == 10:
-        return "🎃 Halloween"
-    return None
-
-
-# --- Rarity and Price Mapping ---
-RARITY_PRICES = {
-    "🟢 Common": (200_000, 500_000),
-    "🔵 Medium": (600_000, 1_000_000),
-    "🟠 Rare": (1_000_000, 3_000_000),
-    "🟡 Legendary": (5_000_000, 10_000_000),
-    "💮 Exclusive": (15_000_000, 30_000_000),
-    "🪽 Celestial": (50_000_000, 100_000_000),
-    "🥴 Special": (150_000_000, 250_000_000),
-    "💎 Premium": (500_000_000, 1_000_000_000),
-    "🔮 Limited": (1_000_000_000, 2_000_000_000),
-    "❄️ Winter": (5_000_000, 15_000_000),
-    "🎃 Halloween": (10_000_000, 25_000_000),
+# Define rarity multipliers for price generation
+RARITY_MULTIPLIER = {
+    "🟢 Common": 1,
+    "🟣 Rare": 2,
+    "🟡 Legendary": 5,
+    "💮 Special Edition": 7,
+    "🔮 Premium Edition": 10,
+    "🎗️ Supreme": 15
 }
 
+# Event mapping
+EVENT_MAPPING = {
+    1: {"name": "Summer", "sign": "🏖"},
+    2: {"name": "Kimono", "sign": "👘"},
+    3: {"name": "Winter", "sign": "☃️"},
+    4: {"name": "Valentine", "sign": "💞"},
+    5: {"name": "School", "sign": "🎒"},
+    6: {"name": "Halloween", "sign": "🎃"},
+    7: {"name": "Game", "sign": "🎮"},
+    8: {"name": "Tuxedo", "sign": "🎩"},
+    9: {"name": "Duo", "sign": "👥"},
+    10: {"name": "Made", "sign": "🧹"},
+    11: {"name": "Monsoon", "sign": "☔"},
+    12: {"name": "Bunny", "sign": "🐰"},
+    13: {"name": "Group", "sign": "🤝🏻"},
+    14: {"name": "Saree", "sign": "🥻"},
+    15: {"name": "Christmas", "sign": "🎄"},
+    16: {"name": "Lord", "sign": "👑"},
+    17: None  # no event
+}
 
-# --- Caption Builder ---
-def build_caption(waifu, price):
+def generate_price(rarity: str) -> int:
+    """Generate random price based on rarity"""
+    base = 500
+    multiplier = RARITY_MULTIPLIER.get(rarity, 1)
+    return random.randint(base * multiplier, base * multiplier * 2)
+
+def build_caption(waifu: dict, price: int) -> str:
+    """Create HTML caption for the waifu"""
     wid = waifu.get("id", waifu.get("_id"))
     name = waifu.get("name", "Unknown")
     anime = waifu.get("anime", "Unknown")
     rarity = waifu.get("rarity", "Unknown")
-    event = waifu.get("event", "")
-
-    event_text = f"🎉 <b>Event:</b> {event}\n" if event else ""
-
+    event = waifu.get("event")
+    
+    event_text = ""
+    if isinstance(event, dict) and event.get("name"):
+        event_text = f"{event.get('sign', '')} {event.get('name')}"
+    
     caption = (
         f"<b>{name}</b>\n"
         f"🎌 <b>Anime:</b> {anime}\n"
         f"💠 <b>Rarity:</b> {rarity}\n"
-        f"{event_text}"
+        f"{('🎉 <b>Event:</b> ' + event_text + '\\n') if event_text else ''}"
         f"🆔 <b>ID:</b> <code>{wid}</code>\n"
-        f"💰 <b>Price:</b> Ŧ{price:,} Gold\n\n"
+        f"💰 <b>Price:</b> {price} Gold\n\n"
         "Tap <b>Buy → Confirm</b> to purchase. Use /bal to check your balance."
     )
     return caption
 
-
-# --- /store Command ---
-async def store(update, context):
+async def store(update: Update, context: CallbackContext):
+    """Show waifus in the store"""
     user_id = update.effective_user.id
     characters = db.characters
 
-    query = {}  # or filter by event/rarity
-    waifus = await characters.find(query).to_list(length=1)  # fetch up to 50 waifus
+    # Determine current month for seasonal events
+    month = datetime.utcnow().month
+    current_event = None
+    if month == 12:
+        current_event = 15  # Christmas
+    elif month == 10:
+        current_event = 6   # Halloween
+    elif month == 1 or month == 2:
+        current_event = 3   # Winter
+    # You can expand with other months/events
 
+    # Query waifus; prioritize seasonal event waifus
+    query = {}
+    if current_event:
+        query["event.name"] = EVENT_MAPPING[current_event]["name"]
+
+    waifus = await characters.find(query).to_list(length=20)
     if not waifus:
-        await update.message.reply_text("No waifus found in the store.")
-        return
+        waifus = await characters.find({}).to_list(length=20)  # fallback if no seasonal waifus
 
     for waifu in waifus:
-        price = waifu.get("price", 1000)  # default price
+        price = waifu.get("price") or generate_price(waifu.get("rarity"))
         caption = build_caption(waifu, price)
         buttons = [
-            [InlineKeyboardButton("💳 Buy", callback_data=f"buy_{waifu['id']}")]
+            [
+                InlineKeyboardButton("💳 Buy", callback_data=f"buy_{waifu['id']}"),
+                InlineKeyboardButton("ℹ Info", callback_data=f"info_{waifu['id']}")
+            ]
         ]
         markup = InlineKeyboardMarkup(buttons)
-
         await update.message.reply_photo(
             photo=waifu["img_url"],
             caption=caption,
@@ -97,108 +107,36 @@ async def store(update, context):
             reply_markup=markup
         )
 
-
-# --- Show Waifu Function ---
-async def show_waifu(update, context):
-    index = context.user_data.get("index", 0)
-    waifus = context.user_data.get("waifus", [])
-    if not waifus:
-        return
-
-    waifu = waifus[index]
-    rarity = waifu.get("rarity", "Unknown")
-    price = random.randint(*RARITY_PRICES.get(rarity, (100000, 200000)))
-
-    caption = build_caption(waifu, price)
-    image = waifu.get("img_url", waifu.get("image_url", ""))
-
-    keyboard = [
-        [
-            InlineKeyboardButton("⬅️ Back", callback_data="prev_waifu"),
-            InlineKeyboardButton("➡️ Next", callback_data="next_waifu"),
-        ],
-        [
-            InlineKeyboardButton("💰 Buy", callback_data=f"buy_{waifu['id']}_{price}"),
-        ],
-        [
-            InlineKeyboardButton("🎯 Filter by Rarity", callback_data="filter_rarity"),
-        ],
-    ]
-
-    if update.message:
-        await update.message.reply_photo(
-            photo=image, caption=caption, parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-    else:
-        query = update.callback_query
-        await query.edit_message_media(
-            InputMediaPhoto(media=image, caption=caption, parse_mode="HTML"),
-            reply_markup=InlineKeyboardMarkup(keyboard),
-        )
-
-
-# --- Callback Buttons ---
-async def callback_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def buy_callback(update: Update, context: CallbackContext):
+    """Handle Buy button"""
     query = update.callback_query
-    data = query.data
     await query.answer()
+    user_id = query.from_user.id
+    data = query.data
 
-    waifus = context.user_data.get("waifus", [])
-    index = context.user_data.get("index", 0)
-
-    if data == "next_waifu":
-        context.user_data["index"] = (index + 1) % len(waifus)
-        await show_waifu(update, context)
-
-    elif data == "prev_waifu":
-        context.user_data["index"] = (index - 1) % len(waifus)
-        await show_waifu(update, context)
-
-    elif data == "filter_rarity":
-        buttons = [
-            [InlineKeyboardButton(r, callback_data=f"rarity_{r}")]
-            for r in RARITY_PRICES.keys()
-        ]
-        await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(buttons))
-
-    elif data.startswith("rarity_"):
-        rarity = data.split("rarity_")[1]
-        waifus = list(characters.find({"rarity": rarity}))
-        if not waifus:
-            await query.edit_message_caption(f"No waifus found for {rarity}.")
-            return
-        context.user_data["waifus"] = waifus
-        context.user_data["index"] = 0
-        await show_waifu(update, context)
-
-    elif data.startswith("buy_"):
-        _, wid, price = data.split("_")
-        price = int(price)
-        user_id = update.effective_user.id
-
-        user = await users.find_one({"id": user_id})
-        if not user or user.get("balance", 0) < price:
-            await query.edit_message_caption("❌ You don’t have enough gold!")
-            return
-
-        await users.update_one({"id": user_id}, {"$inc": {"balance": -price}})
-        waifu = characters.find_one({"id": wid})
-
+    if data.startswith("buy_"):
+        waifu_id = data.split("_")[1]
+        waifu = await db.characters.find_one({"id": waifu_id})
         if not waifu:
             await query.edit_message_caption("❌ Waifu not found.")
             return
 
-        await users.update_one(
+        price = waifu.get("price") or generate_price(waifu.get("rarity"))
+        user_data = await user_collection.find_one({"id": user_id})
+        balance = user_data.get("balance", 0)
+
+        if balance < price:
+            await query.edit_message_caption("❌ You do not have enough Gold. Use /roll or /claim to earn more.")
+            return
+
+        # Deduct gold and give waifu
+        await user_collection.update_one(
             {"id": user_id},
-            {"$push": {"characters": waifu}}
+            {"$inc": {"balance": -price}, "$push": {"characters": waifu}},
+            upsert=True
         )
+        await query.edit_message_caption(f"✅ You successfully bought {waifu['name']} for {price} Gold!")
 
-        await query.edit_message_caption(
-            f"✅ You bought <b>{waifu['name']}</b> for Ŧ{price:,} gold!"
-        )
-
-
-# --- Register Handlers ---
-application.add_handler(CommandHandler("store", store))
-application.add_handler(CallbackQueryHandler(callback_buttons))
+# Handlers
+application.add_handler(CommandHandler("store", store, block=False))
+application.add_handler(CallbackQueryHandler(buy_callback, pattern=r"^buy_"))
