@@ -76,7 +76,7 @@ async def store(update, context):
     characters = db.characters
 
     query = {}  # or filter by event/rarity
-    waifus = await characters.find(query).to_list(length=50)  # fetch up to 50 waifus
+    waifus = await characters.find(query).to_list(length=1)  # fetch up to 50 waifus
 
     if not waifus:
         await update.message.reply_text("No waifus found in the store.")
