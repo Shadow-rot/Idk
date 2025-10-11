@@ -4,20 +4,19 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext, CommandHandler, CallbackQueryHandler
 
 from shivu import application, db, user_collection
-from shivu import shivuu as app
-from shivu import sudo_users_collection
-from shivu.modules.database.sudo import fetch_sudo_users
 
 # Shop collection to store characters available in shop
 shop_collection = db.shop
+
+# Sudo users list
+sudo_users = ["8297659126", "8420981179", "5147822244"]
 
 # Items per page
 ITEMS_PER_PAGE = 1
 
 async def is_sudo_user(user_id: int) -> bool:
     """Check if user is sudo user"""
-    sudo_users = await fetch_sudo_users()
-    return user_id in sudo_users
+    return str(user_id) in sudo_users
 
 async def addshop(update: Update, context: CallbackContext):
     """Add character to shop - Sudo only"""
