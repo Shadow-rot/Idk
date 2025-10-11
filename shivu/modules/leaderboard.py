@@ -39,7 +39,7 @@ async def global_leaderboard(update: Update, context: CallbackContext) -> None:
         count = group['count']
         leaderboard_message += f'{i}. <b>{group_name}</b> - {count}\n'
 
-    leaderboard_message += "────────────────────\nTop Groups via @lustXcatcherrobot"
+    leaderboard_message += "────────────────────\nTop Groups via @waifukunbot"
 
     photo_url = random.choice(photo)
 
@@ -95,7 +95,7 @@ async def leaderboard(update: Update, context: CallbackContext) -> None:
         character_count = user['character_count']
         leaderboard_message += f'{i}. <a href="https://t.me/{username}"><b>{first_name}</b></a> - <b>{character_count}</b>\n'
 
-    leaderboard_message += "────────────────────\nTop 10 Users via @lustXcatcherrobot"
+    leaderboard_message += "────────────────────\nTop 10 Users via @waifukunbot"
 
     # Make sure you have a list named 'photo' with photo URLs
     photo_url = random.choice(photo)
