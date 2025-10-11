@@ -44,10 +44,10 @@ async def start(update: Update, context: CallbackContext) -> None:
         caption = f"""Hey {first_name}✨\n I'm ˹ᴄᴀᴛᴄʜᴇʀ˼. I Am Anime Based Game Bot! Want to get help? Do `/help` !\nWant to request/report bugs? Click on the `Support` button!"""
         
         keyboard = [
-            [InlineKeyboardButton(" SUPPORT ", url=f'https://t.me/siya_infoo'),
+            [InlineKeyboardButton(" SUPPORT ", url=f'https://t.me/PICK_X_SUPPORT'),
              InlineKeyboardButton(" ADD ME ", url=f'https://t.me/waifukunbot?startgroup=new')],
-            [InlineKeyboardButton(" UPDATE ", url=f'https://t.me/siya_infoo')],
-            [InlineKeyboardButton(" CONTACT ", url=f'https://t.me/I_shadwoo'),
+            [InlineKeyboardButton(" UPDATE ", url=f'https://t.me/PICK_X_UPDATE')],
+            [InlineKeyboardButton(" CONTACT ", url=f'https://t.me/ll_Thorfinn_ll'),
              InlineKeyboardButton(" SOURCE ", url=f'https://www.youtube.com/watch?v=l1hPRV0_cwc')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
