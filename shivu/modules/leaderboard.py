@@ -67,7 +67,7 @@ async def ctop(update: Update, context: CallbackContext) -> None:
         character_count = user['character_count']
         leaderboard_message += f'{i}. <a href="https://t.me/{username}"><b>{first_name}</b></a> - {character_count}\n'
 
-    leaderboard_message += "────────────────────\nTop User In Chat via @lustXcatcherrobot"
+    leaderboard_message += "────────────────────\nTop User In Chat via @waifukunbot"
 
     photo_url = random.choice(photo)
 
