@@ -56,7 +56,7 @@ async def start(update: Update, context: CallbackContext) -> None:
     else:
         photo_url = random.choice(PHOTO_URL)
         keyboard = [
-            [InlineKeyboardButton("PM", url=f'https://t.me/lustXcatcherrobot?start=true')],
+            [InlineKeyboardButton("PM", url=f'https://t.me/waifukunbot?start=true')],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         video_url = "https://checker.in/go/10590132"
