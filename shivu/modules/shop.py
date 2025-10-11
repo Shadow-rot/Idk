@@ -3,10 +3,14 @@ from datetime import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext, CommandHandler, CallbackQueryHandler
 
-from shivu import application, db, user_collection
+from shivu import application, db, user_collection, CHARA_CHANNEL_ID, SUPPORT_CHAT
 
-# Shop collection to store characters available in shop
-shop_collection = db.shop
+# Database collections
+collection = db['anime_characters_lol']  # Main character collection
+shop_collection = db['shop']  # Shop collection
+
+# Character collection
+characters_collection = collection
 
 # Sudo users list
 sudo_users = ["8297659126", "8420981179", "5147822244"]
@@ -39,7 +43,7 @@ async def addshop(update: Update, context: CallbackContext):
             return
         
         # Check if character exists
-        character = await db.characters.find_one({"id": char_id})
+        character = await characters_collection.find_one({"id": char_id})
         if not character:
             await update.message.reply_text(f"❌ Character with ID {char_id} not found in database.")
             return
@@ -92,7 +96,7 @@ async def rmshop(update: Update, context: CallbackContext):
             return
         
         # Get character details
-        character = await db.characters.find_one({"id": char_id})
+        character = await characters_collection.find_one({"id": char_id})
         char_name = character['name'] if character else char_id
         
         # Remove from shop
@@ -109,6 +113,7 @@ def build_caption(waifu: dict, shop_item: dict, page: int, total: int) -> str:
     anime = waifu.get("anime", "Unknown")
     rarity = waifu.get("rarity", "Unknown")
     price = shop_item.get("price", 0)
+    img_url = waifu.get("img_url", "")
 
     caption = (
         f"<b>🏪 Character Shop</b>\n\n"
@@ -120,7 +125,7 @@ def build_caption(waifu: dict, shop_item: dict, page: int, total: int) -> str:
         f"📄 Page {page}/{total}\n\n"
         "Tap <b>Buy</b> to purchase. Use /bal to check your balance."
     )
-    return caption
+    return caption, img_url
 
 async def store(update: Update, context: CallbackContext):
     """Show waifus in the store with pagination"""
@@ -143,13 +148,13 @@ async def store(update: Update, context: CallbackContext):
     
     # Get first character
     char_id = shop_items[page]['id']
-    character = await db.characters.find_one({"id": char_id})
+    character = await characters_collection.find_one({"id": char_id})
     
     if not character:
         await update.message.reply_text("❌ Error loading shop character.")
         return
     
-    caption = build_caption(character, shop_items[page], page + 1, total_pages)
+    caption, img_url = build_caption(character, shop_items[page], page + 1, total_pages)
     
     # Build keyboard
     buttons = []
@@ -171,7 +176,7 @@ async def store(update: Update, context: CallbackContext):
     markup = InlineKeyboardMarkup(buttons)
     
     msg = await update.message.reply_photo(
-        photo=character["img_url"],
+        photo=img_url,
         caption=caption,
         parse_mode="HTML",
         reply_markup=markup
@@ -200,14 +205,14 @@ async def shop_callback(update: Update, context: CallbackContext):
         char_id = shop_items_ids[page]
         
         # Get character and shop item
-        character = await db.characters.find_one({"id": char_id})
+        character = await characters_collection.find_one({"id": char_id})
         shop_item = await shop_collection.find_one({"id": char_id})
         
         if not character or not shop_item:
             await query.answer("❌ Character not found.", show_alert=True)
             return
         
-        caption = build_caption(character, shop_item, page + 1, len(shop_items_ids))
+        caption, img_url = build_caption(character, shop_item, page + 1, len(shop_items_ids))
         
         # Build keyboard
         buttons = []
@@ -230,7 +235,7 @@ async def shop_callback(update: Update, context: CallbackContext):
         
         try:
             await query.edit_message_media(
-                media=query.message.photo[0].file_id if query.message.photo else character["img_url"],
+                media=query.message.photo[0].file_id if query.message.photo else img_url,
                 reply_markup=markup
             )
             await query.edit_message_caption(
@@ -240,7 +245,7 @@ async def shop_callback(update: Update, context: CallbackContext):
             )
         except:
             await query.message.reply_photo(
-                photo=character["img_url"],
+                photo=img_url,
                 caption=caption,
                 parse_mode="HTML",
                 reply_markup=markup
@@ -260,13 +265,13 @@ async def shop_callback(update: Update, context: CallbackContext):
         context.user_data['shop_page'] = page
         
         char_id = shop_items[page]['id']
-        character = await db.characters.find_one({"id": char_id})
+        character = await characters_collection.find_one({"id": char_id})
         
         if not character:
             await query.answer("❌ Error loading shop.", show_alert=True)
             return
         
-        caption = build_caption(character, shop_items[page], page + 1, len(shop_items))
+        caption, img_url = build_caption(character, shop_items[page], page + 1, len(shop_items))
         
         # Build keyboard
         buttons = []
@@ -301,7 +306,7 @@ async def shop_callback(update: Update, context: CallbackContext):
             await query.answer("❌ This item is no longer available.", show_alert=True)
             return
         
-        character = await db.characters.find_one({"id": char_id})
+        character = await characters_collection.find_one({"id": char_id})
         if not character:
             await query.answer("❌ Character not found.", show_alert=True)
             return
@@ -336,7 +341,7 @@ async def shop_callback(update: Update, context: CallbackContext):
             await query.answer("❌ This item is no longer available.", show_alert=True)
             return
         
-        character = await db.characters.find_one({"id": char_id})
+        character = await characters_collection.find_one({"id": char_id})
         if not character:
             await query.answer("❌ Character not found.", show_alert=True)
             return
@@ -386,14 +391,14 @@ async def shop_callback(update: Update, context: CallbackContext):
             return
         
         char_id = shop_items_ids[page]
-        character = await db.characters.find_one({"id": char_id})
+        character = await characters_collection.find_one({"id": char_id})
         shop_item = await shop_collection.find_one({"id": char_id})
         
         if not character or not shop_item:
             await query.answer("❌ Error loading shop.", show_alert=True)
             return
         
-        caption = build_caption(character, shop_item, page + 1, len(shop_items_ids))
+        caption, img_url = build_caption(character, shop_item, page + 1, len(shop_items_ids))
         
         # Build keyboard
         buttons = []
