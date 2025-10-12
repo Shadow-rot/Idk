@@ -179,11 +179,11 @@ def format_character_card(character, global_count=None, show_owners=False, owner
             
             # Medal for top 3
             if i == 1:
-                medal = "🥇"
+                medal = "1"
             elif i == 2:
-                medal = "🥈"
+                medal = "2"
             elif i == 3:
-                medal = "🥉"
+                medal = "3"
             else:
                 medal = f"{i}"
             
@@ -248,7 +248,7 @@ async def check_character(update: Update, context: CallbackContext) -> None:
         keyboard = [
             [
                 InlineKeyboardButton(
-                    f"👥 {to_small_caps('show owners')}", 
+                    f"🏆 {to_small_caps('show owners')}", 
                     callback_data=f"show_owners_{character_id}"
                 ),
                 InlineKeyboardButton(
