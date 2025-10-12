@@ -17,7 +17,14 @@ from telegram.ext import (
 )
 
 # Your own imports
-from shivu import user_collection, collection, application, db
+from shivu import application, db
+
+# Database collections
+collection = db['anime_characters_lol']
+user_collection = db['user_collection_lmaoooo']
+user_totals_collection = db['user_totals_lmaoooo']
+group_user_totals_collection = db['group_user_totalsssssss']
+top_global_groups_collection = db['top_global_groups']
 
 # Create indexes for better performance
 try:
@@ -260,34 +267,47 @@ async def show_smashers_callback(update: Update, context) -> None:
             
         character_id = query.data.split('_')[2]
 
-        # Get top users who grabbed this character
-        top_users = await user_collection.aggregate([
-            {'$match': {'characters.id': character_id}},
-            {'$project': {
-                'id': 1,
-                'first_name': 1,
-                'username': 1,
-                'characters': {
-                    '$filter': {
-                        'input': '$characters',
-                        'as': 'char',
-                        'cond': {'$eq': ['$$char.id', character_id]}
-                    }
-                }
-            }},
-            {'$project': {
-                'id': 1,
-                'first_name': 1,
-                'username': 1,
-                'count': {'$size': '$characters'}
-            }},
-            {'$match': {'count': {'$gt': 0}}},
-            {'$sort': {'count': -1}},
-            {'$limit': 10}
-        ]).to_list(length=10)
+        # Get character info first
+        character = await collection.find_one({'id': character_id})
+        if not character:
+            await query.answer(to_small_caps("character not found"), show_alert=True)
+            return
+
+        # Get all users who have this character
+        users_with_char = await user_collection.find({
+            'characters.id': character_id
+        }).to_list(length=None)
+
+        if not users_with_char:
+            await query.answer(to_small_caps("no one has grabbed this character yet"), show_alert=True)
+            return
+
+        # Count characters for each user and sort
+        user_counts = []
+        for user in users_with_char:
+            user_id = user.get('id')
+            first_name = user.get('first_name', 'User')
+            username = user.get('username')
+            
+            # Count how many times this user has this character
+            count = sum(1 for char in user.get('characters', []) if char.get('id') == character_id)
+            
+            if count > 0:
+                user_counts.append({
+                    'id': user_id,
+                    'first_name': first_name,
+                    'username': username,
+                    'count': count
+                })
+        
+        # Sort by count descending
+        user_counts.sort(key=lambda x: x['count'], reverse=True)
+        
+        # Get top 10
+        top_users = user_counts[:10]
 
         if not top_users:
-            await query.answer(to_small_caps("no one has grabbed this character yet"), show_alert=True)
+            await query.answer(to_small_caps("no grabbers found"), show_alert=True)
             return
 
         # Build top grabbers list
@@ -298,9 +318,9 @@ async def show_smashers_callback(update: Update, context) -> None:
             first_name = user_data.get('first_name', 'User')
             username = user_data.get('username')
             
-            # Build user link
+            # Build user link with mention
             if username:
-                user_link = f"<a href='tg://user?id={user_id}'>@{escape(username)}</a>"
+                user_link = f"<a href='tg://user?id={user_id}'>{escape(first_name)}</a> (@{escape(username)})"
             else:
                 user_link = f"<a href='tg://user?id={user_id}'>{escape(first_name)}</a>"
             
@@ -314,9 +334,16 @@ async def show_smashers_callback(update: Update, context) -> None:
             else:
                 medal = f"{i}"
             
-            grabbers_list.append(f"{medal} {user_link} x{count}")
+            grabbers_list.append(f"{medal} {user_link} ᴄᴏᴜɴᴛ <b>x{count}</b>")
 
-        smasher_text = f"\n\n<b>🏆 {to_small_caps('top 10 grabbers')}</b>\n\n" + "\n".join(grabbers_list)
+        # Get total global count
+        total_grabbed = sum(u['count'] for u in user_counts)
+
+        smasher_text = (
+            f"\n\n<b>🏆 {to_small_caps('top 10 grabbers')}</b>\n"
+            f"<b>{to_small_caps('total grabbed')} {total_grabbed} {to_small_caps('times')}</b>\n\n"
+            + "\n".join(grabbers_list)
+        )
 
         # Check if message and caption exist
         if not query.message:
@@ -336,6 +363,17 @@ async def show_smashers_callback(update: Update, context) -> None:
         
         new_caption = original_caption + smasher_text
         
+        # Truncate if too long (Telegram limit is 1024 for captions)
+        if len(new_caption) > 1020:
+            # Keep top 5 only
+            grabbers_list_short = grabbers_list[:5]
+            smasher_text = (
+                f"\n\n<b>🏆 {to_small_caps('top 5 grabbers')}</b>\n"
+                f"<b>{to_small_caps('total grabbed')} {total_grabbed} {to_small_caps('times')}</b>\n\n"
+                + "\n".join(grabbers_list_short)
+            )
+            new_caption = original_caption + smasher_text
+        
         # Edit message caption
         try:
             if query.message.caption:
@@ -352,10 +390,25 @@ async def show_smashers_callback(update: Update, context) -> None:
                 )
         except Exception as edit_error:
             print(f"Error editing message: {edit_error}")
-            await query.answer(to_small_caps("could not update message"), show_alert=True)
+            # Try without reply_markup
+            try:
+                if query.message.caption:
+                    await query.edit_message_caption(
+                        caption=new_caption, 
+                        parse_mode='HTML'
+                    )
+                else:
+                    await query.edit_message_text(
+                        text=new_caption, 
+                        parse_mode='HTML'
+                    )
+            except:
+                await query.answer(to_small_caps("could not update message"), show_alert=True)
             
     except Exception as e:
         print(f"Error showing grabbers: {e}")
+        import traceback
+        traceback.print_exc()
         try:
             await query.answer(to_small_caps("error loading top grabbers"), show_alert=True)
         except:
