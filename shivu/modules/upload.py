@@ -30,8 +30,10 @@ Use rarity number accordingly:
 13. ☔️ Monsoon 
 14. 💝 Valentine 
 15. 🎃 Halloween 
-16. 🏵 Mythic
-17. 🎥 Amv
+16. 🎄 Christmas 
+17. 🏵 Mythic
+18. 🎗 Spacial Events
+19. 🎥 Amv
 
 Use event number accordingly:  
 1 🏖 Summer  
