@@ -249,17 +249,39 @@ async def inlinequery(update: Update, context) -> None:
 async def show_smashers_callback(update: Update, context) -> None:
     """Show top 10 users who grabbed this character"""
     query = update.callback_query
-    await query.answer()
     
     try:
+        await query.answer()
+        
+        # Validate query data
+        if not query.data or len(query.data.split('_')) < 3:
+            await query.answer(to_small_caps("invalid data"), show_alert=True)
+            return
+            
         character_id = query.data.split('_')[2]
 
         # Get top users who grabbed this character
         top_users = await user_collection.aggregate([
             {'$match': {'characters.id': character_id}},
-            {'$unwind': '$characters'},
-            {'$match': {'characters.id': character_id}},
-            {'$group': {'_id': '$id', 'count': {'$sum': 1}, 'first_name': {'$first': '$first_name'}, 'username': {'$first': '$username'}}},
+            {'$project': {
+                'id': 1,
+                'first_name': 1,
+                'username': 1,
+                'characters': {
+                    '$filter': {
+                        'input': '$characters',
+                        'as': 'char',
+                        'cond': {'$eq': ['$$char.id', character_id]}
+                    }
+                }
+            }},
+            {'$project': {
+                'id': 1,
+                'first_name': 1,
+                'username': 1,
+                'count': {'$size': '$characters'}
+            }},
+            {'$match': {'count': {'$gt': 0}}},
             {'$sort': {'count': -1}},
             {'$limit': 10}
         ]).to_list(length=10)
@@ -271,18 +293,18 @@ async def show_smashers_callback(update: Update, context) -> None:
         # Build top grabbers list
         grabbers_list = []
         for i, user_data in enumerate(top_users, 1):
-            user_id = user_data['_id']
-            count = user_data['count']
+            user_id = user_data.get('id')
+            count = user_data.get('count', 0)
             first_name = user_data.get('first_name', 'User')
             username = user_data.get('username')
             
+            # Build user link
             if username:
-                user_link = f"<a href='https://t.me/{username}'>@{escape(username)}</a>"
+                user_link = f"<a href='tg://user?id={user_id}'>@{escape(username)}</a>"
             else:
                 user_link = f"<a href='tg://user?id={user_id}'>{escape(first_name)}</a>"
             
             # Medal emojis for top 3
-            medal = ""
             if i == 1:
                 medal = "🥇"
             elif i == 2:
@@ -290,22 +312,54 @@ async def show_smashers_callback(update: Update, context) -> None:
             elif i == 3:
                 medal = "🥉"
             else:
-                medal = f"{i}."
+                medal = f"{i}"
             
             grabbers_list.append(f"{medal} {user_link} x{count}")
 
         smasher_text = f"\n\n<b>🏆 {to_small_caps('top 10 grabbers')}</b>\n\n" + "\n".join(grabbers_list)
 
+        # Check if message and caption exist
+        if not query.message:
+            await query.answer(to_small_caps("message not found"), show_alert=True)
+            return
+            
+        # Get original caption
+        original_caption = query.message.caption if query.message.caption else query.message.text
+        
+        if not original_caption:
+            await query.answer(to_small_caps("caption not found"), show_alert=True)
+            return
+        
+        # Remove old grabbers section if exists
+        if '🏆' in original_caption:
+            original_caption = original_caption.split('\n\n🏆')[0]
+        
+        new_caption = original_caption + smasher_text
+        
         # Edit message caption
-        if query.message.caption:
-            new_caption = query.message.caption.split('\n\n🏆')[0] + smasher_text
-            await query.edit_message_caption(caption=new_caption, parse_mode='HTML')
-        else:
-            await query.edit_message_text(text=query.message.text + smasher_text, parse_mode='HTML')
+        try:
+            if query.message.caption:
+                await query.edit_message_caption(
+                    caption=new_caption, 
+                    parse_mode='HTML',
+                    reply_markup=query.message.reply_markup
+                )
+            else:
+                await query.edit_message_text(
+                    text=new_caption, 
+                    parse_mode='HTML',
+                    reply_markup=query.message.reply_markup
+                )
+        except Exception as edit_error:
+            print(f"Error editing message: {edit_error}")
+            await query.answer(to_small_caps("could not update message"), show_alert=True)
             
     except Exception as e:
         print(f"Error showing grabbers: {e}")
-        await query.answer(to_small_caps("error loading top grabbers"), show_alert=True)
+        try:
+            await query.answer(to_small_caps("error loading top grabbers"), show_alert=True)
+        except:
+            pass
 
 
 # Add handlers
