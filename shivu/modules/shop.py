@@ -1,37 +1,30 @@
 import random
 from datetime import datetime
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InputMediaPhoto
 from telegram.ext import CallbackContext, CommandHandler, CallbackQueryHandler
 
 from shivu import application, db, user_collection, CHARA_CHANNEL_ID, SUPPORT_CHAT
 
-# Database collections
-collection = db['anime_characters_lol']  # Main character collection
-shop_collection = db['shop']  # Shop collection
-
-# Character collection
+collection = db['anime_characters_lol']
+shop_collection = db['shop']
 characters_collection = collection
 
-# Sudo users list
 sudo_users = ["8297659126", "8420981179", "5147822244"]
 
-# Items per page
 ITEMS_PER_PAGE = 1
 
 async def is_sudo_user(user_id: int) -> bool:
-    """Check if user is sudo user"""
     return str(user_id) in sudo_users
 
 async def addshop(update: Update, context: CallbackContext):
-    """Add character to shop - Sudo only"""
     user_id = update.effective_user.id
     
     if not await is_sudo_user(user_id):
-        await update.message.reply_text("❌ You don't have permission to use this command.")
+        await update.message.reply_text("⛔️ 𝖸𝗈𝗎 𝖽𝗈𝗇'𝗍 𝗁𝖺𝗏𝖾 𝗉𝖾𝗋𝗆𝗂𝗌𝗌𝗂𝗈𝗇 𝗍𝗈 𝗎𝗌𝖾 𝗍𝗁𝗂𝗌 𝖼𝗈𝗆𝗆𝖺𝗇𝖽.")
         return
     
     if len(context.args) < 2:
-        await update.message.reply_text("❌ Usage: /addshop <character_id> <price>")
+        await update.message.reply_text("⚠️ 𝖴𝗌𝖺𝗀𝖾: /addshop <character_id> <price>")
         return
     
     try:
@@ -39,22 +32,19 @@ async def addshop(update: Update, context: CallbackContext):
         price = int(context.args[1])
         
         if price <= 0:
-            await update.message.reply_text("❌ Price must be greater than 0.")
+            await update.message.reply_text("⚠️ 𝖯𝗋𝗂𝖼𝖾 𝗆𝗎𝗌𝗍 𝖻𝖾 𝗀𝗋𝖾𝖺𝗍𝖾𝗋 𝗍𝗁𝖺𝗇 0.")
             return
         
-        # Check if character exists
         character = await characters_collection.find_one({"id": char_id})
         if not character:
-            await update.message.reply_text(f"❌ Character with ID {char_id} not found in database.")
+            await update.message.reply_text(f"⚠️ 𝖢𝗁𝖺𝗋𝖺𝖼𝗍𝖾𝗋 𝗐𝗂𝗍𝗁 𝖨𝖣 {char_id} 𝗇𝗈𝗍 𝖿𝗈𝗎𝗇𝖽 𝗂𝗇 𝖽𝖺𝗍𝖺𝖻𝖺𝗌𝖾.")
             return
         
-        # Check if already in shop
         existing = await shop_collection.find_one({"id": char_id})
         if existing:
-            await update.message.reply_text(f"❌ Character {character['name']} is already in the shop.")
+            await update.message.reply_text(f"⚠️ 𝖢𝗁𝖺𝗋𝖺𝖼𝗍𝖾𝗋 <b>{character['name']}</b> 𝗂𝗌 𝖺𝗅𝗋𝖾𝖺𝖽𝗒 𝗂𝗇 𝗍𝗁𝖾 𝗌𝗁𝗈𝗉.", parse_mode="HTML")
             return
         
-        # Add to shop with price
         shop_item = {
             "id": char_id,
             "price": price,
@@ -64,50 +54,45 @@ async def addshop(update: Update, context: CallbackContext):
         
         await shop_collection.insert_one(shop_item)
         await update.message.reply_text(
-            f"✅ Successfully added <b>{character['name']}</b> to shop!\n"
-            f"💰 Price: {price} Gold",
+            f"✨ 𝖲𝗎𝖼𝖼𝖾𝗌𝗌𝖿𝗎𝗅𝗅𝗒 𝖺𝖽𝖽𝖾𝖽 <b>{character['name']}</b> 𝗍𝗈 𝗌𝗁𝗈𝗉!\n"
+            f"💎 𝖯𝗋𝗂𝖼𝖾: {price} 𝖦𝗈𝗅𝖽",
             parse_mode="HTML"
         )
     
     except ValueError:
-        await update.message.reply_text("❌ Invalid price. Please provide a valid number.")
+        await update.message.reply_text("⚠️ 𝖨𝗇𝗏𝖺𝗅𝗂𝖽 𝗉𝗋𝗂𝖼𝖾. 𝖯𝗅𝖾𝖺𝗌𝖾 𝗉𝗋𝗈𝗏𝗂𝖽𝖾 𝖺 𝗏𝖺𝗅𝗂𝖽 𝗇𝗎𝗆𝖻𝖾𝗋.")
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+        await update.message.reply_text(f"⚠️ 𝖤𝗋𝗋𝗈𝗋: {str(e)}")
 
 async def rmshop(update: Update, context: CallbackContext):
-    """Remove character from shop - Sudo only"""
     user_id = update.effective_user.id
     
     if not await is_sudo_user(user_id):
-        await update.message.reply_text("❌ You don't have permission to use this command.")
+        await update.message.reply_text("⛔️ 𝖸𝗈𝗎 𝖽𝗈𝗇'𝗍 𝗁𝖺𝗏𝖾 𝗉𝖾𝗋𝗆𝗂𝗌𝗌𝗂𝗈𝗇 𝗍𝗈 𝗎𝗌𝖾 𝗍𝗁𝗂𝗌 𝖼𝗈𝗆𝗆𝖺𝗇𝖽.")
         return
     
     if len(context.args) < 1:
-        await update.message.reply_text("❌ Usage: /rmshop <character_id>")
+        await update.message.reply_text("⚠️ 𝖴𝗌𝖺𝗀𝖾: /rmshop <character_id>")
         return
     
     try:
         char_id = context.args[0]
         
-        # Check if in shop
         shop_item = await shop_collection.find_one({"id": char_id})
         if not shop_item:
-            await update.message.reply_text(f"❌ Character with ID {char_id} is not in the shop.")
+            await update.message.reply_text(f"⚠️ 𝖢𝗁𝖺𝗋𝖺𝖼𝗍𝖾𝗋 𝗐𝗂𝗍𝗁 𝖨𝖣 {char_id} 𝗂𝗌 𝗇𝗈𝗍 𝗂𝗇 𝗍𝗁𝖾 𝗌𝗁𝗈𝗉.")
             return
         
-        # Get character details
         character = await characters_collection.find_one({"id": char_id})
         char_name = character['name'] if character else char_id
         
-        # Remove from shop
         await shop_collection.delete_one({"id": char_id})
-        await update.message.reply_text(f"✅ Successfully removed <b>{char_name}</b> from shop!", parse_mode="HTML")
+        await update.message.reply_text(f"✨ 𝖲𝗎𝖼𝖼𝖾𝗌𝗌𝖿𝗎𝗅𝗅𝗒 𝗋𝖾𝗆𝗈𝗏𝖾𝖽 <b>{char_name}</b> 𝖿𝗋𝗈𝗆 𝗌𝗁𝗈𝗉!", parse_mode="HTML")
     
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+        await update.message.reply_text(f"⚠️ 𝖤𝗋𝗋𝗈𝗋: {str(e)}")
 
-def build_caption(waifu: dict, shop_item: dict, page: int, total: int) -> str:
-    """Create HTML caption for the waifu"""
+def build_caption(waifu: dict, shop_item: dict, page: int, total: int) -> tuple:
     wid = waifu.get("id", waifu.get("_id"))
     name = waifu.get("name", "Unknown")
     anime = waifu.get("anime", "Unknown")
@@ -116,60 +101,56 @@ def build_caption(waifu: dict, shop_item: dict, page: int, total: int) -> str:
     img_url = waifu.get("img_url", "")
 
     caption = (
-        f"<b>🏪 Character Shop</b>\n\n"
-        f"<b>{name}</b>\n"
-        f"🎌 <b>Anime:</b> {anime}\n"
-        f"💠 <b>Rarity:</b> {rarity}\n"
-        f"🆔 <b>ID:</b> <code>{wid}</code>\n"
-        f"💰 <b>Price:</b> {price} Gold\n\n"
-        f"📄 Page {page}/{total}\n\n"
-        "Tap <b>Buy</b> to purchase. Use /bal to check your balance."
+        f"╭─━━━━━━━━━━━━━━━─╮\n"
+        f"│  🏪 𝗖𝗛𝗔𝗥𝗔𝗖𝗧𝗘𝗥 𝗦𝗛𝗢𝗣  │\n"
+        f"╰─━━━━━━━━━━━━━━━─╯\n\n"
+        f"✨ <b>{name}</b>\n\n"
+        f"🎭 𝗔𝗻𝗶𝗺𝗲: <code>{anime}</code>\n"
+        f"💫 𝗥𝗮𝗿𝗶𝘁𝘆: {rarity}\n"
+        f"🔖 𝗜𝗗: <code>{wid}</code>\n"
+        f"💎 𝗣𝗿𝗶𝗰𝗲: <b>{price}</b> 𝖦𝗈𝗅𝖽\n\n"
+        f"📖 𝗣𝗮𝗴𝗲: {page}/{total}\n\n"
+        f"𝖳𝖺𝗉 <b>𝗕𝘂𝘆</b> 𝗍𝗈 𝗉𝗎𝗋𝖼𝗁𝖺𝗌𝖾 𝗍𝗁𝗂𝗌 𝖼𝗁𝖺𝗋𝖺𝖼𝗍𝖾𝗋!"
     )
     return caption, img_url
 
 async def store(update: Update, context: CallbackContext):
-    """Show waifus in the store with pagination"""
     user_id = update.effective_user.id
     
-    # Get all shop items
     shop_items = await shop_collection.find({}).to_list(length=None)
     
     if not shop_items:
-        await update.message.reply_text("🏪 The shop is currently empty. Check back later!")
+        await update.message.reply_text("🏪 𝖳𝗁𝖾 𝗌𝗁𝗈𝗉 𝗂𝗌 𝖼𝗎𝗋𝗋𝖾𝗇𝗍𝗅𝗒 𝖾𝗆𝗉𝗍𝗒. 𝖢𝗁𝖾𝖼𝗄 𝖻𝖺𝖼𝗄 𝗅𝖺𝗍𝖾𝗋!")
         return
     
-    # Start at page 0
     page = 0
     total_pages = len(shop_items)
     
-    # Store in context for pagination
     context.user_data['shop_items'] = [item['id'] for item in shop_items]
     context.user_data['shop_page'] = page
     
-    # Get first character
     char_id = shop_items[page]['id']
     character = await characters_collection.find_one({"id": char_id})
     
     if not character:
-        await update.message.reply_text("❌ Error loading shop character.")
+        await update.message.reply_text("⚠️ 𝖤𝗋𝗋𝗈𝗋 𝗅𝗈𝖺𝖽𝗂𝗇𝗀 𝗌𝗁𝗈𝗉 𝖼𝗁𝖺𝗋𝖺𝖼𝗍𝖾𝗋.")
         return
     
     caption, img_url = build_caption(character, shop_items[page], page + 1, total_pages)
     
-    # Build keyboard
     buttons = []
     nav_buttons = []
     
     if total_pages > 1:
         if page > 0:
-            nav_buttons.append(InlineKeyboardButton("◀️ Prev", callback_data=f"shop_page_{page-1}"))
-        nav_buttons.append(InlineKeyboardButton("🔄 Refresh", callback_data="shop_refresh"))
+            nav_buttons.append(InlineKeyboardButton("◀️ 𝗣𝗿𝗲𝘃", callback_data=f"shop_page_{page-1}"))
+        nav_buttons.append(InlineKeyboardButton("🔄 𝗥𝗲𝗳𝗿𝗲𝘀𝗵", callback_data="shop_refresh"))
         if page < total_pages - 1:
-            nav_buttons.append(InlineKeyboardButton("Next ▶️", callback_data=f"shop_page_{page+1}"))
+            nav_buttons.append(InlineKeyboardButton("𝗡𝗲𝘅𝘁 ▶️", callback_data=f"shop_page_{page+1}"))
     else:
-        nav_buttons.append(InlineKeyboardButton("🔄 Refresh", callback_data="shop_refresh"))
+        nav_buttons.append(InlineKeyboardButton("🔄 𝗥𝗲𝗳𝗿𝗲𝘀𝗵", callback_data="shop_refresh"))
     
-    buttons.append([InlineKeyboardButton("💳 Buy", callback_data=f"shop_buy_{char_id}")])
+    buttons.append([InlineKeyboardButton("💳 𝗕𝘂𝘆", callback_data=f"shop_buy_{char_id}")])
     if nav_buttons:
         buttons.append(nav_buttons)
     
@@ -182,52 +163,48 @@ async def store(update: Update, context: CallbackContext):
         reply_markup=markup
     )
     
-    # Store message ID for editing
     context.user_data['shop_message_id'] = msg.message_id
+    context.user_data['shop_chat_id'] = update.effective_chat.id
 
 async def shop_callback(update: Update, context: CallbackContext):
-    """Handle all shop callbacks"""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
     data = query.data
     
-    # Handle pagination
     if data.startswith("shop_page_"):
         page = int(data.split("_")[2])
         shop_items_ids = context.user_data.get('shop_items', [])
         
         if not shop_items_ids or page >= len(shop_items_ids):
-            await query.answer("❌ Invalid page.", show_alert=True)
+            await query.answer("⚠️ 𝖨𝗇𝗏𝖺𝗅𝗂𝖽 𝗉𝖺𝗀𝖾.", show_alert=True)
             return
         
         context.user_data['shop_page'] = page
         char_id = shop_items_ids[page]
         
-        # Get character and shop item
         character = await characters_collection.find_one({"id": char_id})
         shop_item = await shop_collection.find_one({"id": char_id})
         
         if not character or not shop_item:
-            await query.answer("❌ Character not found.", show_alert=True)
+            await query.answer("⚠️ 𝖢𝗁𝖺𝗋𝖺𝖼𝗍𝖾𝗋 𝗇𝗈𝗍 𝖿𝗈𝗎𝗇𝖽.", show_alert=True)
             return
         
         caption, img_url = build_caption(character, shop_item, page + 1, len(shop_items_ids))
         
-        # Build keyboard
         buttons = []
         nav_buttons = []
         
         if len(shop_items_ids) > 1:
             if page > 0:
-                nav_buttons.append(InlineKeyboardButton("◀️ Prev", callback_data=f"shop_page_{page-1}"))
-            nav_buttons.append(InlineKeyboardButton("🔄 Refresh", callback_data="shop_refresh"))
+                nav_buttons.append(InlineKeyboardButton("◀️ 𝗣𝗿𝗲𝘃", callback_data=f"shop_page_{page-1}"))
+            nav_buttons.append(InlineKeyboardButton("🔄 𝗥𝗲𝗳𝗿𝗲𝘀𝗵", callback_data="shop_refresh"))
             if page < len(shop_items_ids) - 1:
-                nav_buttons.append(InlineKeyboardButton("Next ▶️", callback_data=f"shop_page_{page+1}"))
+                nav_buttons.append(InlineKeyboardButton("𝗡𝗲𝘅𝘁 ▶️", callback_data=f"shop_page_{page+1}"))
         else:
-            nav_buttons.append(InlineKeyboardButton("🔄 Refresh", callback_data="shop_refresh"))
+            nav_buttons.append(InlineKeyboardButton("🔄 𝗥𝗲𝗳𝗿𝗲𝘀𝗵", callback_data="shop_refresh"))
         
-        buttons.append([InlineKeyboardButton("💳 Buy", callback_data=f"shop_buy_{char_id}")])
+        buttons.append([InlineKeyboardButton("💳 𝗕𝘂𝘆", callback_data=f"shop_buy_{char_id}")])
         if nav_buttons:
             buttons.append(nav_buttons)
         
@@ -235,31 +212,26 @@ async def shop_callback(update: Update, context: CallbackContext):
         
         try:
             await query.edit_message_media(
-                media=query.message.photo[0].file_id if query.message.photo else img_url,
+                media=InputMediaPhoto(media=img_url, caption=caption, parse_mode="HTML"),
                 reply_markup=markup
             )
-            await query.edit_message_caption(
-                caption=caption,
-                parse_mode="HTML",
-                reply_markup=markup
-            )
-        except:
-            await query.message.reply_photo(
-                photo=img_url,
-                caption=caption,
-                parse_mode="HTML",
-                reply_markup=markup
-            )
+        except Exception as e:
+            try:
+                await query.edit_message_caption(
+                    caption=caption,
+                    parse_mode="HTML",
+                    reply_markup=markup
+                )
+            except:
+                pass
     
-    # Handle refresh
     elif data == "shop_refresh":
         shop_items = await shop_collection.find({}).to_list(length=None)
         
         if not shop_items:
-            await query.edit_message_caption("🏪 The shop is currently empty. Check back later!")
+            await query.edit_message_caption("🏪 𝖳𝗁𝖾 𝗌𝗁𝗈𝗉 𝗂𝗌 𝖼𝗎𝗋𝗋𝖾𝗇𝗍𝗅𝗒 𝖾𝗆𝗉𝗍𝗒. 𝖢𝗁𝖾𝖼𝗄 𝖻𝖺𝖼𝗄 𝗅𝖺𝗍𝖾𝗋!")
             return
         
-        # Reset to first page
         page = 0
         context.user_data['shop_items'] = [item['id'] for item in shop_items]
         context.user_data['shop_page'] = page
@@ -268,150 +240,21 @@ async def shop_callback(update: Update, context: CallbackContext):
         character = await characters_collection.find_one({"id": char_id})
         
         if not character:
-            await query.answer("❌ Error loading shop.", show_alert=True)
+            await query.answer("⚠️ 𝖤𝗋𝗋𝗈𝗋 𝗅𝗈𝖺𝖽𝗂𝗇𝗀 𝗌𝗁𝗈𝗉.", show_alert=True)
             return
         
         caption, img_url = build_caption(character, shop_items[page], page + 1, len(shop_items))
         
-        # Build keyboard
         buttons = []
         nav_buttons = []
         
         if len(shop_items) > 1:
-            nav_buttons.append(InlineKeyboardButton("🔄 Refresh", callback_data="shop_refresh"))
-            nav_buttons.append(InlineKeyboardButton("Next ▶️", callback_data=f"shop_page_{page+1}"))
+            nav_buttons.append(InlineKeyboardButton("🔄 𝗥𝗲𝗳𝗿𝗲𝘀𝗵", callback_data="shop_refresh"))
+            nav_buttons.append(InlineKeyboardButton("𝗡𝗲𝘅𝘁 ▶️", callback_data=f"shop_page_{page+1}"))
         else:
-            nav_buttons.append(InlineKeyboardButton("🔄 Refresh", callback_data="shop_refresh"))
+            nav_buttons.append(InlineKeyboardButton("🔄 𝗥𝗲𝗳𝗿𝗲𝘀𝗵", callback_data="shop_refresh"))
         
-        buttons.append([InlineKeyboardButton("💳 Buy", callback_data=f"shop_buy_{char_id}")])
-        if nav_buttons:
-            buttons.append(nav_buttons)
-        
-        markup = InlineKeyboardMarkup(buttons)
-        
-        await query.edit_message_caption(
-            caption=caption,
-            parse_mode="HTML",
-            reply_markup=markup
-        )
-    
-    elif data.startswith("shop_confirm_"):
-        char_id = data.split("_", 2)[2]
-        
-        if await has_purchased(user_id, char_id):
-            await query.answer(
-                "⚠️ 𝐘𝐨𝐮 𝐡𝐚𝐯𝐞 𝐚𝐥𝐫𝐞𝐚𝐝𝐲 𝐩𝐮𝐫𝐜𝐡𝐚𝐬𝐞𝐝 𝐭𝐡𝐢𝐬 𝐜𝐡𝐚𝐫𝐚𝐜𝐭𝐞𝐫 𝐟𝐫𝐨𝐦 𝐭𝐡𝐞 𝐬𝐡𝐨𝐩!",
-                show_alert=True
-            )
-            return
-        
-        shop_item = await shop_collection.find_one({"id": char_id})
-        if not shop_item:
-            await query.answer("⚠️ 𝐓𝐡𝐢𝐬 𝐢𝐭𝐞𝐦 𝐢𝐬 𝐧𝐨 𝐥𝐨𝐧𝐠𝐞𝐫 𝐚𝐯𝐚𝐢𝐥𝐚𝐛𝐥𝐞.", show_alert=True)
-            return
-        
-        limit = shop_item.get("limit", 0)
-        if limit > 0:
-            purchase_count = await get_purchase_count(char_id)
-            if purchase_count >= limit:
-                await query.answer("⚠️ 𝐓𝐡𝐢𝐬 𝐢𝐭𝐞𝐦 𝐢𝐬 𝐨𝐮𝐭 𝐨𝐟 𝐬𝐭𝐨𝐜𝐤!", show_alert=True)
-                return
-        
-        character = await characters_collection.find_one({"id": char_id})
-        if not character:
-            await query.answer("⚠️ 𝐂𝐡𝐚𝐫𝐚𝐜𝐭𝐞𝐫 𝐧𝐨𝐭 𝐟𝐨𝐮𝐧𝐝.", show_alert=True)
-            return
-        
-        price = shop_item.get("price", 0)
-        
-        user_data = await user_collection.find_one({"id": user_id})
-        balance = user_data.get("balance", 0) if user_data else 0
-        
-        if balance < price:
-            await query.answer("⚠️ 𝐈𝐧𝐬𝐮𝐟𝐟𝐢𝐜𝐢𝐞𝐧𝐭 𝐛𝐚𝐥𝐚𝐧𝐜𝐞!", show_alert=True)
-            await query.edit_message_caption(
-                caption=f"╔═══════════════════════╗\n"
-                        f"║  ⚠️ 𝐈𝐍𝐒𝐔𝐅𝐅𝐈𝐂𝐈𝐄𝐍𝐓 𝐅𝐔𝐍𝐃𝐒  ║\n"
-                        f"╚═══════════════════════╝\n\n"
-                        f"💔 𝐘𝐨𝐮 𝐝𝐨𝐧'𝐭 𝐡𝐚𝐯𝐞 𝐞𝐧𝐨𝐮𝐠𝐡 𝐆𝐨𝐥𝐝!\n\n"
-                        f"💰 𝐑𝐞𝐪𝐮𝐢𝐫𝐞𝐝: <b>{price}</b> 𝐆𝐨𝐥𝐝\n"
-                        f"👛 𝐘𝐨𝐮𝐫 𝐁𝐚𝐥𝐚𝐧𝐜𝐞: <b>{balance}</b> 𝐆𝐨𝐥𝐝\n"
-                        f"📉 𝐒𝐡𝐨𝐫𝐭: <b>{price - balance}</b> 𝐆𝐨𝐥𝐝\n\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"💡 𝐔𝐬𝐞 /bal 𝐭𝐨 𝐜𝐡𝐞𝐜𝐤 𝐲𝐨𝐮𝐫 𝐛𝐚𝐥𝐚𝐧𝐜𝐞!",
-                parse_mode="HTML"
-            )
-            return
-        
-        await user_collection.update_one(
-            {"id": user_id},
-            {
-                "$inc": {"balance": -price},
-                "$push": {"characters": character}
-            },
-            upsert=True
-        )
-        
-        await shop_purchases_collection.insert_one({
-            "user_id": user_id,
-            "char_id": char_id,
-            "price": price,
-            "purchased_at": datetime.utcnow()
-        })
-        
-        new_balance = balance - price
-        
-        await query.edit_message_caption(
-            caption=f"╔═══════════════════════╗\n"
-                    f"║  🎉 𝐏𝐔𝐑𝐂𝐇𝐀𝐒𝐄 𝐒𝐔𝐂𝐂𝐄𝐒𝐒  ║\n"
-                    f"╚═══════════════════════╝\n\n"
-                    f"🎊 𝐂𝐨𝐧𝐠𝐫𝐚𝐭𝐮𝐥𝐚𝐭𝐢𝐨𝐧𝐬!\n\n"
-                    f"┏━━━━━━━━━━━━━━━━━━━━━┓\n"
-                    f"┃  ✨ <b>{character['name']}</b>\n"
-                    f"┗━━━━━━━━━━━━━━━━━━━━━┛\n\n"
-                    f"💸 𝐏𝐚𝐢𝐝: <b>{price}</b> 𝐆𝐨𝐥𝐝\n"
-                    f"💰 𝐑𝐞𝐦𝐚𝐢𝐧𝐢𝐧𝐠: <b>{new_balance}</b> 𝐆𝐨𝐥𝐝\n\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"✅ 𝐀𝐝𝐝𝐞𝐝 𝐭𝐨 𝐲𝐨𝐮𝐫 𝐡𝐚𝐫𝐞𝐦!\n"
-                    f"🎁 𝐄𝐧𝐣𝐨𝐲 𝐲𝐨𝐮𝐫 𝐧𝐞𝐰 𝐜𝐡𝐚𝐫𝐚𝐜𝐭𝐞𝐫!",
-            parse_mode="HTML"
-        )
-        await query.answer("🎉 𝐏𝐮𝐫𝐜𝐡𝐚𝐬𝐞 𝐬𝐮𝐜𝐜𝐞𝐬𝐬𝐟𝐮𝐥!", show_alert=False)
-    
-    elif data == "shop_cancel":
-        page = context.user_data.get('shop_page', 0)
-        shop_items_ids = context.user_data.get('shop_items', [])
-        
-        if not shop_items_ids:
-            await query.answer("⚠️ 𝐒𝐞𝐬𝐬𝐢𝐨𝐧 𝐞𝐱𝐩𝐢𝐫𝐞𝐝. 𝐏𝐥𝐞𝐚𝐬𝐞 𝐮𝐬𝐞 /store 𝐚𝐠𝐚𝐢𝐧.", show_alert=True)
-            return
-        
-        char_id = shop_items_ids[page]
-        character = await characters_collection.find_one({"id": char_id})
-        shop_item = await shop_collection.find_one({"id": char_id})
-        
-        if not character or not shop_item:
-            await query.answer("❌ 𝐄𝐫𝐫𝐨𝐫 𝐥𝐨𝐚𝐝𝐢𝐧𝐠 𝐬𝐡𝐨𝐩.", show_alert=True)
-            return
-        
-        purchase_count = await get_purchase_count(char_id)
-        shop_item['purchased'] = purchase_count
-        
-        caption, img_url = build_caption(character, shop_item, page + 1, len(shop_items_ids))
-        
-        buttons = []
-        nav_buttons = []
-        
-        if len(shop_items_ids) > 1:
-            if page > 0:
-                nav_buttons.append(InlineKeyboardButton("⬅️ 𝐏𝐫𝐞𝐯", callback_data=f"shop_page_{page-1}"))
-            nav_buttons.append(InlineKeyboardButton("🔄 𝐑𝐞𝐟𝐫𝐞𝐬𝐡", callback_data="shop_refresh"))
-            if page < len(shop_items_ids) - 1:
-                nav_buttons.append(InlineKeyboardButton("𝐍𝐞𝐱𝐭 ➡️", callback_data=f"shop_page_{page+1}"))
-        else:
-            nav_buttons.append(InlineKeyboardButton("🔄 𝐑𝐞𝐟𝐫𝐞𝐬𝐡", callback_data="shop_refresh"))
-        
-        buttons.append([InlineKeyboardButton("🛒 𝐁𝐮𝐲 𝐍𝐨𝐰", callback_data=f"shop_buy_{char_id}")])
+        buttons.append([InlineKeyboardButton("💳 𝗕𝘂𝘆", callback_data=f"shop_buy_{char_id}")])
         if nav_buttons:
             buttons.append(nav_buttons)
         
@@ -428,7 +271,140 @@ async def shop_callback(update: Update, context: CallbackContext):
                 parse_mode="HTML",
                 reply_markup=markup
             )
-        await query.answer("🚫 𝐏𝐮𝐫𝐜𝐡𝐚𝐬𝐞 𝐜𝐚𝐧𝐜𝐞𝐥𝐥𝐞𝐝.", show_alert=False)
+        await query.answer("🔄 𝗦𝗵𝗼𝗽 𝗿𝗲𝗳𝗿𝗲𝘀𝗵𝗲𝗱!", show_alert=False)
+    
+    elif data.startswith("shop_buy_"):
+        char_id = data.split("_", 2)[2]
+        
+        shop_item = await shop_collection.find_one({"id": char_id})
+        if not shop_item:
+            await query.answer("⚠️ 𝖳𝗁𝗂𝗌 𝗂𝗍𝖾𝗆 𝗂𝗌 𝗇𝗈 𝗅𝗈𝗇𝗀𝖾𝗋 𝖺𝗏𝖺𝗂𝗅𝖺𝖻𝗅𝖾.", show_alert=True)
+            return
+        
+        character = await characters_collection.find_one({"id": char_id})
+        if not character:
+            await query.answer("⚠️ 𝖢𝗁𝖺𝗋𝖺𝖼𝗍𝖾𝗋 𝗇𝗈𝗍 𝖿𝗈𝗎𝗇𝖽.", show_alert=True)
+            return
+        
+        price = shop_item.get("price", 0)
+        
+        buttons = [
+            [
+                InlineKeyboardButton("✅ 𝗖𝗼𝗻𝗳𝗶𝗿𝗺", callback_data=f"shop_confirm_{char_id}"),
+                InlineKeyboardButton("❌ 𝗖𝗮𝗻𝗰𝗲𝗹", callback_data="shop_cancel")
+            ]
+        ]
+        markup = InlineKeyboardMarkup(buttons)
+        
+        await query.edit_message_caption(
+            caption=f"╭─━━━━━━━━━━━━━━━─╮\n"
+                    f"│  💳 𝗖𝗢𝗡𝗙𝗜𝗥𝗠 𝗣𝗨𝗥𝗖𝗛𝗔𝗦𝗘  │\n"
+                    f"╰─━━━━━━━━━━━━━━━─╯\n\n"
+                    f"✨ <b>{character['name']}</b>\n"
+                    f"💎 𝗣𝗿𝗶𝗰𝗲: <b>{price}</b> 𝖦𝗈𝗅𝖽\n\n"
+                    f"𝖠𝗋𝖾 𝗒𝗈𝗎 𝗌𝗎𝗋𝖾 𝗒𝗈𝗎 𝗐𝖺𝗇𝗍 𝗍𝗈 𝖻𝗎𝗒 𝗍𝗁𝗂𝗌 𝖼𝗁𝖺𝗋𝖺𝖼𝗍𝖾𝗋?",
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+    
+    elif data.startswith("shop_confirm_"):
+        char_id = data.split("_", 2)[2]
+        
+        shop_item = await shop_collection.find_one({"id": char_id})
+        if not shop_item:
+            await query.answer("⚠️ 𝖳𝗁𝗂𝗌 𝗂𝗍𝖾𝗆 𝗂𝗌 𝗇𝗈 𝗅𝗈𝗇𝗀𝖾𝗋 𝖺𝗏𝖺𝗂𝗅𝖺𝖻𝗅𝖾.", show_alert=True)
+            return
+        
+        character = await characters_collection.find_one({"id": char_id})
+        if not character:
+            await query.answer("⚠️ 𝖢𝗁𝖺𝗋𝖺𝖼𝗍𝖾𝗋 𝗇𝗈𝗍 𝖿𝗈𝗎𝗇𝖽.", show_alert=True)
+            return
+        
+        price = shop_item.get("price", 0)
+        
+        user_data = await user_collection.find_one({"id": user_id})
+        balance = user_data.get("balance", 0) if user_data else 0
+        
+        if balance < price:
+            await query.answer("⚠️ 𝖸𝗈𝗎 𝖽𝗈𝗇'𝗍 𝗁𝖺𝗏𝖾 𝖾𝗇𝗈𝗎𝗀𝗁 𝖦𝗈𝗅𝖽!", show_alert=True)
+            await query.edit_message_caption(
+                caption=f"╭─━━━━━━━━━━━━━━━━━─╮\n"
+                        f"│  ⚠️ 𝗜𝗡𝗦𝗨𝗙𝗙𝗜𝗖𝗜𝗘𝗡𝗧 𝗕𝗔𝗟𝗔𝗡𝗖𝗘  │\n"
+                        f"╰─━━━━━━━━━━━━━━━━━─╯\n\n"
+                        f"𝖸𝗈𝗎 𝗇𝖾𝖾𝖽 <b>{price}</b> 𝖦𝗈𝗅𝖽 𝖻𝗎𝗍 𝗈𝗇𝗅𝗒 𝗁𝖺𝗏𝖾 <b>{balance}</b> 𝖦𝗈𝗅𝖽.\n"
+                        f"𝖴𝗌𝖾 /bal 𝗍𝗈 𝖼𝗁𝖾𝖼𝗄 𝗒𝗈𝗎𝗋 𝖻𝖺𝗅𝖺𝗇𝖼𝖾.",
+                parse_mode="HTML"
+            )
+            return
+        
+        await user_collection.update_one(
+            {"id": user_id},
+            {
+                "$inc": {"balance": -price},
+                "$push": {"characters": character}
+            },
+            upsert=True
+        )
+        
+        await query.edit_message_caption(
+            caption=f"╭─━━━━━━━━━━━━━━━━─╮\n"
+                    f"│  ✨ 𝗣𝗨𝗥𝗖𝗛𝗔𝗦𝗘 𝗦𝗨𝗖𝗖𝗘𝗦𝗦!  │\n"
+                    f"╰─━━━━━━━━━━━━━━━━─╯\n\n"
+                    f"𝖸𝗈𝗎 𝖻𝗈𝗎𝗀𝗁𝗍 <b>{character['name']}</b> 𝖿𝗈𝗋 <b>{price}</b> 𝖦𝗈𝗅𝖽!\n"
+                    f"𝖳𝗁𝖾 𝖼𝗁𝖺𝗋𝖺𝖼𝗍𝖾𝗋 𝗁𝖺𝗌 𝖻𝖾𝖾𝗇 𝖺𝖽𝖽𝖾𝖽 𝗍𝗈 𝗒𝗈𝗎𝗋 𝗁𝖺𝗋𝖾𝗆.\n\n"
+                    f"💰 𝗥𝗲𝗺𝗮𝗶𝗻𝗶𝗻𝗴 𝗕𝗮𝗹𝗮𝗻𝗰𝗲: <b>{balance - price}</b> 𝖦𝗈𝗅𝖽",
+            parse_mode="HTML"
+        )
+        await query.answer("✨ 𝗣𝘂𝗿𝗰𝗵𝗮𝘀𝗲 𝘀𝘂𝗰𝗰𝗲𝘀𝘀𝗳𝘂𝗹!", show_alert=False)
+    
+    elif data == "shop_cancel":
+        page = context.user_data.get('shop_page', 0)
+        shop_items_ids = context.user_data.get('shop_items', [])
+        
+        if not shop_items_ids:
+            await query.answer("⚠️ 𝖲𝖾𝗌𝗌𝗂𝗈𝗇 𝖾𝗑𝗉𝗂𝗋𝖾𝖽. 𝖯𝗅𝖾𝖺𝗌𝖾 𝗎𝗌𝖾 /store 𝖺𝗀𝖺𝗂𝗇.", show_alert=True)
+            return
+        
+        char_id = shop_items_ids[page]
+        character = await characters_collection.find_one({"id": char_id})
+        shop_item = await shop_collection.find_one({"id": char_id})
+        
+        if not character or not shop_item:
+            await query.answer("⚠️ 𝖤𝗋𝗋𝗈𝗋 𝗅𝗈𝖺𝖽𝗂𝗇𝗀 𝗌𝗁𝗈𝗉.", show_alert=True)
+            return
+        
+        caption, img_url = build_caption(character, shop_item, page + 1, len(shop_items_ids))
+        
+        buttons = []
+        nav_buttons = []
+        
+        if len(shop_items_ids) > 1:
+            if page > 0:
+                nav_buttons.append(InlineKeyboardButton("◀️ 𝗣𝗿𝗲𝘃", callback_data=f"shop_page_{page-1}"))
+            nav_buttons.append(InlineKeyboardButton("🔄 𝗥𝗲𝗳𝗿𝗲𝘀𝗵", callback_data="shop_refresh"))
+            if page < len(shop_items_ids) - 1:
+                nav_buttons.append(InlineKeyboardButton("𝗡𝗲𝘅𝘁 ▶️", callback_data=f"shop_page_{page+1}"))
+        else:
+            nav_buttons.append(InlineKeyboardButton("🔄 𝗥𝗲𝗳𝗿𝗲𝘀𝗵", callback_data="shop_refresh"))
+        
+        buttons.append([InlineKeyboardButton("💳 𝗕𝘂𝘆", callback_data=f"shop_buy_{char_id}")])
+        if nav_buttons:
+            buttons.append(nav_buttons)
+        
+        markup = InlineKeyboardMarkup(buttons)
+        
+        try:
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=img_url, caption=caption, parse_mode="HTML"),
+                reply_markup=markup
+            )
+        except:
+            await query.edit_message_caption(
+                caption=caption,
+                parse_mode="HTML",
+                reply_markup=markup
+            )
+        await query.answer("𝗣𝘂𝗿𝗰𝗵𝗮𝘀𝗲 𝗰𝗮𝗻𝗰𝗲𝗹𝗹𝗲𝗱.", show_alert=False)
 
 application.add_handler(CommandHandler("store", store, block=False))
 application.add_handler(CommandHandler("addshop", addshop, block=False))
