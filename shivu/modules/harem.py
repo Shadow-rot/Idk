@@ -297,7 +297,7 @@ async def hmode_rarity(update: Update, context: CallbackContext) -> None:
             InlineKeyboardButton("🎗 Events", callback_data="mode_events"),
         ],
         [
-            InlineKeyboardButton("🎥 AMV", callback_data="mode_amv"),
+            InlineKeyboardButton("🎥 𝘼𝙈𝙑", callback_data="mode_amv"),
         ],
         [
             InlineKeyboardButton("⬅️ Back", callback_data="mode_back"),
