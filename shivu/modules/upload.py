@@ -11,7 +11,7 @@ WRONG_FORMAT_TEXT = """Wrong ❌️ format...  eg. /upload Img_url muzan-kibutsu
 img_url character-name anime-name rarity-number event-number
 
 Use rarity number accordingly:
-rarity_map = 1 (🟢 Common), 2 (🟣 Rare), 3 (🟡 Legendary), 4 (💮 Special Edition), 5 (🔮 Premium Edition), 6 (🎗️ Supreme), 7 (🧜🏻‍♀️ Mermaid),
+rarity_map = 1 (🟢 Common), 2 (🟣 Rare), 3 (🟡 Legendary), 4 (💮 Special Edition), 5 (🔮 Premium Edition), 6 (🎗️ Supreme), 7 (🧜🏻‍♀️ Mermaid)
 
 Use event number accordingly:
 event_map = 1 (🏖 Summer), 2 (👘 Kimono), 3 (☃️ Winter), 4 (💞 Valentine), 5 (🎒 School), 6 (🎃 Halloween), 7 (🎮 Game), 8 (🎩 Tuxedo), 9 (👥 Duo), 10 (🧹 Made), 11 (☔ Monsoon), 12 (🐰 Bunny),  13 (🤝🏻 Group), 14 (🥻 Saree), 15 (🎄 Cristmas), 16 (👑 Lord), 17 (None)"""
