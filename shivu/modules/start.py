@@ -5,7 +5,19 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler
 
 from shivu import application, PHOTO_URL, SUPPORT_CHAT, UPDATE_CHAT, BOT_USERNAME, db, GROUP_ID
-from shivu import user_collection, refeer_collection
+from shivu import user_collection, user_totals_collection
+
+# Small caps conversion function
+def to_small_caps(text):
+    small_caps_map = {
+        'a': 'ᴀ', 'b': 'ʙ', 'c': 'ᴄ', 'd': 'ᴅ', 'e': 'ᴇ', 'f': 'ғ', 'g': 'ɢ', 'h': 'ʜ', 'i': 'ɪ',
+        'j': 'ᴊ', 'k': 'ᴋ', 'l': 'ʟ', 'm': 'ᴍ', 'n': 'ɴ', 'o': 'ᴏ', 'p': 'ᴘ', 'q': 'ǫ', 'r': 'ʀ',
+        's': 's', 't': 'ᴛ', 'u': 'ᴜ', 'v': 'ᴠ', 'w': 'ᴡ', 'x': 'x', 'y': 'ʏ', 'z': 'ᴢ',
+        'A': 'ᴀ', 'B': 'ʙ', 'C': 'ᴄ', 'D': 'ᴅ', 'E': 'ᴇ', 'F': 'ғ', 'G': 'ɢ', 'H': 'ʜ', 'I': 'ɪ',
+        'J': 'ᴊ', 'K': 'ᴋ', 'L': 'ʟ', 'M': 'ᴍ', 'N': 'ɴ', 'O': 'ᴏ', 'P': 'ᴘ', 'Q': 'ǫ', 'R': 'ʀ',
+        'S': 's', 'T': 'ᴛ', 'U': 'ᴜ', 'V': 'ᴠ', 'W': 'ᴡ', 'X': 'x', 'Y': 'ʏ', 'Z': 'ᴢ'
+    }
+    return ''.join(small_caps_map.get(c, c) for c in text)
 
 async def start(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
@@ -18,8 +30,6 @@ async def start(update: Update, context: CallbackContext) -> None:
         referring_user_id = int(args[0][2:])
 
     user_data = await user_collection.find_one({"id": user_id})
-
-    # Get total users count
     total_users = await user_collection.count_documents({})
 
     if user_data is None:
@@ -40,7 +50,7 @@ async def start(update: Update, context: CallbackContext) -> None:
                     {"id": referring_user_id}, 
                     {"$inc": {"tokens": 1000, "referred_users": 1}}
                 )
-                referrer_message = f"🎉 <b>Referral Bonus!</b>\n\n✨ {escape(first_name)} joined using your link!\n💰 You earned <b>1000 tokens</b>!"
+                referrer_message = f"🎊 <b>{to_small_caps('referral success')}</b>\n\n🌟 {escape(first_name)} {to_small_caps('joined using your link')}\n💎 {to_small_caps('earned')} <b>1000 {to_small_caps('tokens')}</b>"
                 try:
                     await context.bot.send_message(
                         chat_id=referring_user_id, 
@@ -52,7 +62,7 @@ async def start(update: Update, context: CallbackContext) -> None:
 
         await context.bot.send_message(
             chat_id=GROUP_ID, 
-            text=f"✨ <b>NEW USER JOINED</b>\n\n👤 User: <a href='tg://user?id={user_id}'>{escape(first_name)}</a>\n🆔 ID: <code>{user_id}</code>\n👥 Total Users: <b>{total_users}</b>", 
+            text=f"✦ <b>{to_small_caps('new player')}</b>\n\n👤 {to_small_caps('user')}: <a href='tg://user?id={user_id}'>{escape(first_name)}</a>\n🆔 {to_small_caps('id')}: <code>{user_id}</code>\n👥 {to_small_caps('total')}: <b>{total_users}</b>", 
             parse_mode='HTML'
         )
         user_data = new_user
@@ -63,61 +73,49 @@ async def start(update: Update, context: CallbackContext) -> None:
                 {"$set": {"first_name": first_name, "username": username}}
             )
 
-    # Get user stats
+    # Get actual user stats from database
     user_tokens = user_data.get('tokens', 0)
-    user_chars = len(user_data.get('characters', []))
+    user_totals = await user_totals_collection.find_one({'id': user_id})
+    total_characters = user_totals['count'] if user_totals else 0
     referred_count = user_data.get('referred_users', 0)
 
     if update.effective_chat.type == "private":
-        # Generate referral link
         referral_link = f"https://t.me/{BOT_USERNAME}?start=r_{user_id}"
         
         caption = f"""
-╔═══════════════════╗
-   🌸 <b>WELCOME TO ANIME CATCHER</b> 🌸
-╚═══════════════════╝
+┏━━━━━━━━━━━━━━━━━━━┓
+  ✦ <b>{to_small_caps('anime catcher')}</b> ✦
+┗━━━━━━━━━━━━━━━━━━━┛
 
-👋 Hey <a href='tg://user?id={user_id}'>{escape(first_name)}</a>!
+👋 {to_small_caps('hey')} <a href='tg://user?id={user_id}'>{escape(first_name)}</a>
 
-🎮 <b>Catch, Collect & Trade anime characters!</b>
-✨ Battle with friends and build your dream collection!
+🎯 {to_small_caps('catch collect and dominate')}
+⚡ {to_small_caps('build your anime empire')}
 
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>YOUR STATS</b>
-━━━━━━━━━━━━━━━━━━━━
-💰 Tokens: <b>{user_tokens}</b>
-🃏 Characters: <b>{user_chars}</b>
-👥 Referrals: <b>{referred_count}</b>
-🌐 Total Players: <b>{total_users:,}</b>
+━━━━━━━━━━━━━━━━━━━
+💎 {to_small_caps('balance')}: <b>{user_tokens}</b>
+🎴 {to_small_caps('slaves')}: <b>{total_characters}</b>
+👥 {to_small_caps('referrals')}: <b>{referred_count}</b>
+━━━━━━━━━━━━━━━━━━━
 
-━━━━━━━━━━━━━━━━━━━━
-🎁 <b>EARN REWARDS</b>
-━━━━━━━━━━━━━━━━━━━━
-Invite friends → Get <b>1000 tokens</b> per referral!
-Your friend gets <b>500 tokens</b> to start!
-
-👇 <i>Tap buttons below to get started!</i>
+🎁 {to_small_caps('invite friends get')} <b>1000 💎</b>
 """
 
         keyboard = [
             [
-                InlineKeyboardButton("🎮 Play Now", url=f'https://t.me/{BOT_USERNAME}?startgroup=new'),
-                InlineKeyboardButton("📊 Profile", callback_data='profile')
+                InlineKeyboardButton(f"🎮 {to_small_caps('play')}", url=f'https://t.me/{BOT_USERNAME}?startgroup=new'),
+                InlineKeyboardButton(f"💰 {to_small_caps('earn')}", callback_data='earn')
             ],
             [
-                InlineKeyboardButton("💰 Earn Tokens", callback_data='earn'),
-                InlineKeyboardButton("⚙️ Help", callback_data='help')
+                InlineKeyboardButton(f"📊 {to_small_caps('stats')}", callback_data='stats'),
+                InlineKeyboardButton(f"❓ {to_small_caps('help')}", callback_data='help')
             ],
             [
-                InlineKeyboardButton("🔗 Share Referral Link", url=referral_link)
+                InlineKeyboardButton(f"🔗 {to_small_caps('invite friends')}", callback_data='referral')
             ],
             [
-                InlineKeyboardButton("💬 Support", url=f'https://t.me/PICK_X_SUPPORT'),
-                InlineKeyboardButton("📢 Updates", url=f'https://t.me/PICK_X_UPDATE')
-            ],
-            [
-                InlineKeyboardButton("👨‍💻 Contact Dev", url=f'https://t.me/ll_Thorfinn_ll'),
-                InlineKeyboardButton("💻 Source", url=f'https://www.youtube.com/watch?v=l1hPRV0_cwc')
+                InlineKeyboardButton(f"💬 {to_small_caps('support')}", url=f'https://t.me/PICK_X_SUPPORT'),
+                InlineKeyboardButton(f"📢 {to_small_caps('updates')}", url=f'https://t.me/PICK_X_UPDATE')
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -131,18 +129,15 @@ Your friend gets <b>500 tokens</b> to start!
             parse_mode='HTML'
         )
     else:
-        # Group message - shorter and simpler
         caption = f"""
-✨ <b>Hey {escape(first_name)}!</b>
+✦ <b>{to_small_caps('hey')} {escape(first_name)}</b>
 
-🎮 I'm alive and ready to play!
-🌸 Catch anime characters in this group!
-
-💡 <i>Click below to start in private chat</i>
+🎮 {to_small_caps('im alive and ready')}
+🌸 {to_small_caps('lets catch some anime')}
 """
         keyboard = [
-            [InlineKeyboardButton("🚀 Start Bot", url=f'https://t.me/{BOT_USERNAME}?start=true')],
-            [InlineKeyboardButton("➕ Add to Your Group", url=f'https://t.me/{BOT_USERNAME}?startgroup=new')]
+            [InlineKeyboardButton(f"🚀 {to_small_caps('start')}", url=f'https://t.me/{BOT_USERNAME}?start=true')],
+            [InlineKeyboardButton(f"➕ {to_small_caps('add me')}", url=f'https://t.me/{BOT_USERNAME}?startgroup=new')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         video_url = "https://checker.in/go/10590132"
@@ -155,58 +150,65 @@ Your friend gets <b>500 tokens</b> to start!
             parse_mode='HTML'
         )
 
-# Callback query handler for inline buttons
 async def button_callback(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()
     
     user_id = query.from_user.id
     user_data = await user_collection.find_one({"id": user_id})
+    user_totals = await user_totals_collection.find_one({'id': user_id})
     
-    if query.data == 'profile':
+    if query.data == 'stats':
         user_tokens = user_data.get('tokens', 0)
-        user_chars = len(user_data.get('characters', []))
+        total_characters = user_totals['count'] if user_totals else 0
         referred_count = user_data.get('referred_users', 0)
         
-        profile_text = f"""
-╔═══════════════════╗
-   👤 <b>YOUR PROFILE</b>
-╚═══════════════════╝
+        stats_text = f"""
+┏━━━━━━━━━━━━━━━━━━━┓
+  📊 <b>{to_small_caps('your profile')}</b>
+┗━━━━━━━━━━━━━━━━━━━┛
 
-🎭 Name: {escape(user_data.get('first_name', 'Unknown'))}
-🆔 ID: <code>{user_id}</code>
-💰 Tokens: <b>{user_tokens}</b>
-🃏 Characters: <b>{user_chars}</b>
-👥 Referrals: <b>{referred_count}</b>
+🎭 {to_small_caps('name')}: {escape(user_data.get('first_name', 'unknown'))}
+🆔 {to_small_caps('id')}: <code>{user_id}</code>
 
-<i>Keep playing to unlock more!</i>
+━━━━━━━━━━━━━━━━━━━
+💎 {to_small_caps('balance')}: <b>{user_tokens}</b>
+🎴 {to_small_caps('total slaves')}: <b>{total_characters}</b>
+👥 {to_small_caps('referrals')}: <b>{referred_count}</b>
+━━━━━━━━━━━━━━━━━━━
+
+⚡ {to_small_caps('keep grinding')}
 """
         await query.edit_message_caption(
-            caption=profile_text,
+            caption=stats_text,
             reply_markup=query.message.reply_markup,
             parse_mode='HTML'
         )
     
     elif query.data == 'earn':
-        referral_link = f"https://t.me/{BOT_USERNAME}?start=r_{user_id}"
         earn_text = f"""
-╔═══════════════════╗
-   💰 <b>EARN TOKENS</b>
-╚═══════════════════╝
+┏━━━━━━━━━━━━━━━━━━━┓
+  💰 <b>{to_small_caps('earn tokens')}</b>
+┗━━━━━━━━━━━━━━━━━━━┛
 
-<b>Referral Rewards:</b>
-• You get: <b>1000 tokens</b>
-• Your friend gets: <b>500 tokens</b>
+🎁 {to_small_caps('referral rewards')}
+━━━━━━━━━━━━━━━━━━━
+🌟 {to_small_caps('you earn')}: <b>1000 💎</b>
+🎊 {to_small_caps('friend gets')}: <b>500 💎</b>
 
-<b>How to earn:</b>
-1️⃣ Share your referral link
-2️⃣ Friends join using your link
-3️⃣ Get instant rewards!
+📝 {to_small_caps('how it works')}
+━━━━━━━━━━━━━━━━━━━
+1️⃣ {to_small_caps('share your invite link')}
+2️⃣ {to_small_caps('friend joins via link')}
+3️⃣ {to_small_caps('instant rewards')}
 
-🔗 <b>Your Link:</b>
-<code>{referral_link}</code>
+💡 {to_small_caps('more ways to earn')}
+━━━━━━━━━━━━━━━━━━━
+🎮 {to_small_caps('play games')}
+🎴 {to_small_caps('collect rare slaves')}
+💸 {to_small_caps('trade characters')}
 
-<i>Tap 'Share Referral Link' to invite!</i>
+⚡ {to_small_caps('tap invite button below')}
 """
         await query.edit_message_caption(
             caption=earn_text,
@@ -216,27 +218,71 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
     
     elif query.data == 'help':
         help_text = f"""
-╔═══════════════════╗
-   ⚙️ <b>HELP & COMMANDS</b>
-╚═══════════════════╝
+┏━━━━━━━━━━━━━━━━━━━┓
+  ❓ <b>{to_small_caps('commands')}</b>
+┗━━━━━━━━━━━━━━━━━━━┛
 
-<b>Available Commands:</b>
-/start - Start the bot
-/help - Show this help message
-/profile - View your profile
-/collection - View your characters
-/trade - Trade with others
+💎 {to_small_caps('economy')}
+━━━━━━━━━━━━━━━━━━━
+/bal › {to_small_caps('check balance')}
+/pay › {to_small_caps('send tokens')}
 
-<b>How to Play:</b>
-🎮 Add bot to your group
-🌸 Characters appear randomly
-⚡ Type /catch to collect them!
-💫 Build your collection & trade!
+🎴 {to_small_caps('collection')}
+━━━━━━━━━━━━━━━━━━━
+/slaves › {to_small_caps('view collection')}
+/myslaves › {to_small_caps('your slaves')}
 
-<i>Need more help? Join support group!</i>
+🎮 {to_small_caps('gameplay')}
+━━━━━━━━━━━━━━━━━━━
+/catch › {to_small_caps('catch characters')}
+/trade › {to_small_caps('trade with others')}
+
+📊 {to_small_caps('stats')}
+━━━━━━━━━━━━━━━━━━━
+/profile › {to_small_caps('your profile')}
+/leaderboard › {to_small_caps('top players')}
+
+💡 {to_small_caps('need more help')}
+{to_small_caps('join support group')}
 """
         await query.edit_message_caption(
             caption=help_text,
+            reply_markup=query.message.reply_markup,
+            parse_mode='HTML'
+        )
+    
+    elif query.data == 'referral':
+        referral_link = f"https://t.me/{BOT_USERNAME}?start=r_{user_id}"
+        referred_count = user_data.get('referred_users', 0)
+        
+        referral_text = f"""
+┏━━━━━━━━━━━━━━━━━━━┓
+  🔗 <b>{to_small_caps('referral program')}</b>
+┗━━━━━━━━━━━━━━━━━━━┛
+
+👥 {to_small_caps('total referrals')}: <b>{referred_count}</b>
+💎 {to_small_caps('earned')}: <b>{referred_count * 1000}</b>
+
+📋 {to_small_caps('how to refer')}
+━━━━━━━━━━━━━━━━━━━
+1️⃣ {to_small_caps('copy your link below')}
+2️⃣ {to_small_caps('share with friends')}
+3️⃣ {to_small_caps('they must click and start')}
+4️⃣ {to_small_caps('both get instant rewards')}
+
+🎁 {to_small_caps('rewards')}
+━━━━━━━━━━━━━━━━━━━
+🌟 {to_small_caps('you')} → <b>1000 💎</b>
+🎊 {to_small_caps('friend')} → <b>500 💎</b>
+
+🔗 {to_small_caps('your link')}
+━━━━━━━━━━━━━━━━━━━
+<code>{referral_link}</code>
+
+💡 {to_small_caps('tap to copy and share')}
+"""
+        await query.edit_message_caption(
+            caption=referral_text,
             reply_markup=query.message.reply_markup,
             parse_mode='HTML'
         )
@@ -244,6 +290,5 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
 start_handler = CommandHandler('start', start, block=False)
 application.add_handler(start_handler)
 
-# Add callback query handler
 callback_handler = CallbackQueryHandler(button_callback)
 application.add_handler(callback_handler)
