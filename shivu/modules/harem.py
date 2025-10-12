@@ -338,8 +338,8 @@ async def mode_button(update: Update, context: CallbackContext) -> None:
         elif data == "mode_back":
             keyboard = [
                 [
-                    InlineKeyboardButton("🔄 Default", callback_data="mode_default"),
-                    InlineKeyboardButton("🎨 By Rarity", callback_data="mode_rarity"),
+                    InlineKeyboardButton("🧩 Default", callback_data="mode_default"),
+                    InlineKeyboardButton("🔮 By Rarity", callback_data="mode_rarity"),
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
