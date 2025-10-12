@@ -11,7 +11,7 @@ WRONG_FORMAT_TEXT = """Wrong ❌️ format...  eg. /upload Img_url muzan-kibutsu
 img_url character-name anime-name rarity-number event-number
 
 Use rarity number accordingly:
-rarity_map = 1 (🟢 Common), 2 (🟣 Rare), 3 (🟡 Legendary), 4 (💮 Special Edition), 5 (🔮 Premium Edition), 6 (🎗️ Supreme)
+rarity_map = 1 (🟢 Common), 2 (🟣 Rare), 3 (🟡 Legendary), 4 (💮 Special Edition), 5 (🔮 Premium Edition), 6 (🎗️ Supreme), 7 (🧜🏻‍♀️ Mermaid),
 
 Use event number accordingly:
 event_map = 1 (🏖 Summer), 2 (👘 Kimono), 3 (☃️ Winter), 4 (💞 Valentine), 5 (🎒 School), 6 (🎃 Halloween), 7 (🎮 Game), 8 (🎩 Tuxedo), 9 (👥 Duo), 10 (🧹 Made), 11 (☔ Monsoon), 12 (🐰 Bunny),  13 (🤝🏻 Group), 14 (🥻 Saree), 15 (🎄 Cristmas), 16 (👑 Lord), 17 (None)"""
@@ -69,11 +69,11 @@ async def upload(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text('Invalid URL.')
             return
 
-        rarity_map = {1: "🟢 Common", 2: "🟣 Rare", 3: "🟡 Legendary", 4: "💮 Special Edition", 5: "🔮 Premium Edition", 6: "🎗️ Supreme"}
+        rarity_map = {1: "🟢 Common", 2: "🟣 Rare", 3: "🟡 Legendary", 4: "💮 Special Edition", 5: "🔮 Premium Edition", 6: "🎗️ Supreme", 7: "🧜🏻‍♀️ Mermaid"}
         try:
             rarity = rarity_map[int(args[3])]
         except KeyError:
-            await update.message.reply_text('Invalid rarity. Please use 1, 2, 3, 4, 5, or 6. and if you entered the event mapping wrong then use 13 for skip and you can also see wrong format help text to see event mapping.')
+            await update.message.reply_text('Invalid rarity. Please use 1, 2, 3, 4, 5, 6, 7. and if you entered the event mapping wrong then use 13 for skip and you can also see wrong format help text to see event mapping.')
             return
 
         event_choice = int(args[4])
@@ -160,11 +160,11 @@ async def update(update: Update, context: CallbackContext) -> None:
         if args[1] in ['name', 'anime']:
             new_value = args[2].replace('-', ' ').title()
         elif args[1] == 'rarity':
-            rarity_map = {1: "🟢 Common", 2: "🟣 Rare", 3: "🟡 Legendary", 4: "💮 Special Edition", 5: "🔮 Premium Edition", 6: "🎗️ Supreme"}
+            rarity_map = {1: "🟢 Common", 2: "🟣 Rare", 3: "🟡 Legendary", 4: "💮 Special Edition", 5: "🔮 Premium Edition", 6: "🎗️ Supreme"7: "🧜🏻‍♀️ Mermaid"}
             try:
                 new_value = rarity_map[int(args[2])]
             except KeyError:
-                await update.message.reply_text('Invalid rarity. Please use 1, 2, 3, 4, 5, or 6.')
+             await update.message.reply_text('Invalid rarity. Please use 1, 2, 3, 4, 5, or 6.')
                 return
         elif args[1] == 'event':
             event_map = {
