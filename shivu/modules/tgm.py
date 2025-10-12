@@ -45,13 +45,3 @@ async def tgm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.exception(e)
         await msg.reply_text("❗ Error aaya, dobara koshish karo.")
-
-def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("tgm", tgm))
-
-    print("✅ Bot started... Use /tgm on any image reply.")
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
