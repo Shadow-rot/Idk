@@ -373,5 +373,5 @@ async def mode_button(update: Update, context: CallbackContext) -> None:
 # Register handlers
 application.add_handler(CommandHandler(["pharem"], harem, block=False))
 application.add_handler(CallbackQueryHandler(harem_callback, pattern='^harem:', block=False))
-application.add_handler(CommandHandler("smode", set_hmode, block=False))
+application.add_handler(CommandHandler("pmode", set_pmode, block=False))
 application.add_handler(CallbackQueryHandler(mode_button, pattern='^mode_', block=False))
