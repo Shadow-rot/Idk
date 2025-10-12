@@ -249,7 +249,7 @@ async def set_hmode(update: Update, context: CallbackContext) -> None:
     """Set harem display mode"""
     keyboard = [
         [
-            InlineKeyboardButton("🧩 Default", callback_data="mode_default"),
+            InlineKeyboardButton("🧩  Default", callback_data="mode_default"),
             InlineKeyboardButton("🔮 By Rarity", callback_data="mode_rarity"),
         ]
     ]
