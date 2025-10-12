@@ -9,16 +9,19 @@ from telegram.ext import CommandHandler, CallbackContext, MessageHandler, Callba
 from telegram.error import BadRequest, Forbidden
 
 from shivu import (
-    collection, 
-    top_global_groups_collection, 
-    group_user_totals_collection, 
-    user_collection, 
-    user_totals_collection, 
+    db,
     shivuu,
     application, 
     LOGGER
 )
 from shivu.modules import ALL_MODULES
+
+# Database collections
+collection = db['anime_characters_lol']
+user_collection = db['user_collection_lmaoooo']
+user_totals_collection = db['user_totals_lmaoooo']
+group_user_totals_collection = db['group_user_totalsssssss']
+top_global_groups_collection = db['top_global_groups']
 
 # Global dictionaries for tracking
 locks = {}
@@ -160,9 +163,16 @@ async def send_image(update: Update, context: CallbackContext) -> None:
         if chat_id in first_correct_guesses:
             del first_correct_guesses[chat_id]
 
+        # Get rarity emoji
+        rarity = character.get('rarity', '🟢 Common')
+        if isinstance(rarity, str):
+            rarity_emoji = rarity.split(' ')[0] if ' ' in rarity else '🟢'
+        else:
+            rarity_emoji = '🟢'
+
         # Send character image
         caption = (
-            f"***{character.get('rarity', ['🟢'])[0]} ʟᴏᴏᴋ ᴀ ᴡᴀɪғᴜ ʜᴀꜱ ꜱᴘᴀᴡɴᴇᴅ !! "
+            f"***{rarity_emoji} ʟᴏᴏᴋ ᴀ ᴡᴀɪғᴜ ʜᴀꜱ ꜱᴘᴀᴡɴᴇᴅ !! "
             f"ᴍᴀᴋᴇ ʜᴇʀ ʏᴏᴜʀ'ꜱ ʙʏ ɢɪᴠɪɴɢ\n/grab 𝚆𝚊𝚒𝚏𝚞 𝚗𝚊𝚖𝚎***"
         )
 
@@ -315,13 +325,22 @@ async def guess(update: Update, context: CallbackContext) -> None:
                 )
             ]]
 
+            # Get rarity properly
+            rarity = character.get('rarity', '🟢 Common')
+            if isinstance(rarity, str):
+                rarity_parts = rarity.split(' ', 1)
+                rarity_emoji = rarity_parts[0] if len(rarity_parts) > 0 else '🟢'
+                rarity_text = rarity_parts[1] if len(rarity_parts) > 1 else 'Common'
+            else:
+                rarity_emoji = '🟢'
+                rarity_text = 'Common'
+
             success_message = (
                 f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> '
                 f'Congratulations 🎊 You grabbed a new Waifu !!✅\n\n'
                 f'🎀 𝙉𝙖𝙢𝙚: <code>{character.get("name", "Unknown")}</code>\n'
                 f'⚡ 𝘼𝙣𝙞𝙢𝙚: <code>{character.get("anime", "Unknown")}</code>\n'
-                f'{character.get("rarity", ["🟢 Common"])[0]} 𝙍𝙖𝙧𝙞𝙩𝙮: '
-                f'<code>{character.get("rarity", ["🟢 Common"])[2:]}</code>\n\n'
+                f'{rarity_emoji} 𝙍𝙖𝙧𝙞𝙩𝙮: <code>{rarity_text}</code>\n\n'
                 f'✧⁠ Character successfully added in your harem'
             )
 
@@ -368,8 +387,8 @@ async def fav(update: Update, context: CallbackContext) -> None:
         # Create inline buttons for confirmation
         buttons = [
             [
-                InlineKeyboardButton("Yes", callback_data=f"yes_{character_id}"),
-                InlineKeyboardButton("No", callback_data=f"no_{character_id}")
+                InlineKeyboardButton("✅ Yes", callback_data=f"fav_yes_{character_id}_{user_id}"),
+                InlineKeyboardButton("❌ No", callback_data=f"fav_no_{user_id}")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(buttons)
@@ -378,9 +397,10 @@ async def fav(update: Update, context: CallbackContext) -> None:
         await update.message.reply_photo(
             photo=character.get("img_url", ""),
             caption=(
-                f"<b>Do you want to make this waifu your favorite..!</b>\n"
-                f"↬ <code>{character.get('name', 'Unknown')}</code> "
-                f"<code>({character.get('anime', 'Unknown')})</code>"
+                f"<b>💖 Do you want to make this waifu your favorite?</b>\n\n"
+                f"✨ <b>Name:</b> <code>{character.get('name', 'Unknown')}</code>\n"
+                f"📺 <b>Anime:</b> <code>{character.get('anime', 'Unknown')}</code>\n"
+                f"🆔 <b>ID:</b> <code>{character.get('id', 'Unknown')}</code>"
             ),
             reply_markup=reply_markup,
             parse_mode='HTML'
@@ -391,36 +411,69 @@ async def fav(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text('An error occurred while processing your request.')
 
 
-async def handle_yes(update: Update, context: CallbackContext) -> None:
-    """Handle 'Yes' button for favorite selection"""
+async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
+    """Handle favorite button callbacks"""
     query = update.callback_query
-    await query.answer()
-
-    user_id = query.from_user.id
-    character_id = query.data.split('_')[1]
-
-    try:
-        # Update the user's favorites with the selected waifu
-        await user_collection.update_one(
-            {'id': user_id}, 
-            {'$set': {'favorites': [character_id]}}
-        )
-
-        await query.edit_message_caption(caption="✅ Waifu marked as favorite!")
-    except Exception as e:
-        LOGGER.error(f"Error setting favorite: {e}")
-        await query.edit_message_caption(caption="❌ Error setting favorite.")
-
-
-async def handle_no(update: Update, context: CallbackContext) -> None:
-    """Handle 'No' button for favorite selection"""
-    query = update.callback_query
-    await query.answer("Okay, no worries!")
     
     try:
-        await query.edit_message_caption(caption="❌ Action canceled.")
+        await query.answer()
+        
+        # Parse callback data
+        data_parts = query.data.split('_')
+        action = data_parts[1]  # 'yes' or 'no'
+        
+        if action == 'yes':
+            character_id = data_parts[2]
+            user_id = int(data_parts[3])
+            
+            # Verify the user clicking is the same user who requested
+            if query.from_user.id != user_id:
+                await query.answer("⚠️ This is not your request!", show_alert=True)
+                return
+            
+            # Update the user's favorite
+            result = await user_collection.update_one(
+                {'id': user_id}, 
+                {'$set': {'favorites': character_id}}
+            )
+            
+            if result.modified_count > 0:
+                await query.edit_message_caption(
+                    caption=(
+                        f"<b>✅ Success!</b>\n\n"
+                        f"💖 Waifu marked as your favorite!\n"
+                        f"🆔 Character ID: <code>{character_id}</code>"
+                    ),
+                    parse_mode='HTML'
+                )
+            else:
+                await query.edit_message_caption(
+                    caption="❌ Failed to set favorite. Please try again.",
+                    parse_mode='HTML'
+                )
+                
+        elif action == 'no':
+            user_id = int(data_parts[2])
+            
+            # Verify the user clicking is the same user who requested
+            if query.from_user.id != user_id:
+                await query.answer("⚠️ This is not your request!", show_alert=True)
+                return
+            
+            await query.edit_message_caption(
+                caption="❌ Action canceled. No changes made.",
+                parse_mode='HTML'
+            )
+            
     except Exception as e:
-        LOGGER.error(f"Error canceling favorite: {e}")
+        LOGGER.error(f"Error in fav callback: {e}")
+        try:
+            await query.edit_message_caption(
+                caption="❌ An error occurred. Please try again.",
+                parse_mode='HTML'
+            )
+        except:
+            await query.answer("❌ Error occurred", show_alert=True)
 
 
 def main() -> None:
@@ -429,8 +482,9 @@ def main() -> None:
         # Add command handlers
         application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
         application.add_handler(CommandHandler('fav', fav, block=False))
-        application.add_handler(CallbackQueryHandler(handle_yes, pattern="^yes_"))
-        application.add_handler(CallbackQueryHandler(handle_no, pattern="^no_"))
+        
+        # Add callback handlers with specific patterns
+        application.add_handler(CallbackQueryHandler(handle_fav_callback, pattern="^fav_", block=False))
 
         # Add message handler (should be last)
         application.add_handler(MessageHandler(
