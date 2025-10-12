@@ -13,7 +13,7 @@ from shivu import shivuu as bot
 character_cache = TTLCache(maxsize=1000, ttl=300)
 anime_cache = TTLCache(maxsize=500, ttl=600)
 
-OWNER_ID = 5147822244
+OWNER_ID = 8297659126
 
 # ==================== UTILITY FUNCTIONS ====================
 
