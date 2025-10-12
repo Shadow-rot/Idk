@@ -22,20 +22,17 @@ from shivu import application, db
 # Database collections
 collection = db['anime_characters_lol']
 user_collection = db['user_collection_lmaoooo']
-user_totals_collection = db['user_totals_lmaoooo']
-group_user_totals_collection = db['group_user_totalsssssss']
-top_global_groups_collection = db['top_global_groups']
 
 # Create indexes for better performance
 try:
-    db.characters.create_index([('id', ASCENDING)])
-    db.characters.create_index([('anime', ASCENDING)])
-    db.characters.create_index([('name', ASCENDING)])
-    db.characters.create_index([('rarity', ASCENDING)])
+    collection.create_index([('id', ASCENDING)])
+    collection.create_index([('anime', ASCENDING)])
+    collection.create_index([('name', ASCENDING)])
+    collection.create_index([('rarity', ASCENDING)])
     
-    db.user_collection.create_index([('id', ASCENDING)])
-    db.user_collection.create_index([('characters.id', ASCENDING)])
-    db.user_collection.create_index([('characters.name', ASCENDING)])
+    user_collection.create_index([('id', ASCENDING)])
+    user_collection.create_index([('characters.id', ASCENDING)])
+    user_collection.create_index([('characters.name', ASCENDING)])
 except Exception as e:
     print(f"Index creation error: {e}")
 
@@ -57,20 +54,6 @@ def to_small_caps(text):
         '0': '0', '1': '1', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9'
     }
     return ''.join(small_caps_map.get(c, c) for c in text)
-
-# Helper function for event captions
-def get_event_caption(character: dict) -> str:
-    """Get event caption with emoji"""
-    event = character.get('event')
-    if not event or not isinstance(event, dict):
-        return ""
-    
-    event_name = event.get('name', '')
-    event_sign = event.get('sign', '')
-    
-    if event_name and event_sign:
-        return f"\n{event_sign} {to_small_caps('event')} {event_name} {event_sign}"
-    return ""
 
 
 async def get_global_count(character_id: str) -> int:
@@ -101,6 +84,38 @@ async def get_anime_count(anime_name: str) -> int:
     except Exception as e:
         print(f"Error getting anime count: {e}")
         return 0
+
+
+async def get_user_favorite_image(user_id: int, characters_list: list) -> str:
+    """Get user's favorite character image or fallback to first character"""
+    try:
+        # Get user data
+        user = await user_collection.find_one({'id': user_id})
+        if not user:
+            return None
+        
+        # Get favorite character ID
+        fav_id = user.get('favorites')
+        
+        if fav_id:
+            # Find favorite character in user's collection
+            fav_char = next(
+                (c for c in characters_list if isinstance(c, dict) and c.get('id') == fav_id),
+                None
+            )
+            if fav_char and 'img_url' in fav_char:
+                return fav_char['img_url']
+        
+        # Fallback to first character with image
+        for char in characters_list:
+            if isinstance(char, dict) and 'img_url' in char:
+                return char['img_url']
+        
+        return None
+        
+    except Exception as e:
+        print(f"Error getting favorite image: {e}")
+        return None
 
 
 # Inline query handler
@@ -221,10 +236,6 @@ async def inlinequery(update: Update, context) -> None:
                     f"<b>{rarity_emoji} {to_small_caps('rarity')}</b> <code>{to_small_caps(rarity_text)}</code>\n\n"
                     f"<b>{to_small_caps('globally grabbed')} {global_count} {to_small_caps('times')}</b>"
                 )
-
-            # Add event info
-            event_caption = get_event_caption(character)
-            caption += event_caption
 
             # Inline button
             button = InlineKeyboardMarkup([
