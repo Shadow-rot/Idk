@@ -517,7 +517,6 @@ await query.answer(to_small_caps("error loading stats"), show_alert=True)
 ==================== HANDLER REGISTRATION ====================
 
 Telegram handlers
-
 application.add_handler(CommandHandler('check', check_character, block=False))
 application.add_handler(CommandHandler('find', find_character, block=False))
 application.add_handler(CallbackQueryHandler(handle_top_owners, pattern=r'^top_owners_', block=False))
