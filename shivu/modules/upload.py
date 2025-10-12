@@ -165,7 +165,7 @@ async def update(update: Update, context: CallbackContext) -> None:
                 new_value = rarity_map[int(args[2])]
             except KeyError:
              await update.message.reply_text('Invalid rarity. Please use 1, 2, 3, 4, 5, or 6.')
-                return
+   return
         elif args[1] == 'event':
             event_map = {
                 1: {"name": "𝒔𝒖𝒎𝒎𝒆𝒓", "sign": "🏖"},
