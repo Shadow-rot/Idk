@@ -307,7 +307,7 @@ async def hmode_rarity(update: Update, context: CallbackContext) -> None:
     
     query = update.callback_query
     await query.edit_message_caption(
-        caption="<b>🎨 Filter by Rarity</b>\n\nSelect a rarity to display:",
+        caption="<b>🔮 Filter Rarity</b>\n\nSelect a rarity to display:",
         reply_markup=reply_markup,
         parse_mode='HTML'
     )
