@@ -179,11 +179,11 @@ def format_character_card(character, global_count=None, show_owners=False, owner
             
             # Medal for top 3
             if i == 1:
-                medal = "1"
+                medal = "1:"
             elif i == 2:
-                medal = "2"
+                medal = "2:"
             elif i == 3:
-                medal = "3"
+                medal = "3:"
             else:
                 medal = f"{i}"
             
