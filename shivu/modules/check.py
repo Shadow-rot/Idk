@@ -372,7 +372,7 @@ async def get_users_by_character(character_id):
         return []
 
 
-@bot.on_message(filters.command(["ik"]) & filters.user(OWNER_ID))
+@bot.on_message(filters.command(["ik"])
 async def find_users_with_character(_, message: t.Message):
     """Find all users who have a specific character (Owner only)"""
     try:
