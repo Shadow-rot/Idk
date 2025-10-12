@@ -74,7 +74,7 @@ async def start(update: Update, context: CallbackContext) -> None:
             )
 
     # Get actual user stats from database
-    user_tokens = user_data.get('tokens', 0)
+    user_balance = user_data.get('balance', 0)  # Gold coins from wallet
     user_totals = await user_totals_collection.find_one({'id': user_id})
     total_characters = user_totals['count'] if user_totals else 0
     referred_count = user_data.get('referred_users', 0)
@@ -84,38 +84,38 @@ async def start(update: Update, context: CallbackContext) -> None:
         
         caption = f"""
 ┏━━━━━━━━━━━━━━━━━━━┓
-  ✦ <b>{to_small_caps('anime catcher')}</b> ✦
+  ⚡ <b>{to_small_caps('anime catcher')}</b> ⚡
 ┗━━━━━━━━━━━━━━━━━━━┛
 
-👋 {to_small_caps('hey')} <a href='tg://user?id={user_id}'>{escape(first_name)}</a>
+🌟 {to_small_caps('hey')} <a href='tg://user?id={user_id}'>{escape(first_name)}</a>
 
-🎯 {to_small_caps('catch collect and dominate')}
-⚡ {to_small_caps('build your anime empire')}
+🎯 {to_small_caps('catch collect dominate')}
+✨ {to_small_caps('build your empire now')}
 
 ━━━━━━━━━━━━━━━━━━━
-💎 {to_small_caps('balance')}: <b>{user_tokens}</b>
+🪙 {to_small_caps('wallet')}: <b>{user_balance}</b> {to_small_caps('gold')}
 🎴 {to_small_caps('slaves')}: <b>{total_characters}</b>
-👥 {to_small_caps('referrals')}: <b>{referred_count}</b>
+👤 {to_small_caps('referrals')}: <b>{referred_count}</b>
 ━━━━━━━━━━━━━━━━━━━
 
-🎁 {to_small_caps('invite friends get')} <b>1000 💎</b>
+🎁 {to_small_caps('invite get')} <b>1000 🪙</b>
 """
 
         keyboard = [
             [
-                InlineKeyboardButton(f"🎮 {to_small_caps('play')}", url=f'https://t.me/{BOT_USERNAME}?startgroup=new'),
-                InlineKeyboardButton(f"💰 {to_small_caps('earn')}", callback_data='earn')
+                InlineKeyboardButton(f"⚔️ {to_small_caps('play')}", url=f'https://t.me/{BOT_USERNAME}?startgroup=new'),
+                InlineKeyboardButton(f"🪙 {to_small_caps('earn')}", callback_data='earn')
             ],
             [
                 InlineKeyboardButton(f"📊 {to_small_caps('stats')}", callback_data='stats'),
-                InlineKeyboardButton(f"❓ {to_small_caps('help')}", callback_data='help')
+                InlineKeyboardButton(f"❔ {to_small_caps('help')}", callback_data='help')
             ],
             [
-                InlineKeyboardButton(f"🔗 {to_small_caps('invite friends')}", callback_data='referral')
+                InlineKeyboardButton(f"🔗 {to_small_caps('invite')}", callback_data='referral')
             ],
             [
                 InlineKeyboardButton(f"💬 {to_small_caps('support')}", url=f'https://t.me/PICK_X_SUPPORT'),
-                InlineKeyboardButton(f"📢 {to_small_caps('updates')}", url=f'https://t.me/PICK_X_UPDATE')
+                InlineKeyboardButton(f"📣 {to_small_caps('updates')}", url=f'https://t.me/PICK_X_UPDATE')
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -130,13 +130,13 @@ async def start(update: Update, context: CallbackContext) -> None:
         )
     else:
         caption = f"""
-✦ <b>{to_small_caps('hey')} {escape(first_name)}</b>
+⚡ <b>{to_small_caps('hey')} {escape(first_name)}</b>
 
-🎮 {to_small_caps('im alive and ready')}
-🌸 {to_small_caps('lets catch some anime')}
+✨ {to_small_caps('im alive and ready')}
+🎴 {to_small_caps('catch anime with me')}
 """
         keyboard = [
-            [InlineKeyboardButton(f"🚀 {to_small_caps('start')}", url=f'https://t.me/{BOT_USERNAME}?start=true')],
+            [InlineKeyboardButton(f"🌟 {to_small_caps('start')}", url=f'https://t.me/{BOT_USERNAME}?start=true')],
             [InlineKeyboardButton(f"➕ {to_small_caps('add me')}", url=f'https://t.me/{BOT_USERNAME}?startgroup=new')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -159,25 +159,25 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
     user_totals = await user_totals_collection.find_one({'id': user_id})
     
     if query.data == 'stats':
-        user_tokens = user_data.get('tokens', 0)
+        user_balance = user_data.get('balance', 0)
         total_characters = user_totals['count'] if user_totals else 0
         referred_count = user_data.get('referred_users', 0)
         
         stats_text = f"""
 ┏━━━━━━━━━━━━━━━━━━━┓
-  📊 <b>{to_small_caps('your profile')}</b>
+  📊 <b>{to_small_caps('your stats')}</b>
 ┗━━━━━━━━━━━━━━━━━━━┛
 
-🎭 {to_small_caps('name')}: {escape(user_data.get('first_name', 'unknown'))}
+👤 {to_small_caps('name')}: {escape(user_data.get('first_name', 'unknown'))}
 🆔 {to_small_caps('id')}: <code>{user_id}</code>
 
 ━━━━━━━━━━━━━━━━━━━
-💎 {to_small_caps('balance')}: <b>{user_tokens}</b>
+🪙 {to_small_caps('wallet')}: <b>{user_balance}</b> {to_small_caps('gold')}
 🎴 {to_small_caps('total slaves')}: <b>{total_characters}</b>
-👥 {to_small_caps('referrals')}: <b>{referred_count}</b>
+👤 {to_small_caps('referrals')}: <b>{referred_count}</b>
 ━━━━━━━━━━━━━━━━━━━
 
-⚡ {to_small_caps('keep grinding')}
+⚡ {to_small_caps('keep grinding warrior')}
 """
         await query.edit_message_caption(
             caption=stats_text,
@@ -188,27 +188,26 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
     elif query.data == 'earn':
         earn_text = f"""
 ┏━━━━━━━━━━━━━━━━━━━┓
-  💰 <b>{to_small_caps('earn tokens')}</b>
+  🪙 <b>{to_small_caps('earn gold')}</b>
 ┗━━━━━━━━━━━━━━━━━━━┛
 
 🎁 {to_small_caps('referral rewards')}
 ━━━━━━━━━━━━━━━━━━━
-🌟 {to_small_caps('you earn')}: <b>1000 💎</b>
-🎊 {to_small_caps('friend gets')}: <b>500 💎</b>
+✨ {to_small_caps('you earn')}: <b>1000 🪙</b>
+🌟 {to_small_caps('friend gets')}: <b>500 🪙</b>
 
-📝 {to_small_caps('how it works')}
+📝 {to_small_caps('daily rewards')}
 ━━━━━━━━━━━━━━━━━━━
-1️⃣ {to_small_caps('share your invite link')}
-2️⃣ {to_small_caps('friend joins via link')}
-3️⃣ {to_small_caps('instant rewards')}
+🎯 /claim → {to_small_caps('get')} <b>2000 🪙</b> {to_small_caps('daily')}
+🎲 /roll → {to_small_caps('gamble and win big')}
 
-💡 {to_small_caps('more ways to earn')}
+💰 {to_small_caps('more ways')}
 ━━━━━━━━━━━━━━━━━━━
-🎮 {to_small_caps('play games')}
+⚔️ {to_small_caps('play games')}
 🎴 {to_small_caps('collect rare slaves')}
 💸 {to_small_caps('trade characters')}
 
-⚡ {to_small_caps('tap invite button below')}
+⚡ {to_small_caps('start earning now')}
 """
         await query.edit_message_caption(
             caption=earn_text,
@@ -219,31 +218,32 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
     elif query.data == 'help':
         help_text = f"""
 ┏━━━━━━━━━━━━━━━━━━━┓
-  ❓ <b>{to_small_caps('commands')}</b>
+  ❔ <b>{to_small_caps('commands')}</b>
 ┗━━━━━━━━━━━━━━━━━━━┛
 
-💎 {to_small_caps('economy')}
+🪙 {to_small_caps('economy')}
 ━━━━━━━━━━━━━━━━━━━
-/bal › {to_small_caps('check balance')}
-/pay › {to_small_caps('send tokens')}
+/bal → {to_small_caps('check wallet')}
+/pay → {to_small_caps('send gold')}
+/claim → {to_small_caps('daily reward')}
+/roll → {to_small_caps('gamble gold')}
 
 🎴 {to_small_caps('collection')}
 ━━━━━━━━━━━━━━━━━━━
-/slaves › {to_small_caps('view collection')}
-/myslaves › {to_small_caps('your slaves')}
+/slaves → {to_small_caps('all characters')}
+/myslaves → {to_small_caps('your collection')}
 
-🎮 {to_small_caps('gameplay')}
+⚔️ {to_small_caps('gameplay')}
 ━━━━━━━━━━━━━━━━━━━
-/catch › {to_small_caps('catch characters')}
-/trade › {to_small_caps('trade with others')}
+/catch → {to_small_caps('catch slaves')}
+/trade → {to_small_caps('trade slaves')}
 
-📊 {to_small_caps('stats')}
+📊 {to_small_caps('ranking')}
 ━━━━━━━━━━━━━━━━━━━
-/profile › {to_small_caps('your profile')}
-/leaderboard › {to_small_caps('top players')}
+/xp → {to_small_caps('check rank')}
+/tophunters → {to_small_caps('leaderboard')}
 
-💡 {to_small_caps('need more help')}
-{to_small_caps('join support group')}
+💡 {to_small_caps('join support for help')}
 """
         await query.edit_message_caption(
             caption=help_text,
@@ -257,29 +257,29 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
         
         referral_text = f"""
 ┏━━━━━━━━━━━━━━━━━━━┓
-  🔗 <b>{to_small_caps('referral program')}</b>
+  🔗 <b>{to_small_caps('invite program')}</b>
 ┗━━━━━━━━━━━━━━━━━━━┛
 
-👥 {to_small_caps('total referrals')}: <b>{referred_count}</b>
-💎 {to_small_caps('earned')}: <b>{referred_count * 1000}</b>
+👤 {to_small_caps('your referrals')}: <b>{referred_count}</b>
+🪙 {to_small_caps('earned')}: <b>{referred_count * 1000}</b> {to_small_caps('gold')}
 
-📋 {to_small_caps('how to refer')}
+📋 {to_small_caps('how to invite')}
 ━━━━━━━━━━━━━━━━━━━
-1️⃣ {to_small_caps('copy your link below')}
+1️⃣ {to_small_caps('copy link below')}
 2️⃣ {to_small_caps('share with friends')}
-3️⃣ {to_small_caps('they must click and start')}
-4️⃣ {to_small_caps('both get instant rewards')}
+3️⃣ {to_small_caps('they click and start bot')}
+4️⃣ {to_small_caps('instant rewards')}
 
-🎁 {to_small_caps('rewards')}
+🎁 {to_small_caps('reward breakdown')}
 ━━━━━━━━━━━━━━━━━━━
-🌟 {to_small_caps('you')} → <b>1000 💎</b>
-🎊 {to_small_caps('friend')} → <b>500 💎</b>
+✨ {to_small_caps('you get')} → <b>1000 🪙</b>
+🌟 {to_small_caps('friend gets')} → <b>500 🪙</b>
 
-🔗 {to_small_caps('your link')}
+🔗 {to_small_caps('your invite link')}
 ━━━━━━━━━━━━━━━━━━━
 <code>{referral_link}</code>
 
-💡 {to_small_caps('tap to copy and share')}
+💡 {to_small_caps('tap to copy link')}
 """
         await query.edit_message_caption(
             caption=referral_text,
