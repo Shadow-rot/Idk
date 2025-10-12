@@ -2,6 +2,7 @@ from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 from telegraph import Telegraph
 import requests
+from shivu import application
 
 telegraph = Telegraph()
 telegraph.create_account(short_name="ShivuBot")
