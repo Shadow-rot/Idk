@@ -84,7 +84,7 @@ async def start(update: Update, context: CallbackContext) -> None:
         
         caption = f"""
 ┏━━━━━━━━━━━━━━━━━━━┓
-  ⚡ <b>{to_small_caps('pick catcher')}</b> ⚡
+  ⚡ <b>{to_small_caps('anime catcher')}</b> ⚡
 ┗━━━━━━━━━━━━━━━━━━━┛
 
 🌟 {to_small_caps('hey')} <a href='tg://user?id={user_id}'>{escape(first_name)}</a>
