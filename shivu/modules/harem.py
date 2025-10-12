@@ -30,7 +30,7 @@ HAREM_MODE_MAPPING = {
     "christmas": "🎄 Christmas",
     "mythic": "🏵 Mythic",
     "events": "🎗 Special Events",
-    "amv": "🎥 AMV",
+    "𝘼𝙈𝙑": "🎥 𝘼𝙈𝙑",
     "default": None
 }
 
