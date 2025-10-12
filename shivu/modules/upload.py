@@ -15,13 +15,23 @@ Format:
 img_url character-name anime-name rarity-number event-number  
 
 Use rarity number accordingly:  
-1 🟢 Common  
-2 🟣 Rare  
-3 🟡 Legendary  
-4 💮 Special Edition  
-5 🔮 Premium Edition  
-6 🎗️ Supreme  
-7 🧜🏻‍♀️ Mermaid  
+1. 🟢 Comman 
+2. 🟣 Rare
+3. 🟡 Legendary 
+4. 💮 Special Edition 
+5. 💫 Neon 
+6. ✨ Manga 
+7. 🎭 Cosplay 
+8. 🎐 Celestial 
+9. 🔮 Premium edition 
+10.💋 Erotic 
+11. 🌤 Summer 
+12. ☃️ Winter 
+13. ☔️ Monsoon 
+14. 💝 Valentine 
+15. 🎃 Halloween 
+16. 🏵 Mythic
+17. 🎥 Amv
 
 Use event number accordingly:  
 1 🏖 Summer  
@@ -70,13 +80,23 @@ EVENT_MAPPING = {
 }
 
 RARITY_MAP = {
-    1: "🟢 Common",
+    1: "🟢 Comman",
     2: "🟣 Rare",
-    3: "🟡 Legendary",
-    4: "💮 Special Edition",
-    5: "🔮 Premium Edition",
-    6: "🎗️ Supreme",
-    7: "🧜🏻‍♀️ Mermaid"
+    3: "🟡 Legendary", 
+    4: "💮 Special Edition", 
+    5: "💫 Neon",
+    6: "✨ Manga", 
+    7: "🎭 Cosplay",
+    8: "🎐 Celestial",
+    9: "🔮 Premium edition",
+    10: "💋 Erotic",
+    11: "🌤 Summer",
+    12: "☃️ Winter",
+    13: "☔️ Monsoon",
+    14: "💝 Valentine",
+    15: "🎃 Halloween", 
+    16: "🏵 Mythic",
+    17: "🎥 Amv"
 }
 
 
