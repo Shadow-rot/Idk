@@ -272,7 +272,7 @@ async def find_character(update: Update, context: CallbackContext) -> None:
 
 # ==================== /ANI COMMAND (PYROGRAM) ====================
 
-@bot.on_message(filters.command(["ani"]))
+@bot.on_message(filters.command(["anime"]))
 async def find_anime(_, message: t.Message):
     """Find all characters from an anime with pagination"""
     try:
@@ -372,7 +372,7 @@ async def get_users_by_character(character_id):
         return []
 
 
-@bot.on_message(filters.command(["ik"]))
+@bot.on_message(filters.command(["pfind"]))
 async def find_users_with_character(_, message: t.Message):
     """Find all users who have a specific character"""
     try:
@@ -522,6 +522,6 @@ async def handle_char_stats(update: Update, context: CallbackContext) -> None:
 
 # Telegram handlers
 application.add_handler(CommandHandler('check', check_character, block=False))
-application.add_handler(CommandHandler('findchar', find_character, block=False))
+application.add_handler(CommandHandler('find', find_character, block=False))
 application.add_handler(CallbackQueryHandler(handle_top_owners, pattern=r'^top_owners_', block=False))
 application.add_handler(CallbackQueryHandler(handle_char_stats, pattern=r'^char_stats_', block=False))
