@@ -295,8 +295,8 @@ async def off_anime(update: Update, context: CallbackContext) -> None:
 
 def register_rarity_handlers():
     """Register rarity and anime control handlers"""
-    application.add_handler(CommandHandler('set_on', set_on_rarity, block=False))
-    application.add_handler(CommandHandler('set_off', set_off_rarity, block=False))
-    application.add_handler(CommandHandler('on', on_anime, block=False))
-    application.add_handler(CommandHandler('off', off_anime, block=False))
+    application.add_handler(CommandHandler('set_off', set_on_rarity, block=False))
+    application.add_handler(CommandHandler('set_on', set_off_rarity, block=False))
+    application.add_handler(CommandHandler('off', on_anime, block=False))
+    application.add_handler(CommandHandler('on', off_anime, block=False))
     LOGGER.info("[RARITY CONTROL] Handlers registered")
