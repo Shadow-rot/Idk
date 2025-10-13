@@ -159,7 +159,7 @@ def format_character_card(character, global_count=None, show_owners=False, owner
     if show_owners and owners_list:
         # Show owners list
         caption = f"""<b>╭━━━━━━━━━━━━━━━━━╮</b>
-<b>┃  👥 {to_small_caps('character owners')}  ┃</b>
+<b>┃  🎴 {to_small_caps('character owners')}  ┃</b>
 <b>╰━━━━━━━━━━━━━━━━━╯</b>
 
 <b>🆔 {to_small_caps('id')}</b> <code>{char_id}</code>
@@ -534,7 +534,7 @@ async def handle_back_to_card(update: Update, context: CallbackContext) -> None:
         keyboard = [
             [
                 InlineKeyboardButton(
-                    f"👥 {to_small_caps('show owners')}", 
+                    f"🌍 {to_small_caps('show owners')}", 
                     callback_data=f"show_owners_{character_id}"
                 ),
                 InlineKeyboardButton(
