@@ -163,12 +163,12 @@ def format_character_card(character, global_count=None, show_owners=False, owner
 <b>╰━━━━━━━━━━━━━━━━━╯</b>
 
 <b>🆔 {to_small_caps('id')}</b> <code>{char_id}</code>
-<b>✨ {to_small_caps('name')}</b> <code>{escape(char_name)}</code>
+<b>🧬 {to_small_caps('name')}</b> <code>{escape(char_name)}</code>
 <b>📺 {to_small_caps('anime')}</b> <code>{escape(char_anime)}</code>
 <b>{rarity_emoji} {to_small_caps('rarity')}</b> <code>{to_small_caps(rarity_text)}</code>
 
 <b>━━━━━━━━━━━━━━━━━</b>
-<b>🏆 {to_small_caps('top 10 owners')}</b>
+<b>🌍 {to_small_caps('top 10 owners')}</b>
 """
         
         for i, user in enumerate(owners_list[:10], 1):
@@ -202,7 +202,7 @@ def format_character_card(character, global_count=None, show_owners=False, owner
 <b>╰━━━━━━━━━━━━━━━━━╯</b>
 
 <b>🆔 {to_small_caps('id')}</b> <code>{char_id}</code>
-<b>✨ {to_small_caps('name')}</b> <code>{escape(char_name)}</code>
+<b>🧬 {to_small_caps('name')}</b> <code>{escape(char_name)}</code>
 <b>📺 {to_small_caps('anime')}</b> <code>{escape(char_anime)}</code>
 <b>{rarity_emoji} {to_small_caps('rarity')}</b> <code>{to_small_caps(rarity_text)}</code>"""
         
