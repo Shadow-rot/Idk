@@ -23,7 +23,7 @@ async def give_character(receiver_id, character_id):
                 f"🍀 Slave Added {receiver_id}\n"
                 f"\n"
                 f"🍥 Name : {character['name']}\n"
-                f"🏵️ Rarity : {character['rarity']}\n"
+                f" Rarity : {character['rarity']}\n"
                 f"🆔 ID : {character['id']}"
             )
 
