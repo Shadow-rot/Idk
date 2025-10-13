@@ -158,8 +158,7 @@ def format_character_card(character, global_count=None, show_owners=False, owner
     # Build caption
     if show_owners and owners_list:
         # Show owners list
-        caption = f"""
-<b>╭━━━━━━━━━━━━━━━━━╮</b>
+        caption = f"""<b>╭━━━━━━━━━━━━━━━━━╮</b>
 <b>┃  🎴 {to_small_caps('character owners')}  ┃</b>
 <b>╰━━━━━━━━━━━━━━━━━╯</b>
 
@@ -170,8 +169,7 @@ def format_character_card(character, global_count=None, show_owners=False, owner
 
 <b>━━━━━━━━━━━━━━━━━</b>
 """
-<b>🫧 {to_small_caps('top 10 owners')}</b>
-"""
+<b>🫧 {to_small_caps('top 10 owners')}</b>"""
         
         for i, user in enumerate(owners_list[:10], 1):
             user_id = user['id']
