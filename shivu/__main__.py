@@ -389,8 +389,8 @@ async def guess(update: Update, context: CallbackContext) -> None:
             success_message = (
                 f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> '
                 f'Congratulations 🎊 You grabbed a new Waifu !!✅\n\n'
-                f'🎀 𝙉𝙖𝙢𝙚: <code>{character.get("name", "Unknown")}</code>\n'
-                f'⚡ 𝘼𝙣𝙞𝙢𝙚: <code>{character.get("anime", "Unknown")}</code>\n'
+                f'🍁 𝙉𝙖𝙢𝙚: <code>{character.get("name", "Unknown")}</code>\n'
+                f'⛩️ 𝘼𝙣𝙞𝙢𝙚: <code>{character.get("anime", "Unknown")}</code>\n'
                 f'{rarity_emoji} 𝙍𝙖𝙧𝙞𝙩𝙮: <code>{rarity_text}</code>\n\n'
                 f'✧⁠ Character successfully added in your harem'
             )
