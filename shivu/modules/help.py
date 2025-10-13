@@ -183,21 +183,20 @@ async def help_callback(update: Update, context: CallbackContext):
 ━━━━━━━━━━━━━━━━━━━
 🎯 <b>{to_small_caps('catching')}</b>
 ━━━━━━━━━━━━━━━━━━━
-• <code>/slave name</code> → {to_small_caps('catch slave')}
+• <code>/grab name</code> → {to_small_caps('catch slave')}
 • {to_small_caps('spawns every 100 messages')}
 
 ━━━━━━━━━━━━━━━━━━━
 👤 <b>{to_small_caps('view collection')}</b>
 ━━━━━━━━━━━━━━━━━━━
-• <code>/myslave</code> → {to_small_caps('your slaves')}
-• <code>/slaves</code> → {to_small_caps('all slaves')}
+• <code>/pharem</code> → {to_small_caps('your slaves')}
 • <code>/smode</code> → {to_small_caps('sort by rank')}
 
 ━━━━━━━━━━━━━━━━━━━
 💱 <b>{to_small_caps('trading')}</b>
 ━━━━━━━━━━━━━━━━━━━
 • <code>/trade</code> → {to_small_caps('trade with others')}
-• <code>/sinfo id</code> → {to_small_caps('slave details')}
+• <code>/check id</code> → {to_small_caps('slave details')}
 
 🌟 {to_small_caps('build your empire')}
 """
@@ -235,6 +234,8 @@ async def help_callback(update: Update, context: CallbackContext):
 • {to_small_caps('level up through battles')}
 
 ✨ {to_small_caps('collect rare beasts')}
+
+coming soon 
 """
         await query.edit_message_caption(
             caption=caption,
@@ -289,9 +290,8 @@ async def help_callback(update: Update, context: CallbackContext):
 ━━━━━━━━━━━━━━━━━━━
 👤 <b>{to_small_caps('personal stats')}</b>
 ━━━━━━━━━━━━━━━━━━━
-• <code>/sinv</code> → {to_small_caps('check tokens')}
 • <code>/xp</code> → {to_small_caps('check level')}
-• <code>/sinfo</code> → {to_small_caps('full profile')}
+• <code>/info</code> → {to_small_caps('full profile')}
 
 ━━━━━━━━━━━━━━━━━━━
 🏆 <b>{to_small_caps('leaderboards')}</b>
