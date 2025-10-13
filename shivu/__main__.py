@@ -365,7 +365,7 @@ async def fav(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙥𝙧𝙤𝙫𝙞𝙙𝙚 𝙒𝘼𝙄𝙁𝙐 𝙞𝙙...')
         return
 
-    character_id = context.args[0]
+    character_id = str(context.args[0])  # Convert to string
 
     try:
         # Find the user in the database
@@ -374,11 +374,11 @@ async def fav(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text('𝙔𝙤𝙪 𝙝𝙖𝙫𝙚 𝙣𝙤𝙩 𝙂𝙤𝙩 𝘼𝙣𝙮 𝙒𝘼𝙄𝙁𝙐 𝙮𝙚𝙩...')
             return
 
-        # Find the waifu in the user's character list
+        # Find the waifu in the user's character list (compare as strings)
         character = next(
-    (c for c in user.get('characters', []) if str(c.get('id')) == str(character_id)),
-    None
-)
+            (c for c in user.get('characters', []) if str(c.get('id')) == character_id),
+            None
+        )
         
         if not character:
             await update.message.reply_text('𝙏𝙝𝙞𝙨 𝙒𝘼𝙄𝙁𝙐 𝙞𝙨 𝙉𝙤𝙩 𝙄𝙣 𝙮𝙤𝙪𝙧 𝙒𝘼𝙄𝙁𝙐 𝙡𝙞𝙨𝙩')
@@ -423,7 +423,7 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
         action = data_parts[1]  # 'yes' or 'no'
         
         if action == 'yes':
-            character_id = data_parts[2]
+            character_id = str(data_parts[2])  # Convert to string
             user_id = int(data_parts[3])
             
             # Verify the user clicking is the same user who requested
@@ -431,18 +431,20 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
                 await query.answer("⚠️ This is not your request!", show_alert=True)
                 return
             
-            # Update the user's favorite
+            # Update the user's favorite (store as string with upsert)
             result = await user_collection.update_one(
-                {'id': user_id}, 
-                {'$set': {'favorites': character_id}}
+                {'id': user_id},
+                {'$set': {'favorites': character_id}},  # Store as string
+                upsert=True
             )
             
-            if result.modified_count > 0:
+            if result.modified_count > 0 or result.upserted_id:
                 await query.edit_message_caption(
                     caption=(
                         f"<b>✅ Success!</b>\n\n"
                         f"💖 Waifu marked as your favorite!\n"
-                        f"🆔 Character ID: <code>{character_id}</code>"
+                        f"🆔 Character ID: <code>{character_id}</code>\n\n"
+                        f"<i>Your favorite will be shown in inline queries!</i>"
                     ),
                     parse_mode='HTML'
                 )
