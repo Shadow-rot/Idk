@@ -57,14 +57,14 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
     # Ignore non-group messages
     if update.effective_chat.type not in ['group', 'supergroup']:
         return
-    
+
     # Ignore bot messages and commands
     if not update.message or not update.message.text:
         return
-    
+
     if update.message.text.startswith('/'):
         return
-    
+
     chat_id = str(update.effective_chat.id)
     user_id = update.effective_user.id
 
@@ -113,7 +113,7 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
         # Increment message count
         if chat_id not in message_counts:
             message_counts[chat_id] = 0
-        
+
         message_counts[chat_id] += 1
 
         # Check if it's time to spawn
@@ -129,7 +129,7 @@ async def send_image(update: Update, context: CallbackContext) -> None:
     try:
         # Fetch all characters
         all_characters = list(await collection.find({}).to_list(length=None))
-        
+
         if not all_characters:
             LOGGER.error("No characters found in database")
             return
@@ -182,7 +182,7 @@ async def send_image(update: Update, context: CallbackContext) -> None:
             caption=caption,
             parse_mode='Markdown'
         )
-        
+
         LOGGER.info(f"Character spawned in chat {chat_id}: {character.get('name', 'Unknown')}")
 
     except Exception as e:
@@ -243,7 +243,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
                         update_fields['username'] = update.effective_user.username
                 if update.effective_user.first_name != user.get('first_name'):
                     update_fields['first_name'] = update.effective_user.first_name
-                
+
                 if update_fields:
                     await user_collection.update_one({'id': user_id}, {'$set': update_fields})
 
@@ -264,7 +264,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
                 'user_id': user_id, 
                 'group_id': chat_id
             })
-            
+
             if group_user_total:
                 update_fields = {}
                 if hasattr(update.effective_user, 'username') and update.effective_user.username:
@@ -272,7 +272,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
                         update_fields['username'] = update.effective_user.username
                 if update.effective_user.first_name != group_user_total.get('first_name'):
                     update_fields['first_name'] = update.effective_user.first_name
-                
+
                 if update_fields:
                     await group_user_totals_collection.update_one(
                         {'user_id': user_id, 'group_id': chat_id}, 
@@ -298,7 +298,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
                 update_fields = {}
                 if update.effective_chat.title != group_info.get('group_name'):
                     update_fields['group_name'] = update.effective_chat.title
-                
+
                 if update_fields:
                     await top_global_groups_collection.update_one(
                         {'group_id': chat_id}, 
@@ -357,11 +357,136 @@ async def guess(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙒𝙧𝙞𝙩𝙚 𝘾𝙤𝙧𝙧𝙚𝙘𝙩 𝙉𝙖𝙢𝙚... ❌️')
 
 
+async def fav(update: Update, context: CallbackContext) -> None:
+    """Set a character as favorite"""
+    user_id = update.effective_user.id
+
+    if not context.args:
+        await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙥𝙧𝙤𝙫𝙞𝙙𝙚 𝙒𝘼𝙄𝙁𝙐 𝙞𝙙...')
+        return
+
+    character_id = str(context.args[0])  # Convert to string
+
+    try:
+        # Find the user in the database
+        user = await user_collection.find_one({'id': user_id})
+        if not user:
+            await update.message.reply_text('𝙔𝙤𝙪 𝙝𝙖𝙫𝙚 𝙣𝙤𝙩 𝙂𝙤𝙩 𝘼𝙣𝙮 𝙒𝘼𝙄𝙁𝙐 𝙮𝙚𝙩...')
+            return
+
+        # Find the waifu in the user's character list (compare as strings)
+        character = next(
+            (c for c in user.get('characters', []) if str(c.get('id')) == character_id),
+            None
+        )
+
+        if not character:
+            await update.message.reply_text('𝙏𝙝𝙞𝙨 𝙒𝘼𝙄𝙁𝙐 𝙞𝙨 𝙉𝙤𝙩 𝙄𝙣 𝙮𝙤𝙪𝙧 𝙒𝘼𝙄𝙁𝙐 𝙡𝙞𝙨𝙩')
+            return
+
+        # Create inline buttons for confirmation
+        buttons = [
+            [
+                InlineKeyboardButton("✅ Yes", callback_data=f"fav_yes_{character_id}_{user_id}"),
+                InlineKeyboardButton("❌ No", callback_data=f"fav_no_{user_id}")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(buttons)
+
+        # Send message with buttons and waifu details
+        await update.message.reply_photo(
+            photo=character.get("img_url", ""),
+            caption=(
+                f"<b>💖 Do you want to make this waifu your favorite?</b>\n\n"
+                f"✨ <b>Name:</b> <code>{character.get('name', 'Unknown')}</code>\n"
+                f"📺 <b>Anime:</b> <code>{character.get('anime', 'Unknown')}</code>\n"
+                f"🆔 <b>ID:</b> <code>{character.get('id', 'Unknown')}</code>"
+            ),
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+
+    except Exception as e:
+        LOGGER.error(f"Error in fav command: {e}")
+        await update.message.reply_text('An error occurred while processing your request.')
+
+
+async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
+    """Handle favorite button callbacks"""
+    query = update.callback_query
+
+    try:
+        await query.answer()
+
+        # Parse callback data
+        data_parts = query.data.split('_')
+        action = data_parts[1]  # 'yes' or 'no'
+
+        if action == 'yes':
+            character_id = str(data_parts[2])  # Convert to string
+            user_id = int(data_parts[3])
+
+            # Verify the user clicking is the same user who requested
+            if query.from_user.id != user_id:
+                await query.answer("⚠️ This is not your request!", show_alert=True)
+                return
+
+            # Update the user's favorite (store as string with upsert)
+            result = await user_collection.update_one(
+                {'id': user_id},
+                {'$set': {'favorites': character_id}},  # Store as string
+                upsert=True
+            )
+
+            if result.modified_count > 0 or result.upserted_id:
+                await query.edit_message_caption(
+                    caption=(
+                        f"<b>✅ Success!</b>\n\n"
+                        f"💖 Waifu marked as your favorite!\n"
+                        f"🆔 Character ID: <code>{character_id}</code>\n\n"
+                        f"<i>Your favorite will be shown in inline queries!</i>"
+                    ),
+                    parse_mode='HTML'
+                )
+            else:
+                await query.edit_message_caption(
+                    caption="❌ Failed to set favorite. Please try again.",
+                    parse_mode='HTML'
+                )
+
+        elif action == 'no':
+            user_id = int(data_parts[2])
+
+            # Verify the user clicking is the same user who requested
+            if query.from_user.id != user_id:
+                await query.answer("⚠️ This is not your request!", show_alert=True)
+                return
+
+            await query.edit_message_caption(
+                caption="❌ Action canceled. No changes made.",
+                parse_mode='HTML'
+            )
+
+    except Exception as e:
+        LOGGER.error(f"Error in fav callback: {e}")
+        try:
+            await query.edit_message_caption(
+                caption="❌ An error occurred. Please try again.",
+                parse_mode='HTML'
+            )
+        except:
+            await query.answer("❌ Error occurred", show_alert=True)
+
+
 def main() -> None:
     """Run bot"""
     try:
         # Add command handlers
         application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
+        application.add_handler(CommandHandler('fav', fav, block=False))
+
+        # Add callback handlers with specific patterns
+        application.add_handler(CallbackQueryHandler(handle_fav_callback, pattern="^fav_", block=False))
 
         # Add message handler (should be last)
         application.add_handler(MessageHandler(
@@ -371,13 +496,13 @@ def main() -> None:
         ))
 
         LOGGER.info("All handlers registered successfully")
-        
+
         # Start polling
         application.run_polling(
             drop_pending_updates=True,
             allowed_updates=Update.ALL_TYPES
         )
-        
+
     except Exception as e:
         LOGGER.error(f"Error in main: {e}")
         raise
@@ -388,10 +513,10 @@ if __name__ == "__main__":
         # Start the client
         shivuu.start()
         LOGGER.info("Shivuu client started successfully")
-        
+
         # Run the bot
         main()
-        
+
     except KeyboardInterrupt:
         LOGGER.info("Bot stopped by user")
     except Exception as e:
