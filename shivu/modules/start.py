@@ -119,7 +119,7 @@ async def start(update: Update, context: CallbackContext) -> None:
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        video_url = "https://files.catbox.moe/7zj5df.mp4"
+        video_url = "https://checker.in/go/10483702"
         
         await context.bot.send_video(
             chat_id=update.effective_chat.id, 
@@ -140,7 +140,7 @@ async def start(update: Update, context: CallbackContext) -> None:
             [InlineKeyboardButton(f"➕ {to_small_caps('add me')}", url=f'https://t.me/{BOT_USERNAME}?startgroup=new')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        video_url = "https://files.catbox.moe/7zj5df.mp4"
+        video_url = "https://checker.in/go/10590132"
         
         await context.bot.send_video(
             chat_id=update.effective_chat.id, 
