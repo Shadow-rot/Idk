@@ -376,9 +376,9 @@ async def fav(update: Update, context: CallbackContext) -> None:
 
         # Find the waifu in the user's character list
         character = next(
-            (c for c in user.get('characters', []) if c.get('id') == character_id), 
-            None
-        )
+    (c for c in user.get('characters', []) if str(c.get('id')) == str(character_id)),
+    None
+)
         
         if not character:
             await update.message.reply_text('𝙏𝙝𝙞𝙨 𝙒𝘼𝙄𝙁𝙐 𝙞𝙨 𝙉𝙤𝙩 𝙄𝙣 𝙮𝙤𝙪𝙧 𝙒𝘼𝙄𝙁𝙐 𝙡𝙞𝙨𝙩')
