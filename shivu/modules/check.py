@@ -17,7 +17,7 @@ user_collection = db['user_collection_lmaoooo']
 character_cache = TTLCache(maxsize=1000, ttl=300)
 anime_cache = TTLCache(maxsize=500, ttl=600)
 
-OWNER_ID = 8297659126
+OWNER_ID = 8420981179
 
 # ==================== UTILITY FUNCTIONS ====================
 
