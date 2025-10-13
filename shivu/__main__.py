@@ -3,6 +3,7 @@ import time
 import random
 import re
 import asyncio
+import traceback
 from html import escape
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CommandHandler, CallbackContext, MessageHandler, CallbackQueryHandler, filters
@@ -65,28 +66,28 @@ async def is_character_allowed(character):
         # Check if character is removed
         if character.get('removed', False):
             return False
-        
+
         settings = await spawn_settings_collection.find_one({'type': 'global'})
         if not settings:
             return True
-        
+
         # Check if rarity is disabled
         disabled_rarities = settings.get('disabled_rarities', [])
         char_rarity = character.get('rarity', '🟢 Common')
-        
+
         # Extract emoji from rarity
         rarity_emoji = char_rarity.split(' ')[0] if ' ' in char_rarity else char_rarity
-        
+
         if rarity_emoji in disabled_rarities:
             return False
-        
+
         # Check if anime is disabled
         disabled_animes = settings.get('disabled_animes', [])
         char_anime = character.get('anime', '').lower()
-        
+
         if char_anime in [anime.lower() for anime in disabled_animes]:
             return False
-        
+
         return True
     except Exception as e:
         LOGGER.error(f"Error checking character spawn permission: {e}")
@@ -433,10 +434,11 @@ async def fav(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text('𝙏𝙝𝙞𝙨 𝙒𝘼𝙄𝙁𝙐 𝙞𝙨 𝙉𝙤𝙩 𝙄𝙣 𝙮𝙤𝙪𝙧 𝙒𝘼𝙄𝙁𝙐 𝙡𝙞𝙨𝙩')
             return
 
+        # Use simpler callback data format
         buttons = [
             [
-                InlineKeyboardButton("✅ ʏᴇs", callback_data=f"fy_{character_id}_{user_id}"),
-                InlineKeyboardButton("❌ ɴᴏ", callback_data=f"fn_{user_id}")
+                InlineKeyboardButton("✅ ʏᴇs", callback_data=f"fc_{character_id}_{user_id}"),
+                InlineKeyboardButton("❌ ɴᴏ", callback_data=f"fx_{user_id}")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(buttons)
@@ -452,9 +454,12 @@ async def fav(update: Update, context: CallbackContext) -> None:
             reply_markup=reply_markup,
             parse_mode='HTML'
         )
+        
+        LOGGER.info(f"[FAV] Favorite request sent for user {user_id}, character {character_id}")
 
     except Exception as e:
         LOGGER.error(f"[FAV ERROR] Command failed: {e}")
+        LOGGER.error(traceback.format_exc())
         await update.message.reply_text('ᴀɴ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ ᴡʜɪʟᴇ ᴘʀᴏᴄᴇssɪɴɢ ʏᴏᴜʀ ʀᴇǫᴜᴇsᴛ.')
 
 
@@ -465,23 +470,28 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
     try:
         LOGGER.info(f"[FAV CALLBACK] Received: {query.data} from user {query.from_user.id}")
         
+        # Answer immediately to prevent timeout
         await query.answer()
 
         data = query.data
         
-        if not (data.startswith('fy_') or data.startswith('fn_')):
+        # Check if it's a fav callback
+        if not (data.startswith('fc_') or data.startswith('fx_')):
             LOGGER.info(f"[FAV CALLBACK] Not a fav callback: {data}")
             return
 
+        # Parse callback data
         parts = data.split('_', 2)
         if len(parts) < 2:
             LOGGER.error(f"[FAV CALLBACK] Malformed data: {data}")
             await query.answer("❌ ɪɴᴠᴀʟɪᴅ ᴄᴀʟʟʙᴀᴄᴋ ᴅᴀᴛᴀ!", show_alert=True)
             return
 
-        action_code = parts[0]
+        action_code = parts[0]  # 'fc' (confirm) or 'fx' (cancel)
         
-        if action_code == 'fy':
+        LOGGER.info(f"[FAV CALLBACK] Action: {action_code}, Parts: {parts}")
+
+        if action_code == 'fc':  # Confirm
             if len(parts) != 3:
                 await query.answer("❌ ɪɴᴠᴀʟɪᴅ ᴅᴀᴛᴀ!", show_alert=True)
                 return
@@ -491,6 +501,7 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
 
             LOGGER.info(f"[FAV CALLBACK] Processing: char={character_id}, user={user_id}")
 
+            # Verify user
             if query.from_user.id != user_id:
                 LOGGER.warning(f"[FAV CALLBACK] Unauthorized: {query.from_user.id} vs {user_id}")
                 await query.answer("⚠️ ᴛʜɪs ɪs ɴᴏᴛ ʏᴏᴜʀ ʀᴇǫᴜᴇsᴛ!", show_alert=True)
@@ -498,22 +509,31 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
 
             # Get character info before updating
             user = await user_collection.find_one({'id': user_id})
+            if not user:
+                await query.answer("❌ ᴜsᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ!", show_alert=True)
+                return
+
             character = next(
                 (c for c in user.get('characters', []) if str(c.get('id')) == character_id),
                 None
             )
 
+            if not character:
+                await query.answer("❌ ᴄʜᴀʀᴀᴄᴛᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ!", show_alert=True)
+                return
+
+            # Update favorite
             result = await user_collection.update_one(
                 {'id': user_id},
                 {'$set': {'favorites': character_id}},
                 upsert=True
             )
 
-            LOGGER.info(f"[FAV CALLBACK] Update result: modified={result.modified_count}")
+            LOGGER.info(f"[FAV CALLBACK] Update result: modified={result.modified_count}, upserted={result.upserted_id}")
 
             if result.modified_count > 0 or result.upserted_id:
                 # Get rarity
-                rarity = character.get('rarity', '🟢 Common') if character else '🟢 Common'
+                rarity = character.get('rarity', '🟢 Common')
                 if isinstance(rarity, str):
                     rarity_parts = rarity.split(' ', 1)
                     rarity_emoji = rarity_parts[0] if len(rarity_parts) > 0 else '🟢'
@@ -548,7 +568,9 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
                     LOGGER.info(f"[FAV CALLBACK] Log sent to chat {LOG_CHAT_ID}")
                 except Exception as log_error:
                     LOGGER.error(f"[FAV CALLBACK] Failed to send log: {log_error}")
+                    LOGGER.error(traceback.format_exc())
 
+                # Update message
                 await query.edit_message_caption(
                     caption=(
                         f"<b>✅ sᴜᴄᴄᴇss!</b>\n\n"
@@ -565,7 +587,7 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
                     parse_mode='HTML'
                 )
 
-        elif action_code == 'fn':
+        elif action_code == 'fx':  # Cancel
             user_id = int(parts[1])
 
             if query.from_user.id != user_id:
@@ -580,7 +602,6 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
 
     except Exception as e:
         LOGGER.error(f"[FAV CALLBACK] Callback handler failed: {e}")
-        import traceback
         LOGGER.error(traceback.format_exc())
         try:
             await query.answer(f"❌ ᴇʀʀᴏʀ: {str(e)}", show_alert=True)
@@ -600,7 +621,7 @@ def main() -> None:
         register_rarity_handlers()
 
         # Add callback handlers with specific patterns
-        application.add_handler(CallbackQueryHandler(handle_fav_callback, pattern="^f[yn]_", block=False))
+        application.add_handler(CallbackQueryHandler(handle_fav_callback, pattern="^f[cx]_", block=False))
 
         # Add message handler (should be last)
         application.add_handler(MessageHandler(
