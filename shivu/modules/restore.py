@@ -9,7 +9,7 @@ from shivu import application, collection, LOGGER
 # Log chat (optional)
 LOG_CHAT_ID = -1003071132623  # you can keep or remove this
 
-OWNER_ID
+OWNER_ID = 5147822244
 
 async def restore_chr(update: Update, context: CallbackContext) -> None:
     """Restore a removed character back to circulation (Owner only)."""
