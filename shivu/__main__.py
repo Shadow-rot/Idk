@@ -413,6 +413,8 @@ async def fav(update: Update, context: CallbackContext) -> None:
     """Set a character as favorite"""
     user_id = update.effective_user.id
 
+    LOGGER.info(f"[FAV] Command called by user {user_id}")
+
     if not context.args:
         await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙥𝙧𝙤𝙫𝙞𝙙𝙚 𝙒𝘼𝙄𝙁𝙐 𝙞𝙙...')
         return
@@ -422,6 +424,7 @@ async def fav(update: Update, context: CallbackContext) -> None:
     try:
         user = await user_collection.find_one({'id': user_id})
         if not user:
+            LOGGER.warning(f"[FAV] User {user_id} not found in database")
             await update.message.reply_text('𝙔𝙤𝙪 𝙝𝙖𝙫𝙚 𝙣𝙤𝙩 𝙂𝙤𝙩 𝘼𝙣𝙮 𝙒𝘼𝙄𝙁𝙐 𝙮𝙚𝙩...')
             return
 
@@ -431,13 +434,14 @@ async def fav(update: Update, context: CallbackContext) -> None:
         )
 
         if not character:
+            LOGGER.warning(f"[FAV] Character {character_id} not found for user {user_id}")
             await update.message.reply_text('𝙏𝙝𝙞𝙨 𝙒𝘼𝙄𝙁𝙐 𝙞𝙨 𝙉𝙤𝙩 𝙄𝙣 𝙮𝙤𝙪𝙧 𝙒𝘼𝙄𝙁𝙐 𝙡𝙞𝙨𝙩')
             return
 
-        # Use simpler callback data format
+        # Use same callback format as gift
         buttons = [
             [
-                InlineKeyboardButton("✅ ʏᴇs", callback_data=f"fc_{character_id}_{user_id}"),
+                InlineKeyboardButton("✅ ʏᴇs", callback_data=f"fc_{user_id}_{character_id}"),
                 InlineKeyboardButton("❌ ɴᴏ", callback_data=f"fx_{user_id}")
             ]
         ]
@@ -455,7 +459,7 @@ async def fav(update: Update, context: CallbackContext) -> None:
             parse_mode='HTML'
         )
         
-        LOGGER.info(f"[FAV] Favorite request sent for user {user_id}, character {character_id}")
+        LOGGER.info(f"[FAV] Confirmation message sent for user {user_id}, character {character_id}")
 
     except Exception as e:
         LOGGER.error(f"[FAV ERROR] Command failed: {e}")
@@ -470,9 +474,10 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
     try:
         LOGGER.info(f"[FAV CALLBACK] Received: {query.data} from user {query.from_user.id}")
         
-        # Answer immediately to prevent timeout
+        # Answer callback immediately
         await query.answer()
 
+        # Extract data from callback
         data = query.data
         
         # Check if it's a fav callback
@@ -493,23 +498,25 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
 
         if action_code == 'fc':  # Confirm
             if len(parts) != 3:
+                LOGGER.error(f"[FAV CALLBACK] Invalid parts length: {len(parts)}")
                 await query.answer("❌ ɪɴᴠᴀʟɪᴅ ᴅᴀᴛᴀ!", show_alert=True)
                 return
             
-            character_id = str(parts[1])
-            user_id = int(parts[2])
+            user_id = int(parts[1])
+            character_id = str(parts[2])
 
-            LOGGER.info(f"[FAV CALLBACK] Processing: char={character_id}, user={user_id}")
+            LOGGER.info(f"[FAV CALLBACK] Processing confirmation - user={user_id}, char={character_id}")
 
             # Verify user
             if query.from_user.id != user_id:
-                LOGGER.warning(f"[FAV CALLBACK] Unauthorized: {query.from_user.id} vs {user_id}")
+                LOGGER.warning(f"[FAV CALLBACK] Unauthorized access attempt by {query.from_user.id} for user {user_id}")
                 await query.answer("⚠️ ᴛʜɪs ɪs ɴᴏᴛ ʏᴏᴜʀ ʀᴇǫᴜᴇsᴛ!", show_alert=True)
                 return
 
             # Get character info before updating
             user = await user_collection.find_one({'id': user_id})
             if not user:
+                LOGGER.error(f"[FAV CALLBACK] User {user_id} not found in database")
                 await query.answer("❌ ᴜsᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ!", show_alert=True)
                 return
 
@@ -519,8 +526,11 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
             )
 
             if not character:
+                LOGGER.error(f"[FAV CALLBACK] Character {character_id} not found for user {user_id}")
                 await query.answer("❌ ᴄʜᴀʀᴀᴄᴛᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ!", show_alert=True)
                 return
+
+            LOGGER.info(f"[FAV CALLBACK] Character found: {character.get('name', 'Unknown')}")
 
             # Update favorite
             result = await user_collection.update_one(
@@ -529,7 +539,7 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
                 upsert=True
             )
 
-            LOGGER.info(f"[FAV CALLBACK] Update result: modified={result.modified_count}, upserted={result.upserted_id}")
+            LOGGER.info(f"[FAV CALLBACK] Database update - modified={result.modified_count}, upserted={result.upserted_id}")
 
             if result.modified_count > 0 or result.upserted_id:
                 # Get rarity
@@ -582,6 +592,7 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
                 )
                 LOGGER.info(f"[FAV CALLBACK] Favorite set successfully for user {user_id}")
             else:
+                LOGGER.error(f"[FAV CALLBACK] Database update failed - no changes made")
                 await query.edit_message_caption(
                     caption="❌ ғᴀɪʟᴇᴅ ᴛᴏ sᴇᴛ ғᴀᴠᴏʀɪᴛᴇ. ᴘʟᴇᴀsᴇ ᴛʀʏ ᴀɢᴀɪɴ.",
                     parse_mode='HTML'
@@ -590,7 +601,10 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
         elif action_code == 'fx':  # Cancel
             user_id = int(parts[1])
 
+            LOGGER.info(f"[FAV CALLBACK] Cancel requested by user {user_id}")
+
             if query.from_user.id != user_id:
+                LOGGER.warning(f"[FAV CALLBACK] Unauthorized cancel attempt by {query.from_user.id}")
                 await query.answer("⚠️ ᴛʜɪs ɪs ɴᴏᴛ ʏᴏᴜʀ ʀᴇǫᴜᴇsᴛ!", show_alert=True)
                 return
 
@@ -631,6 +645,7 @@ def main() -> None:
         ))
 
         LOGGER.info("All handlers registered successfully")
+        LOGGER.info("[FAV] Favorite command handler registered with pattern ^f[cx]_")
 
         # Start polling
         application.run_polling(
