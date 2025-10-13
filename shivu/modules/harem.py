@@ -134,7 +134,7 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
             # Count total characters in this anime
             total_anime_count = await collection.count_documents({"anime": anime})
             
-            harem_message += f'<b>📺 {anime} [{user_anime_count}/{total_anime_count}]</b>\n'
+            harem_message += f'<b>➥ {anime} [{user_anime_count}/{total_anime_count}]</b>\n'
             
             for char in chars:
                 char_id = char.get('id')
