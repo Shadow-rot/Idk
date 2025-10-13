@@ -95,7 +95,8 @@ async def handle_gift_command(update: Update, context: CallbackContext):
             rarity_emoji = '🟢'
             rarity_text = 'Common'
 
-        # Create confirmation message
+        # Create confirmation message with user-specific callback data
+        callback_base = f"{sender_id}"
         caption = (
             f"<b>🎁 Gift Confirmation</b>\n\n"
             f"<b>To:</b> <a href='tg://user?id={receiver_id}'>{receiver_first_name}</a>\n\n"
@@ -107,11 +108,11 @@ async def handle_gift_command(update: Update, context: CallbackContext):
             f"<i>Are you sure you want to gift this character?</i>"
         )
 
-        # Create confirmation buttons
+        # Create confirmation buttons with user-specific callback data
         keyboard = [
             [
-                InlineKeyboardButton("✅ Confirm", callback_data="confirm_gift"),
-                InlineKeyboardButton("❌ Cancel", callback_data="cancel_gift")
+                InlineKeyboardButton("✅ Confirm", callback_data=f"gift_confirm_{callback_base}"),
+                InlineKeyboardButton("❌ Cancel", callback_data=f"gift_cancel_{callback_base}")
             ]
         ]
 
@@ -132,81 +133,84 @@ async def handle_gift_command(update: Update, context: CallbackContext):
 async def handle_gift_callback(update: Update, context: CallbackContext):
     """Handle gift confirmation callbacks"""
     query = update.callback_query
-    user_id = query.from_user.id
-
+    
     try:
-        await query.answer()
+        # Extract data from callback
+        data = query.data
+        if not data.startswith(('gift_confirm_', 'gift_cancel_')):
+            return
+        
+        user_id = int(data.split('_')[-1])
+        action = data.split('_')[1]  # confirm or cancel
+
+        # Verify user
+        if query.from_user.id != user_id:
+            await query.answer("⚠️ This is not your gift confirmation!", show_alert=True)
+            return
 
         if user_id not in pending_gifts:
-            await query.edit_message_caption(
-                caption="❌ No pending gift found!",
-                parse_mode='HTML'
-            )
+            await query.answer("❌ No pending gift found!", show_alert=True)
             return
 
         gift_data = pending_gifts[user_id]
-        receiver_id = gift_data['receiver_id']
-        character = gift_data['character']
+        
+        if action == "confirm":
+            try:
+                # Get sender and receiver data
+                sender = await user_collection.find_one({'id': user_id})
+                receiver = await user_collection.find_one({'id': gift_data['receiver_id']})
+                character = gift_data['character']
 
-        if query.data == "confirm_gift":
-            # Get sender and receiver data
-            sender = await user_collection.find_one({'id': user_id})
-            receiver = await user_collection.find_one({'id': receiver_id})
+                # Remove from sender
+                await user_collection.update_one(
+                    {'id': user_id},
+                    {'$pull': {'characters': {'id': character['id']}}}
+                )
 
-            if not sender:
+                # Add to receiver
+                if receiver:
+                    await user_collection.update_one(
+                        {'id': gift_data['receiver_id']},
+                        {'$push': {'characters': character}}
+                    )
+                else:
+                    await user_collection.insert_one({
+                        'id': gift_data['receiver_id'],
+                        'username': gift_data['receiver_username'],
+                        'first_name': gift_data['receiver_first_name'],
+                        'characters': [character]
+                    })
+
                 await query.edit_message_caption(
-                    caption="❌ Error: Sender data not found!",
+                    caption=f"✅ Successfully gifted {character['name']} to {gift_data['receiver_first_name']}!",
                     parse_mode='HTML'
                 )
-                return
 
-            # Remove character from sender
-            await user_collection.update_one(
-                {'id': user_id},
-                {'$pull': {'characters': {'id': character['id']}}}
-            )
-
-            # Add character to receiver
-            if receiver:
-                await user_collection.update_one(
-                    {'id': receiver_id},
-                    {'$push': {'characters': character}}
+            except Exception as e:
+                LOGGER.error(f"Error processing gift: {e}")
+                await query.edit_message_caption(
+                    caption="❌ Failed to process gift!",
+                    parse_mode='HTML'
                 )
-            else:
-                # Create new user entry for receiver
-                await user_collection.insert_one({
-                    'id': receiver_id,
-                    'username': gift_data['receiver_username'],
-                    'first_name': gift_data['receiver_first_name'],
-                    'characters': [character]
-                })
 
-            # Clear pending gift
-            del pending_gifts[user_id]
-
-            await query.edit_message_caption(
-                caption=(
-                    f"<b>✅ Gift Sent Successfully!</b>\n\n"
-                    f"<b>Character:</b> <code>{escape(character['name'])}</code>\n"
-                    f"<b>To:</b> <a href='tg://user?id={receiver_id}'>{escape(gift_data['receiver_first_name'])}</a>"
-                ),
-                parse_mode='HTML'
-            )
-
-        elif query.data == "cancel_gift":
-            del pending_gifts[user_id]
+        elif action == "cancel":
             await query.edit_message_caption(
                 caption="❌ Gift cancelled!",
                 parse_mode='HTML'
             )
 
+        # Clean up
+        if user_id in pending_gifts:
+            del pending_gifts[user_id]
+
     except Exception as e:
         LOGGER.error(f"Error in gift callback: {e}")
-        await query.edit_message_caption(
-            caption="❌ An error occurred!",
-            parse_mode='HTML'
-        )
+        await query.answer("❌ An error occurred!", show_alert=True)
+
+def register_handlers():
+    """Register command and callback handlers"""
+    application.add_handler(CommandHandler("gift", handle_gift_command))
+    application.add_handler(CallbackQueryHandler(handle_gift_callback, pattern=r"^gift_"))
 
 # Register handlers
-application.add_handler(CommandHandler("gift", handle_gift_command))
-application.add_handler(CallbackQueryHandler(handle_gift_callback, pattern='^confirm_gift$|^cancel_gift$'))
+register_handlers()
