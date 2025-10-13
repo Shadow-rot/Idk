@@ -2,9 +2,10 @@ from pyrogram import Client, filters
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
 from shivu import shivuu as bot, LOGGER
-from telegram.ext import MessageHandler, filters
+from telegram.ext import MessageHandler, filters as ptb_filters
 from shivu import user_collection, application
 from html import escape
+import traceback
 
 # Store pending gifts
 pending_gifts = {}
@@ -14,6 +15,8 @@ async def handle_gift_command(update: Update, context: CallbackContext):
     try:
         message = update.message
         sender_id = message.from_user.id
+
+        LOGGER.info(f"Gift command called by user {sender_id}")
 
         # Check if replying to a message
         if not message.reply_to_message:
@@ -85,6 +88,8 @@ async def handle_gift_command(update: Update, context: CallbackContext):
             'receiver_first_name': receiver_first_name
         }
 
+        LOGGER.info(f"Pending gift stored for user {sender_id}")
+
         # Get character rarity
         rarity = character.get('rarity', '🟢 Common')
         if isinstance(rarity, str):
@@ -95,8 +100,7 @@ async def handle_gift_command(update: Update, context: CallbackContext):
             rarity_emoji = '🟢'
             rarity_text = 'Common'
 
-        # Create confirmation message with user-specific callback data
-        callback_base = f"{sender_id}"
+        # Create confirmation message with simpler callback data
         caption = (
             f"<b>🎁 Gift Confirmation</b>\n\n"
             f"<b>To:</b> <a href='tg://user?id={receiver_id}'>{receiver_first_name}</a>\n\n"
@@ -108,11 +112,11 @@ async def handle_gift_command(update: Update, context: CallbackContext):
             f"<i>Are you sure you want to gift this character?</i>"
         )
 
-        # Create confirmation buttons with user-specific callback data
+        # Create confirmation buttons
         keyboard = [
             [
-                InlineKeyboardButton("✅ Confirm", callback_data=f"gift_confirm_{callback_base}"),
-                InlineKeyboardButton("❌ Cancel", callback_data=f"gift_cancel_{callback_base}")
+                InlineKeyboardButton("✅ Confirm", callback_data=f"giftconfirm_{sender_id}"),
+                InlineKeyboardButton("❌ Cancel", callback_data=f"giftcancel_{sender_id}")
             ]
         ]
 
@@ -123,10 +127,13 @@ async def handle_gift_command(update: Update, context: CallbackContext):
             parse_mode='HTML'
         )
 
+        LOGGER.info(f"Gift confirmation message sent for user {sender_id}")
+
     except Exception as e:
         LOGGER.error(f"Error in gift command: {e}")
+        LOGGER.error(traceback.format_exc())
         await message.reply_text(
-            "<b>❌ An error occurred!</b>",
+            f"<b>❌ An error occurred!</b>\n<code>{str(e)}</code>",
             parse_mode='HTML'
         )
 
@@ -135,13 +142,28 @@ async def handle_gift_callback(update: Update, context: CallbackContext):
     query = update.callback_query
     
     try:
+        await query.answer()  # Answer immediately to prevent timeout
+        
+        LOGGER.info(f"Callback received: {query.data} from user {query.from_user.id}")
+
         # Extract data from callback
         data = query.data
-        if not data.startswith(('gift_confirm_', 'gift_cancel_')):
-            return
         
-        user_id = int(data.split('_')[-1])
-        action = data.split('_')[1]  # confirm or cancel
+        if not (data.startswith('giftconfirm_') or data.startswith('giftcancel_')):
+            LOGGER.warning(f"Invalid callback data: {data}")
+            return
+
+        # Parse callback data
+        parts = data.split('_')
+        if len(parts) != 2:
+            LOGGER.error(f"Malformed callback data: {data}")
+            await query.answer("❌ Invalid callback data!", show_alert=True)
+            return
+
+        action = parts[0].replace('gift', '')  # 'confirm' or 'cancel'
+        user_id = int(parts[1])
+
+        LOGGER.info(f"Parsed action: {action}, user_id: {user_id}")
 
         # Verify user
         if query.from_user.id != user_id:
@@ -150,29 +172,35 @@ async def handle_gift_callback(update: Update, context: CallbackContext):
 
         if user_id not in pending_gifts:
             await query.answer("❌ No pending gift found!", show_alert=True)
+            LOGGER.warning(f"No pending gift for user {user_id}")
             return
 
         gift_data = pending_gifts[user_id]
-        
+
         if action == "confirm":
+            LOGGER.info(f"Processing gift confirmation for user {user_id}")
             try:
                 # Get sender and receiver data
                 sender = await user_collection.find_one({'id': user_id})
                 receiver = await user_collection.find_one({'id': gift_data['receiver_id']})
                 character = gift_data['character']
 
+                LOGGER.info(f"Sender found: {sender is not None}, Receiver found: {receiver is not None}")
+
                 # Remove from sender
-                await user_collection.update_one(
+                result = await user_collection.update_one(
                     {'id': user_id},
                     {'$pull': {'characters': {'id': character['id']}}}
                 )
+                LOGGER.info(f"Character removed from sender: {result.modified_count} docs modified")
 
                 # Add to receiver
                 if receiver:
-                    await user_collection.update_one(
+                    result = await user_collection.update_one(
                         {'id': gift_data['receiver_id']},
                         {'$push': {'characters': character}}
                     )
+                    LOGGER.info(f"Character added to receiver: {result.modified_count} docs modified")
                 else:
                     await user_collection.insert_one({
                         'id': gift_data['receiver_id'],
@@ -180,37 +208,56 @@ async def handle_gift_callback(update: Update, context: CallbackContext):
                         'first_name': gift_data['receiver_first_name'],
                         'characters': [character]
                     })
+                    LOGGER.info(f"New receiver document created")
+
+                success_msg = (
+                    f"✅ <b>Gift Successful!</b>\n\n"
+                    f"<code>{escape(character['name'])}</code> has been gifted to "
+                    f"<a href='tg://user?id={gift_data['receiver_id']}'>{gift_data['receiver_first_name']}</a>!"
+                )
 
                 await query.edit_message_caption(
-                    caption=f"✅ Successfully gifted {character['name']} to {gift_data['receiver_first_name']}!",
+                    caption=success_msg,
                     parse_mode='HTML'
                 )
 
+                LOGGER.info(f"Gift successfully processed for user {user_id}")
+
             except Exception as e:
                 LOGGER.error(f"Error processing gift: {e}")
+                LOGGER.error(traceback.format_exc())
                 await query.edit_message_caption(
-                    caption="❌ Failed to process gift!",
+                    caption=f"❌ <b>Failed to process gift!</b>\n<code>{str(e)}</code>",
                     parse_mode='HTML'
                 )
 
         elif action == "cancel":
+            LOGGER.info(f"Gift cancelled by user {user_id}")
             await query.edit_message_caption(
-                caption="❌ Gift cancelled!",
+                caption="❌ <b>Gift cancelled!</b>",
                 parse_mode='HTML'
             )
 
         # Clean up
         if user_id in pending_gifts:
             del pending_gifts[user_id]
+            LOGGER.info(f"Pending gift removed for user {user_id}")
 
     except Exception as e:
         LOGGER.error(f"Error in gift callback: {e}")
-        await query.answer("❌ An error occurred!", show_alert=True)
+        LOGGER.error(traceback.format_exc())
+        try:
+            await query.answer(f"❌ An error occurred: {str(e)}", show_alert=True)
+        except:
+            pass
 
 def register_handlers():
     """Register command and callback handlers"""
+    # Remove any existing handlers with same pattern
     application.add_handler(CommandHandler("gift", handle_gift_command))
-    application.add_handler(CallbackQueryHandler(handle_gift_callback, pattern=r"^gift_"))
+    application.add_handler(CallbackQueryHandler(handle_gift_callback, pattern=r"^gift"))
 
 # Register handlers
 register_handlers()
+
+LOGGER.info("Gift handlers registered successfully")
