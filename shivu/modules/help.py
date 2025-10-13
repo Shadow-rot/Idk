@@ -2,6 +2,7 @@ import os
 import random
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
+from telegram.error import BadRequest, TimedOut, NetworkError
 from shivu import application, user_collection
 
 # Small caps conversion function
@@ -26,15 +27,43 @@ TIPS = [
     "💡 ᴛʀᴀᴅᴇ sʟᴀᴠᴇs ᴡɪᴛʜ ᴏᴛʜᴇʀs ᴛᴏ ɢʀᴏᴡ"
 ]
 
-# Main help command
-async def help_command(update: Update, context: CallbackContext):
-    user = update.effective_user
-    user_data = await user_collection.find_one({'id': user.id})
-    
-    balance = user_data.get('balance', 0) if user_data else 0
-    first_name = user.first_name
-    
-    caption = f"""
+# Helper function to get user balance safely
+async def get_user_balance(user_id):
+    try:
+        user_data = await user_collection.find_one({'id': user_id})
+        return user_data.get('balance', 0) if user_data else 0
+    except Exception as e:
+        print(f"Error fetching user balance: {e}")
+        return 0
+
+# Generate main help keyboard
+def get_main_keyboard(user_id):
+    return [
+        [
+            InlineKeyboardButton(f"🎮 {to_small_caps('games')}", callback_data=f'help_games_{user_id}'),
+            InlineKeyboardButton(f"💰 {to_small_caps('economy')}", callback_data=f'help_economy_{user_id}')
+        ],
+        [
+            InlineKeyboardButton(f"🎴 {to_small_caps('slaves')}", callback_data=f'help_slaves_{user_id}'),
+            InlineKeyboardButton(f"🐉 {to_small_caps('beasts')}", callback_data=f'help_beasts_{user_id}')
+        ],
+        [
+            InlineKeyboardButton(f"💎 {to_small_caps('pass')}", callback_data=f'help_pass_{user_id}'),
+            InlineKeyboardButton(f"📊 {to_small_caps('info')}", callback_data=f'help_info_{user_id}')
+        ],
+        [
+            InlineKeyboardButton(f"🏆 {to_small_caps('leaderboard')}", callback_data=f'help_top_{user_id}'),
+            InlineKeyboardButton(f"🎁 {to_small_caps('rewards')}", callback_data=f'help_rewards_{user_id}')
+        ],
+        [
+            InlineKeyboardButton(f"📚 {to_small_caps('guide')}", callback_data=f'help_guide_{user_id}'),
+            InlineKeyboardButton(f"🪄 {to_small_caps('tips')}", callback_data=f'help_tips_{user_id}')
+        ]
+    ]
+
+# Generate main help caption
+def get_main_caption(first_name, balance):
+    return f"""
 ╔═══════════════════╗
   ✨ <b>{to_small_caps('help center')}</b> ✨
 ╚═══════════════════╝
@@ -50,61 +79,37 @@ async def help_command(update: Update, context: CallbackContext):
 
 💡 <i>{random.choice(TIPS)}</i>
 """
-    
-    keyboard = [
-        [
-            InlineKeyboardButton(f"🎮 {to_small_caps('games')}", callback_data=f'help_games_{user.id}'),
-            InlineKeyboardButton(f"💰 {to_small_caps('economy')}", callback_data=f'help_economy_{user.id}')
-        ],
-        [
-            InlineKeyboardButton(f"🎴 {to_small_caps('slaves')}", callback_data=f'help_slaves_{user.id}'),
-            InlineKeyboardButton(f"🐉 {to_small_caps('beasts')}", callback_data=f'help_beasts_{user.id}')
-        ],
-        [
-            InlineKeyboardButton(f"💎 {to_small_caps('pass')}", callback_data=f'help_pass_{user.id}'),
-            InlineKeyboardButton(f"📊 {to_small_caps('info')}", callback_data=f'help_info_{user.id}')
-        ],
-        [
-            InlineKeyboardButton(f"🏆 {to_small_caps('leaderboard')}", callback_data=f'help_top_{user.id}'),
-            InlineKeyboardButton(f"🎁 {to_small_caps('rewards')}", callback_data=f'help_rewards_{user.id}')
-        ],
-        [
-            InlineKeyboardButton(f"📚 {to_small_caps('guide')}", callback_data=f'help_guide_{user.id}'),
-            InlineKeyboardButton(f"🪄 {to_small_caps('tips')}", callback_data=f'help_tips_{user.id}')
-        ]
-    ]
-    
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    photo_url = "https://te.legra.ph/file/b6661a11573417d03b4b4.png"
-    
-    await context.bot.send_photo(
-        chat_id=update.effective_chat.id,
-        photo=photo_url,
-        caption=caption,
-        reply_markup=reply_markup,
-        parse_mode="HTML"
-    )
 
-# Callback handler
-async def help_callback(update: Update, context: CallbackContext):
-    query = update.callback_query
-    await query.answer()
-    
-    data = query.data
-    parts = data.split('_')
-    action = '_'.join(parts[1:-1])
-    expected_user_id = int(parts[-1])
-    
-    user_id = query.from_user.id
-    
-    if user_id != expected_user_id:
-        await query.answer("⚠️ ᴛʜɪs ɪsɴ'ᴛ ғᴏʀ ʏᴏᴜ", show_alert=True)
-        return
-    
-    back_button = [[InlineKeyboardButton(f"⤾ {to_small_caps('back')}", callback_data=f'help_back_{user_id}')]]
-    
-    if action == 'games':
-        caption = f"""
+# Main help command
+async def help_command(update: Update, context: CallbackContext):
+    try:
+        user = update.effective_user
+        balance = await get_user_balance(user.id)
+        first_name = user.first_name
+
+        caption = get_main_caption(first_name, balance)
+        keyboard = get_main_keyboard(user.id)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        photo_url = "https://te.legra.ph/file/b6661a11573417d03b4b4.png"
+
+        await context.bot.send_photo(
+            chat_id=update.effective_chat.id,
+            photo=photo_url,
+            caption=caption,
+            reply_markup=reply_markup,
+            parse_mode="HTML"
+        )
+    except BadRequest as e:
+        print(f"Bad request error in help_command: {e}")
+        await update.message.reply_text("❌ Failed to send help menu. Please try again.")
+    except Exception as e:
+        print(f"Error in help_command: {e}")
+        await update.message.reply_text("❌ An error occurred. Please try again later.")
+
+# Get category caption
+def get_category_caption(action):
+    captions = {
+        'games': f"""
 ╔═══════════════════╗
   🎮 <b>{to_small_caps('game zone')}</b>
 ╚═══════════════════╝
@@ -131,15 +136,8 @@ async def help_callback(update: Update, context: CallbackContext):
 • <code>/stour</code> → {to_small_caps('slave contracts')}
 
 ✨ {to_small_caps('earn xp and gold while playing')}
-"""
-        await query.edit_message_caption(
-            caption=caption,
-            reply_markup=InlineKeyboardMarkup(back_button),
-            parse_mode='HTML'
-        )
-    
-    elif action == 'economy':
-        caption = f"""
+""",
+        'economy': f"""
 ╔═══════════════════╗
   💰 <b>{to_small_caps('economy')}</b>
 ╚═══════════════════╝
@@ -165,15 +163,8 @@ async def help_callback(update: Update, context: CallbackContext):
 • <code>/weekly</code> → {to_small_caps('weekly bonus')}
 
 💡 {to_small_caps('max pay 70b every 20 min')}
-"""
-        await query.edit_message_caption(
-            caption=caption,
-            reply_markup=InlineKeyboardMarkup(back_button),
-            parse_mode='HTML'
-        )
-    
-    elif action == 'slaves':
-        caption = f"""
+""",
+        'slaves': f"""
 ╔═══════════════════╗
   🎴 <b>{to_small_caps('slave collection')}</b>
 ╚═══════════════════╝
@@ -200,15 +191,8 @@ async def help_callback(update: Update, context: CallbackContext):
 • <code>/sinfo id</code> → {to_small_caps('slave details')}
 
 🌟 {to_small_caps('build your empire')}
-"""
-        await query.edit_message_caption(
-            caption=caption,
-            reply_markup=InlineKeyboardMarkup(back_button),
-            parse_mode='HTML'
-        )
-    
-    elif action == 'beasts':
-        caption = f"""
+""",
+        'beasts': f"""
 ╔═══════════════════╗
   🐉 <b>{to_small_caps('beast system')}</b>
 ╚═══════════════════╝
@@ -235,15 +219,8 @@ async def help_callback(update: Update, context: CallbackContext):
 • {to_small_caps('level up through battles')}
 
 ✨ {to_small_caps('collect rare beasts')}
-"""
-        await query.edit_message_caption(
-            caption=caption,
-            reply_markup=InlineKeyboardMarkup(back_button),
-            parse_mode='HTML'
-        )
-    
-    elif action == 'pass':
-        caption = f"""
+""",
+        'pass': f"""
 ╔═══════════════════╗
   💎 <b>{to_small_caps('slave pass')}</b>
 ╚═══════════════════╝
@@ -271,15 +248,8 @@ async def help_callback(update: Update, context: CallbackContext):
 • <code>/pass</code> → {to_small_caps('view pass status')}
 
 🌟 {to_small_caps('upgrade to premium today')}
-"""
-        await query.edit_message_caption(
-            caption=caption,
-            reply_markup=InlineKeyboardMarkup(back_button),
-            parse_mode='HTML'
-        )
-    
-    elif action == 'info':
-        caption = f"""
+""",
+        'info': f"""
 ╔═══════════════════╗
   📊 <b>{to_small_caps('information')}</b>
 ╚═══════════════════╝
@@ -303,15 +273,8 @@ async def help_callback(update: Update, context: CallbackContext):
 • <code>/gstop</code> → {to_small_caps('gold rankings')}
 
 💡 {to_small_caps('track your progress')}
-"""
-        await query.edit_message_caption(
-            caption=caption,
-            reply_markup=InlineKeyboardMarkup(back_button),
-            parse_mode='HTML'
-        )
-    
-    elif action == 'top':
-        caption = f"""
+""",
+        'top': f"""
 ╔═══════════════════╗
   🏆 <b>{to_small_caps('leaderboards')}</b>
 ╚═══════════════════╝
@@ -333,15 +296,8 @@ async def help_callback(update: Update, context: CallbackContext):
 • <code>/topgroups</code> → {to_small_caps('top groups')}
 
 ✨ {to_small_caps('climb to the top')}
-"""
-        await query.edit_message_caption(
-            caption=caption,
-            reply_markup=InlineKeyboardMarkup(back_button),
-            parse_mode='HTML'
-        )
-    
-    elif action == 'rewards':
-        caption = f"""
+""",
+        'rewards': f"""
 ╔═══════════════════╗
   🎁 <b>{to_small_caps('daily rewards')}</b>
 ╚═══════════════════╝
@@ -368,15 +324,8 @@ async def help_callback(update: Update, context: CallbackContext):
 • {to_small_caps('they get')} → <b>500🪙</b>
 
 🌟 {to_small_caps('never miss your rewards')}
-"""
-        await query.edit_message_caption(
-            caption=caption,
-            reply_markup=InlineKeyboardMarkup(back_button),
-            parse_mode='HTML'
-        )
-    
-    elif action == 'guide':
-        caption = f"""
+""",
+        'guide': f"""
 ╔═══════════════════╗
   📚 <b>{to_small_caps('quick start guide')}</b>
 ╚═══════════════════╝
@@ -410,15 +359,49 @@ async def help_callback(update: Update, context: CallbackContext):
 
 ✨ {to_small_caps('have fun and dominate')}
 """
-        await query.edit_message_caption(
-            caption=caption,
-            reply_markup=InlineKeyboardMarkup(back_button),
-            parse_mode='HTML'
-        )
+    }
+    return captions.get(action, "")
+
+# Callback handler
+async def help_callback(update: Update, context: CallbackContext):
+    query = update.callback_query
     
-    elif action == 'tips':
-        tip = random.choice(TIPS)
-        caption = f"""
+    try:
+        await query.answer()
+    except Exception as e:
+        print(f"Error answering callback: {e}")
+        return
+
+    try:
+        data = query.data
+        parts = data.split('_')
+        action = '_'.join(parts[1:-1])
+        expected_user_id = int(parts[-1])
+
+        user_id = query.from_user.id
+
+        if user_id != expected_user_id:
+            await query.answer("⚠️ ᴛʜɪs ɪsɴ'ᴛ ғᴏʀ ʏᴏᴜ", show_alert=True)
+            return
+
+        # Handle back action
+        if action == 'back':
+            balance = await get_user_balance(user_id)
+            first_name = query.from_user.first_name
+            caption = get_main_caption(first_name, balance)
+            keyboard = get_main_keyboard(user_id)
+
+            await query.edit_message_caption(
+                caption=caption,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='HTML'
+            )
+            return
+
+        # Handle tips action (special case with refresh button)
+        if action == 'tips':
+            tip = random.choice(TIPS)
+            caption = f"""
 ╔═══════════════════╗
   🪄 <b>{to_small_caps('pro tips')}</b>
 ╚═══════════════════╝
@@ -442,71 +425,44 @@ async def help_callback(update: Update, context: CallbackContext):
 
 ✨ {to_small_caps('tap for new tip')}
 """
-        keyboard = [
-            [InlineKeyboardButton(f"🔄 {to_small_caps('new tip')}", callback_data=f'help_tips_{user_id}')],
-            [InlineKeyboardButton(f"⤾ {to_small_caps('back')}", callback_data=f'help_back_{user_id}')]
-        ]
-        await query.edit_message_caption(
-            caption=caption,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='HTML'
-        )
-    
-    elif action == 'back':
-        user_data = await user_collection.find_one({'id': user_id})
-        balance = user_data.get('balance', 0) if user_data else 0
-        first_name = query.from_user.first_name
-        
-        caption = f"""
-╔═══════════════════╗
-  ✨ <b>{to_small_caps('help center')}</b> ✨
-╚═══════════════════╝
-
-👋 {to_small_caps('hey')} <b>{first_name}</b>
-
-🎮 {to_small_caps('need help senpai')}
-🌸 {to_small_caps('choose a category below')}
-
-━━━━━━━━━━━━━━━━━━━
-🪙 {to_small_caps('your balance')}: <b>{balance}</b>
-━━━━━━━━━━━━━━━━━━━
-
-💡 <i>{random.choice(TIPS)}</i>
-"""
-        
-        keyboard = [
-            [
-                InlineKeyboardButton(f"🎮 {to_small_caps('games')}", callback_data=f'help_games_{user_id}'),
-                InlineKeyboardButton(f"💰 {to_small_caps('economy')}", callback_data=f'help_economy_{user_id}')
-            ],
-            [
-                InlineKeyboardButton(f"🎴 {to_small_caps('slaves')}", callback_data=f'help_slaves_{user_id}'),
-                InlineKeyboardButton(f"🐉 {to_small_caps('beasts')}", callback_data=f'help_beasts_{user_id}')
-            ],
-            [
-                InlineKeyboardButton(f"💎 {to_small_caps('pass')}", callback_data=f'help_pass_{user_id}'),
-                InlineKeyboardButton(f"📊 {to_small_caps('info')}", callback_data=f'help_info_{user_id}')
-            ],
-            [
-                InlineKeyboardButton(f"🏆 {to_small_caps('leaderboard')}", callback_data=f'help_top_{user_id}'),
-                InlineKeyboardButton(f"🎁 {to_small_caps('rewards')}", callback_data=f'help_rewards_{user_id}')
-            ],
-            [
-                InlineKeyboardButton(f"📚 {to_small_caps('guide')}", callback_data=f'help_guide_{user_id}'),
-                InlineKeyboardButton(f"🪄 {to_small_caps('tips')}", callback_data=f'help_tips_{user_id}')
+            keyboard = [
+                [InlineKeyboardButton(f"🔄 {to_small_caps('new tip')}", callback_data=f'help_tips_{user_id}')],
+                [InlineKeyboardButton(f"⤾ {to_small_caps('back')}", callback_data=f'help_back_{user_id}')]
             ]
-        ]
-        
-        await query.edit_message_caption(
-            caption=caption,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='HTML'
-        )
+            await query.edit_message_caption(
+                caption=caption,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='HTML'
+            )
+            return
+
+        # Handle other categories
+        caption = get_category_caption(action)
+        if caption:
+            back_button = [[InlineKeyboardButton(f"⤾ {to_small_caps('back')}", callback_data=f'help_back_{user_id}')]]
+            await query.edit_message_caption(
+                caption=caption,
+                reply_markup=InlineKeyboardMarkup(back_button),
+                parse_mode='HTML'
+            )
+        else:
+            await query.answer("❌ Invalid category", show_alert=True)
+
+    except BadRequest as e:
+        print(f"Bad request error in callback: {e}")
+        await query.answer("❌ Failed to update menu", show_alert=True)
+    except TimedOut:
+        print("Timeout error in callback")
+    except NetworkError as e:
+        print(f"Network error in callback: {e}")
+    except Exception as e:
+        print(f"Unexpected error in callback: {e}")
+        await query.answer("❌ An error occurred", show_alert=True)
 
 # Add handlers
 help_handler = CommandHandler(['help', 'menu', 'panel'], help_command, block=False)
 application.add_handler(help_handler)
 
-callback_pattern = r'help_(games|economy|slaves|beasts|pass|info|top|rewards|guide|tips|back)_\d+'
+callback_pattern = r'help_(games|economy|slaves|beasts|pass|info|top|rewards|guide|tips|back)_\d+$'
 help_callback_handler = CallbackQueryHandler(help_callback, pattern=callback_pattern, block=False)
 application.add_handler(help_callback_handler)
