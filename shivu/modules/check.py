@@ -158,8 +158,7 @@ def format_character_card(character, global_count=None, show_owners=False, owner
     # Build caption
     if show_owners and owners_list:
         # Show owners list
-        caption = f"""
-<b>╭━━━━━━━━━━━━━━━━━╮</b>
+        caption = f"""<b>╭━━━━━━━━━━━━━━━━━╮</b>
 <b>┃  🎴 {to_small_caps('character owners')}  ┃</b>
 <b>╰━━━━━━━━━━━━━━━━━╯</b>
 
