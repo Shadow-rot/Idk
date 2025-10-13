@@ -200,10 +200,10 @@ def format_character_card(character, global_count=None, show_owners=False, owner
 <b>┃  🎴 {to_small_caps('character card')}  ┃</b>
 <b>╰━━━━━━━━━━━━━━━━━╯</b>
 
-<b>🆔 {to_small_caps('id')}</b> <code>{char_id}</code>
-<b>🧬 {to_small_caps('name')}</b> <code>{escape(char_name)}</code>
-<b>📺 {to_small_caps('anime')}</b> <code>{escape(char_anime)}</code>
-<b>{rarity_emoji} {to_small_caps('rarity')}</b> <code>{to_small_caps(rarity_text)}</code>"""
+<b>🆔 {to_small_caps('id')}</b> : <code>{char_id}</code>
+<b>🧬 {to_small_caps('name')}</b> : <code>{escape(char_name)}</code>
+<b>📺 {to_small_caps('anime')}</b> : <code>{escape(char_anime)}</code>
+<b>{rarity_emoji} {to_small_caps('rarity')}</b> : <code>{to_small_caps(rarity_text)}</code>"""
         
         if global_count is not None:
             caption += f"\n\n<b>🌍 {to_small_caps('globally grabbed')}</b> <code>{global_count}x</code>"
