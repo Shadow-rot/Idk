@@ -162,6 +162,335 @@ async def inlinequery(update: Update, context) -> None:
                             or regex.search(c.get('id', '')) 
                             or regex.search(c.get('anime', ''))
                         ]
+                    
+                    # Get user's favorite image for collection display
+                    fav_image = await get_user_favorite_image(user_id_int, all_characters)
+        else:
+            # Global character search
+            if query:
+                regex = re.compile(re.escape(query), re.IGNORECASE)
+                all_characters = await collection.find({
+                    "$or": [
+                        {"name": regex}, 
+                        {"rarity": regex}, 
+                        {"id": regex}, 
+                        {"anime": regex}
+                    ]
+                }).to_list(length=200)
+            else:
+                # Get all characters
+                if 'all_characters' in all_characters_cache:
+                    all_characters = all_characters_cache['all_characters']
+                else:
+                    all_characters = await collection.find({}).limit(200).to_list(length=200)
+                    all_characters_cache['all_characters'] = all_characters
+
+        # Pagination
+        characters = all_characters[offset:offset+50]
+        has_more = len(all_characters) > offset + 50
+        next_offset = str(offset + 50) if has_more else ""
+
+        results = []
+        for character in characters:
+            char_id = character.get('id')
+            if not char_id:
+                continue
+
+            char_name = character.get('name', 'Unknown')
+            char_anime = character.get('anime', 'Unknown')
+            char_rarity = character.get('rarity', '🟢 Common')
+            char_img = character.get('img_url', '')
+
+            # Extract rarity emoji and text
+            if isinstance(char_rarity, str):
+                rarity_parts = char_rarity.split(' ', 1)
+                rarity_emoji = rarity_parts[0] if len(rarity_parts) > 0 else '🟢'
+                rarity_text = rarity_parts[1] if len(rarity_parts) > 1 else 'Common'
+            else:
+                rarity_emoji = '🟢'
+                rarity_text = 'Common'
+
+            # Build caption based on query type
+            if query.startswith('collection.') and user:
+                # User collection caption
+                user_character_count = sum(1 for c in user.get('characters', []) if c.get('id') == char_id)
+                user_anime_count = sum(1 for c in user.get('characters', []) if c.get('anime') == char_anime)
+                anime_total = await get_anime_count(char_anime)
+                
+                user_first_name = user.get('first_name', 'User')
+                user_id_int = user.get('id')
+                
+                caption = (
+                    f"<b>{to_small_caps('look at')} <a href='tg://user?id={user_id_int}'>{escape(user_first_name)}</a>{to_small_caps('s waifu')}</b>\n\n"
+                    f"<b>{to_small_caps('id')}</b> <code>{char_id}</code>\n"
+                    f"<b>{to_small_caps('name')}</b> <code>{escape(char_name)}</code> x{user_character_count}\n"
+                    f"<b>{to_small_caps('anime')}</b> <code>{escape(char_anime)}</code> {user_anime_count}/{anime_total}\n"
+                    f"<b>{rarity_emoji} {to_small_caps('rarity')}</b> <code>{to_small_caps(rarity_text)}</code>"
+                )
+                
+                # Use favorite image if available, otherwise use character's own image
+                display_image = fav_image if fav_image else char_img
+            else:
+                # Global search caption
+                global_count = await get_global_count(char_id)
+                
+                caption = (
+                    f"<b>{to_small_caps('look at this waifu')}</b>\n\n"
+                    f"<b>{to_small_caps('id')}</b> <code>{char_id}</code>\n"
+                    f"<b>{to_small_caps('name')}</b> <code>{escape(char_name)}</code>\n"
+                    f"<b>{to_small_caps('anime')}</b> <code>{escape(char_anime)}</code>\n"
+                    f"<b>{rarity_emoji} {to_small_caps('rarity')}</b> <code>{to_small_caps(rarity_text)}</code>\n\n"
+                    f"<b>{to_small_caps('globally grabbed')} {global_count} {to_small_caps('times')}</b>"
+                )
+                
+                display_image = char_img
+
+            # Inline button
+            button = InlineKeyboardMarkup([
+                [InlineKeyboardButton(
+                    f"🏆 {to_small_caps('top grabbers')}", 
+                    callback_data=f"show_smashers_{char_id}"
+                )]
+            ])
+
+            results.append(
+                InlineQueryResultPhoto(
+                    id=f"{char_id}_{offset}_{time.time()}",
+                    photo_url=display_image,
+                    thumbnail_url=display_image,
+                    caption=caption,
+                    parse_mode='HTML',
+                    reply_markup=button
+                )
+            )
+
+        await update.inline_query.answer(results, next_offset=next_offset, cache_time=5)
+        
+    except Exception as e:
+        print(f"Error in inline query: {e}")
+        import traceback
+        traceback.print_exc()
+        await update.inline_query.answer([], next_offset="", cache_time=5)
+
+
+# Callback to show top grabbers
+async def show_smashers_callback(update: Update, context) -> None:
+    """Show top 10 users who grabbed this character"""
+    query = update.callback_query
+    
+    try:
+        await query.answer()
+        
+        # Validate query data
+        if not query.data or len(query.data.split('_')) < 3:
+            await query.answer(to_small_caps("invalid data"), show_alert=True)
+            return
+            
+        character_id = query.data.split('_')[2]
+
+        # Get character info first
+        character = await collection.find_one({'id': character_id})
+        if not character:
+            await query.answer(to_small_caps("character not found"), show_alert=True)
+            return
+
+        # Get all users who have this character
+        users_with_char = await user_collection.find({
+            'characters.id': character_id
+        }).to_list(length=None)
+
+        if not users_with_char:
+            await query.answer(to_small_caps("no one has grabbed this character yet"), show_alert=True)
+            return
+
+        # Count characters for each user and sort
+        user_counts = []
+        for user in users_with_char:
+            user_id = user.get('id')
+            first_name = user.get('first_name', 'User')
+            username = user.get('username')
+            
+            # Count how many times this user has this character
+            count = sum(1 for char in user.get('characters', []) if char.get('id') == character_id)
+            
+            if count > 0:
+                user_counts.append({
+                    'id': user_id,
+                    'first_name': first_name,
+                    'username': username,
+                    'count': count
+                })
+        
+        # Sort by count descending
+        user_counts.sort(key=lambda x: x['count'], reverse=True)
+        
+        # Get top 10
+        top_users = user_counts[:10]
+
+        if not top_users:
+            await query.answer(to_small_caps("no grabbers found"), show_alert=True)
+            return
+
+        # Build top grabbers list
+        grabbers_list = []
+        for i, user_data in enumerate(top_users, 1):
+            user_id = user_data.get('id')
+            count = user_data.get('count', 0)
+            first_name = user_data.get('first_name', 'User')
+            username = user_data.get('username')
+            
+            # Build user link with mention
+            if username:
+                user_link = f"<a href='tg://user?id={user_id}'>{escape(first_name)}</a> (@{escape(username)})"
+            else:
+                user_link = f"<a href='tg://user?id={user_id}'>{escape(first_name)}</a>"
+            
+            # Medal emojis for top 3
+            if i == 1:
+                medal = "🥇"
+            elif i == 2:
+                medal = "🥈"
+            elif i == 3:
+                medal = "🥉"
+            else:
+                medal = f"{i}"
+            
+            grabbers_list.append(f"{medal} {user_link} ᴄᴏᴜɴᴛ <b>x{count}</b>")
+
+        # Get total global count
+        total_grabbed = sum(u['count'] for u in user_counts)
+
+        smasher_text = (
+            f"\n\n<b>🏆 {to_small_caps('top 10 grabbers')}</b>\n"
+            f"<b>{to_small_caps('total grabbed')} {total_grabbed} {to_small_caps('times')}</b>\n\n"
+            + "\n".join(grabbers_list)
+        )
+
+        # Check if message and caption exist
+        if not query.message:
+            await query.answer(to_small_caps("message not found"), show_alert=True)
+            return
+            
+        # Get original caption
+        original_caption = query.message.caption if query.message.caption else query.message.text
+        
+        if not original_caption:
+            await query.answer(to_small_caps("caption not found"), show_alert=True)
+            return
+        
+        # Remove old grabbers section if exists
+        if '🏆' in original_caption:
+            original_caption = original_caption.split('\n\n🏆')[0]
+        
+        new_caption = original_caption + smasher_text
+        
+        # Truncate if too long (Telegram limit is 1024 for captions)
+        if len(new_caption) > 1020:
+            # Keep top 5 only
+            grabbers_list_short = grabbers_list[:5]
+            smasher_text = (
+                f"\n\n<b>🏆 {to_small_caps('top 5 grabbers')}</b>\n"
+                f"<b>{to_small_caps('total grabbed')} {total_grabbed} {to_small_caps('times')}</b>\n\n"
+                + "\n".join(grabbers_list_short)
+            )
+            new_caption = original_caption + smasher_text
+        
+        # Edit message caption
+        try:
+            if query.message.caption:
+                await query.edit_message_caption(
+                    caption=new_caption, 
+                    parse_mode='HTML',
+                    reply_markup=query.message.reply_markup
+                )
+            else:
+                await query.edit_message_text(
+                    text=new_caption, 
+                    parse_mode='HTML',
+                    reply_markup=query.message.reply_markup
+                )
+        except Exception as edit_error:
+            print(f"Error editing message: {edit_error}")
+            # Try without reply_markup
+            try:
+                if query.message.caption:
+                    await query.edit_message_caption(
+                        caption=new_caption, 
+                        parse_mode='HTML'
+                    )
+                else:
+                    await query.edit_message_text(
+                        text=new_caption, 
+                        parse_mode='HTML'
+                    )
+            except:
+                await query.answer(to_small_caps("could not update message"), show_alert=True)
+            
+    except Exception as e:
+        print(f"Error showing grabbers: {e}")
+        import traceback
+        traceback.print_exc()
+        try:
+            await query.answer(to_small_caps("error loading top grabbers"), show_alert=True)
+        except:
+            pass
+
+
+# Add handlers
+application.add_handler(InlineQueryHandler(inlinequery, block=False))
+application.add_handler(CallbackQueryHandler(show_smashers_callback, pattern=r'^show_smashers_', block=False))
+        
+        return None
+        
+    except Exception as e:
+        print(f"Error getting favorite image: {e}")
+        return None
+
+
+# Inline query handler
+async def inlinequery(update: Update, context) -> None:
+    """Handle inline queries for character search"""
+    query = update.inline_query.query
+    offset = int(update.inline_query.offset) if update.inline_query.offset else 0
+
+    # Determine which characters to fetch
+    all_characters = []
+    user = None
+    user_id = None
+    
+    try:
+        if query.startswith('collection.'):
+            # User collection search
+            parts = query.split(' ', 1)
+            user_id = parts[0].split('.')[1]
+            search_terms = parts[1] if len(parts) > 1 else ''
+
+            if user_id.isdigit():
+                user_id_int = int(user_id)
+                
+                # Get user from cache or database
+                if user_id in user_collection_cache:
+                    user = user_collection_cache[user_id]
+                else:
+                    user = await user_collection.find_one({'id': user_id_int})
+                    if user:
+                        user_collection_cache[user_id] = user
+
+                if user:
+                    # Get unique characters from user's collection
+                    characters_dict = {c.get('id'): c for c in user.get('characters', []) if c.get('id')}
+                    all_characters = list(characters_dict.values())
+                    
+                    # Apply search filter
+                    if search_terms:
+                        regex = re.compile(search_terms, re.IGNORECASE)
+                        all_characters = [
+                            c for c in all_characters 
+                            if regex.search(c.get('name', '')) 
+                            or regex.search(c.get('rarity', '')) 
+                            or regex.search(c.get('id', '')) 
+                            or regex.search(c.get('anime', ''))
+                        ]
         else:
             # Global character search
             if query:
