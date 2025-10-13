@@ -7,6 +7,8 @@ from shivu import application, db, LOGGER, OWNER_ID
 # Database collection for spawn settings
 spawn_settings_collection = db['spawn_settings']
 
+OWNER_ID = 5147822244
+
 # Rarity list with emojis
 RARITY_LIST = {
     '🟢': 'ᴄᴏᴍᴍᴏɴ',
