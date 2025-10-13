@@ -16,12 +16,19 @@ from shivu import (
 )
 from shivu.modules import ALL_MODULES
 
+# Import custom modules
+from remove_character import register_remove_handlers
+from rarity_control import register_rarity_handlers, spawn_settings_collection
+
 # Database collections
 collection = db['anime_characters_lol']
 user_collection = db['user_collection_lmaoooo']
 user_totals_collection = db['user_totals_lmaoooo']
 group_user_totals_collection = db['group_user_totalsssssss']
 top_global_groups_collection = db['top_global_groups']
+
+# Log chat ID
+LOG_CHAT_ID = -1003071132623
 
 # Global dictionaries for tracking
 locks = {}
@@ -50,6 +57,40 @@ def escape_markdown(text):
     """Escape markdown special characters"""
     escape_chars = r'\*_`\\~>#+-=|{}.!'
     return re.sub(r'([%s])' % re.escape(escape_chars), r'\\\1', text)
+
+
+async def is_character_allowed(character):
+    """Check if character is allowed to spawn based on settings"""
+    try:
+        # Check if character is removed
+        if character.get('removed', False):
+            return False
+        
+        settings = await spawn_settings_collection.find_one({'type': 'global'})
+        if not settings:
+            return True
+        
+        # Check if rarity is disabled
+        disabled_rarities = settings.get('disabled_rarities', [])
+        char_rarity = character.get('rarity', '🟢 Common')
+        
+        # Extract emoji from rarity
+        rarity_emoji = char_rarity.split(' ')[0] if ' ' in char_rarity else char_rarity
+        
+        if rarity_emoji in disabled_rarities:
+            return False
+        
+        # Check if anime is disabled
+        disabled_animes = settings.get('disabled_animes', [])
+        char_anime = character.get('anime', '').lower()
+        
+        if char_anime in [anime.lower() for anime in disabled_animes]:
+            return False
+        
+        return True
+    except Exception as e:
+        LOGGER.error(f"Error checking character spawn permission: {e}")
+        return True
 
 
 async def message_counter(update: Update, context: CallbackContext) -> None:
@@ -142,7 +183,7 @@ async def send_image(update: Update, context: CallbackContext) -> None:
         if len(sent_characters[chat_id]) >= len(all_characters):
             sent_characters[chat_id] = []
 
-        # Filter characters that haven't been sent yet
+        # Filter characters that haven't been sent yet and are allowed
         available_characters = [
             c for c in all_characters 
             if 'id' in c and c.get('id') not in sent_characters[chat_id]
@@ -152,8 +193,18 @@ async def send_image(update: Update, context: CallbackContext) -> None:
             available_characters = all_characters
             sent_characters[chat_id] = []
 
+        # Filter by spawn settings
+        allowed_characters = []
+        for char in available_characters:
+            if await is_character_allowed(char):
+                allowed_characters.append(char)
+
+        if not allowed_characters:
+            LOGGER.info(f"No allowed characters to spawn in chat {chat_id}")
+            return
+
         # Select random character
-        character = random.choice(available_characters)
+        character = random.choice(allowed_characters)
 
         # Mark character as sent
         sent_characters[chat_id].append(character['id'])
@@ -365,16 +416,14 @@ async def fav(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙥𝙧𝙤𝙫𝙞𝙙𝙚 𝙒𝘼𝙄𝙁𝙐 𝙞𝙙...')
         return
 
-    character_id = str(context.args[0])  # Convert to string
+    character_id = str(context.args[0])
 
     try:
-        # Find the user in the database
         user = await user_collection.find_one({'id': user_id})
         if not user:
             await update.message.reply_text('𝙔𝙤𝙪 𝙝𝙖𝙫𝙚 𝙣𝙤𝙩 𝙂𝙤𝙩 𝘼𝙣𝙮 𝙒𝘼𝙄𝙁𝙐 𝙮𝙚𝙩...')
             return
 
-        # Find the waifu in the user's character list (compare as strings)
         character = next(
             (c for c in user.get('characters', []) if str(c.get('id')) == character_id),
             None
@@ -384,31 +433,29 @@ async def fav(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text('𝙏𝙝𝙞𝙨 𝙒𝘼𝙄𝙁𝙐 𝙞𝙨 𝙉𝙤𝙩 𝙄𝙣 𝙮𝙤𝙪𝙧 𝙒𝘼𝙄𝙁𝙐 𝙡𝙞𝙨𝙩')
             return
 
-        # Create inline buttons for confirmation
         buttons = [
             [
-                InlineKeyboardButton("✅ Yes", callback_data=f"fav_yes_{character_id}_{user_id}"),
-                InlineKeyboardButton("❌ No", callback_data=f"fav_no_{user_id}")
+                InlineKeyboardButton("✅ ʏᴇs", callback_data=f"fy_{character_id}_{user_id}"),
+                InlineKeyboardButton("❌ ɴᴏ", callback_data=f"fn_{user_id}")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(buttons)
 
-        # Send message with buttons and waifu details
         await update.message.reply_photo(
             photo=character.get("img_url", ""),
             caption=(
-                f"<b>💖 Do you want to make this waifu your favorite?</b>\n\n"
-                f"✨ <b>Name:</b> <code>{character.get('name', 'Unknown')}</code>\n"
-                f"📺 <b>Anime:</b> <code>{character.get('anime', 'Unknown')}</code>\n"
-                f"🆔 <b>ID:</b> <code>{character.get('id', 'Unknown')}</code>"
+                f"<b>💖 ᴅᴏ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴍᴀᴋᴇ ᴛʜɪs ᴡᴀɪғᴜ ʏᴏᴜʀ ғᴀᴠᴏʀɪᴛᴇ?</b>\n\n"
+                f"✨ <b>ɴᴀᴍᴇ:</b> <code>{character.get('name', 'Unknown')}</code>\n"
+                f"📺 <b>ᴀɴɪᴍᴇ:</b> <code>{character.get('anime', 'Unknown')}</code>\n"
+                f"🆔 <b>ɪᴅ:</b> <code>{character.get('id', 'Unknown')}</code>"
             ),
             reply_markup=reply_markup,
             parse_mode='HTML'
         )
 
     except Exception as e:
-        LOGGER.error(f"Error in fav command: {e}")
-        await update.message.reply_text('An error occurred while processing your request.')
+        LOGGER.error(f"[FAV ERROR] Command failed: {e}")
+        await update.message.reply_text('ᴀɴ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ ᴡʜɪʟᴇ ᴘʀᴏᴄᴇssɪɴɢ ʏᴏᴜʀ ʀᴇǫᴜᴇsᴛ.')
 
 
 async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
@@ -416,66 +463,129 @@ async def handle_fav_callback(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
 
     try:
+        LOGGER.info(f"[FAV CALLBACK] Received: {query.data} from user {query.from_user.id}")
+        
         await query.answer()
 
-        # Parse callback data
-        data_parts = query.data.split('_')
-        action = data_parts[1]  # 'yes' or 'no'
+        data = query.data
+        
+        if not (data.startswith('fy_') or data.startswith('fn_')):
+            LOGGER.info(f"[FAV CALLBACK] Not a fav callback: {data}")
+            return
 
-        if action == 'yes':
-            character_id = str(data_parts[2])  # Convert to string
-            user_id = int(data_parts[3])
+        parts = data.split('_', 2)
+        if len(parts) < 2:
+            LOGGER.error(f"[FAV CALLBACK] Malformed data: {data}")
+            await query.answer("❌ ɪɴᴠᴀʟɪᴅ ᴄᴀʟʟʙᴀᴄᴋ ᴅᴀᴛᴀ!", show_alert=True)
+            return
 
-            # Verify the user clicking is the same user who requested
+        action_code = parts[0]
+        
+        if action_code == 'fy':
+            if len(parts) != 3:
+                await query.answer("❌ ɪɴᴠᴀʟɪᴅ ᴅᴀᴛᴀ!", show_alert=True)
+                return
+            
+            character_id = str(parts[1])
+            user_id = int(parts[2])
+
+            LOGGER.info(f"[FAV CALLBACK] Processing: char={character_id}, user={user_id}")
+
             if query.from_user.id != user_id:
-                await query.answer("⚠️ This is not your request!", show_alert=True)
+                LOGGER.warning(f"[FAV CALLBACK] Unauthorized: {query.from_user.id} vs {user_id}")
+                await query.answer("⚠️ ᴛʜɪs ɪs ɴᴏᴛ ʏᴏᴜʀ ʀᴇǫᴜᴇsᴛ!", show_alert=True)
                 return
 
-            # Update the user's favorite (store as string with upsert)
+            # Get character info before updating
+            user = await user_collection.find_one({'id': user_id})
+            character = next(
+                (c for c in user.get('characters', []) if str(c.get('id')) == character_id),
+                None
+            )
+
             result = await user_collection.update_one(
                 {'id': user_id},
-                {'$set': {'favorites': character_id}},  # Store as string
+                {'$set': {'favorites': character_id}},
                 upsert=True
             )
 
+            LOGGER.info(f"[FAV CALLBACK] Update result: modified={result.modified_count}")
+
             if result.modified_count > 0 or result.upserted_id:
+                # Get rarity
+                rarity = character.get('rarity', '🟢 Common') if character else '🟢 Common'
+                if isinstance(rarity, str):
+                    rarity_parts = rarity.split(' ', 1)
+                    rarity_emoji = rarity_parts[0] if len(rarity_parts) > 0 else '🟢'
+                    rarity_text = rarity_parts[1] if len(rarity_parts) > 1 else 'Common'
+                else:
+                    rarity_emoji = '🟢'
+                    rarity_text = 'Common'
+
+                # Send log to log chat
+                try:
+                    log_caption = (
+                        f"<b>💖 ғᴀᴠᴏʀɪᴛᴇ sᴇᴛ ʟᴏɢ</b>\n"
+                        f"{'='*30}\n\n"
+                        f"<b>👤 ᴜsᴇʀ:</b>\n"
+                        f"• ɴᴀᴍᴇ: <a href='tg://user?id={user_id}'>{escape(query.from_user.first_name)}</a>\n"
+                        f"• ᴜsᴇʀɴᴀᴍᴇ: @{query.from_user.username or 'N/A'}\n"
+                        f"• ɪᴅ: <code>{user_id}</code>\n\n"
+                        f"<b>💝 ᴄʜᴀʀᴀᴄᴛᴇʀ:</b>\n"
+                        f"• ɴᴀᴍᴇ: <code>{escape(character.get('name', 'Unknown'))}</code>\n"
+                        f"• ᴀɴɪᴍᴇ: <code>{escape(character.get('anime', 'Unknown'))}</code>\n"
+                        f"• ɪᴅ: <code>{character.get('id', 'N/A')}</code>\n"
+                        f"• ʀᴀʀɪᴛʏ: {rarity_emoji} <code>{rarity_text}</code>\n\n"
+                        f"✅ <i>ғᴀᴠᴏʀɪᴛᴇ sᴇᴛ sᴜᴄᴄᴇssғᴜʟʟʏ!</i>"
+                    )
+
+                    await context.bot.send_photo(
+                        chat_id=LOG_CHAT_ID,
+                        photo=character.get('img_url', 'https://i.imgur.com/placeholder.png'),
+                        caption=log_caption,
+                        parse_mode='HTML'
+                    )
+                    LOGGER.info(f"[FAV CALLBACK] Log sent to chat {LOG_CHAT_ID}")
+                except Exception as log_error:
+                    LOGGER.error(f"[FAV CALLBACK] Failed to send log: {log_error}")
+
                 await query.edit_message_caption(
                     caption=(
-                        f"<b>✅ Success!</b>\n\n"
-                        f"💖 Waifu marked as your favorite!\n"
-                        f"🆔 Character ID: <code>{character_id}</code>\n\n"
-                        f"<i>Your favorite will be shown in inline queries!</i>"
+                        f"<b>✅ sᴜᴄᴄᴇss!</b>\n\n"
+                        f"💖 ᴡᴀɪғᴜ ᴍᴀʀᴋᴇᴅ ᴀs ʏᴏᴜʀ ғᴀᴠᴏʀɪᴛᴇ!\n"
+                        f"🆔 ᴄʜᴀʀᴀᴄᴛᴇʀ ɪᴅ: <code>{character_id}</code>\n\n"
+                        f"<i>ʏᴏᴜʀ ғᴀᴠᴏʀɪᴛᴇ ᴡɪʟʟ ʙᴇ sʜᴏᴡɴ ɪɴ ɪɴʟɪɴᴇ ǫᴜᴇʀɪᴇs!</i>"
                     ),
                     parse_mode='HTML'
                 )
+                LOGGER.info(f"[FAV CALLBACK] Favorite set successfully for user {user_id}")
             else:
                 await query.edit_message_caption(
-                    caption="❌ Failed to set favorite. Please try again.",
+                    caption="❌ ғᴀɪʟᴇᴅ ᴛᴏ sᴇᴛ ғᴀᴠᴏʀɪᴛᴇ. ᴘʟᴇᴀsᴇ ᴛʀʏ ᴀɢᴀɪɴ.",
                     parse_mode='HTML'
                 )
 
-        elif action == 'no':
-            user_id = int(data_parts[2])
+        elif action_code == 'fn':
+            user_id = int(parts[1])
 
-            # Verify the user clicking is the same user who requested
             if query.from_user.id != user_id:
-                await query.answer("⚠️ This is not your request!", show_alert=True)
+                await query.answer("⚠️ ᴛʜɪs ɪs ɴᴏᴛ ʏᴏᴜʀ ʀᴇǫᴜᴇsᴛ!", show_alert=True)
                 return
 
             await query.edit_message_caption(
-                caption="❌ Action canceled. No changes made.",
+                caption="❌ ᴀᴄᴛɪᴏɴ ᴄᴀɴᴄᴇʟᴇᴅ. ɴᴏ ᴄʜᴀɴɢᴇs ᴍᴀᴅᴇ.",
                 parse_mode='HTML'
             )
+            LOGGER.info(f"[FAV CALLBACK] Action cancelled by user {user_id}")
 
     except Exception as e:
-        LOGGER.error(f"Error in fav callback: {e}")
+        LOGGER.error(f"[FAV CALLBACK] Callback handler failed: {e}")
+        import traceback
+        LOGGER.error(traceback.format_exc())
         try:
-            await query.edit_message_caption(
-                caption="❌ An error occurred. Please try again.",
-                parse_mode='HTML'
-            )
+            await query.answer(f"❌ ᴇʀʀᴏʀ: {str(e)}", show_alert=True)
         except:
-            await query.answer("❌ Error occurred", show_alert=True)
+            pass
 
 
 def main() -> None:
@@ -485,8 +595,12 @@ def main() -> None:
         application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
         application.add_handler(CommandHandler('fav', fav, block=False))
 
+        # Register custom module handlers
+        register_remove_handlers()
+        register_rarity_handlers()
+
         # Add callback handlers with specific patterns
-        application.add_handler(CallbackQueryHandler(handle_fav_callback, pattern="^fav_", block=False))
+        application.add_handler(CallbackQueryHandler(handle_fav_callback, pattern="^f[yn]_", block=False))
 
         # Add message handler (should be last)
         application.add_handler(MessageHandler(
