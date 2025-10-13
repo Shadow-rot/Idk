@@ -168,7 +168,7 @@ def format_character_card(character, global_count=None, show_owners=False, owner
 <b>{rarity_emoji} {to_small_caps('rarity')}</b> <code>{to_small_caps(rarity_text)}</code>
 
 <b>━━━━━━━━━━━━━━━━━</b>
-<b>🌍 {to_small_caps('top 10 owners')}</b>
+<b>🫧 {to_small_caps('top 10 owners')}</b>
 """
         
         for i, user in enumerate(owners_list[:10], 1):
@@ -194,7 +194,7 @@ def format_character_card(character, global_count=None, show_owners=False, owner
             caption += f"\n{medal} {user_link} <code>x{count}</code>"
         
         if global_count:
-            caption += f"\n\n<b>🌍 {to_small_caps('total grabbed')}</b> <code>{global_count}x</code>"
+            caption += f"\n\n<b>🔮 {to_small_caps('total grabbed')}</b> <code>{global_count}x</code>"
     else:
         # Normal character card
         caption = f"""<b>╭━━━━━━━━━━━━━━━━━╮</b>
@@ -534,7 +534,7 @@ async def handle_back_to_card(update: Update, context: CallbackContext) -> None:
         keyboard = [
             [
                 InlineKeyboardButton(
-                    f"🌍 {to_small_caps('show owners')}", 
+                    f"🏆 {to_small_caps('show owners')}", 
                     callback_data=f"show_owners_{character_id}"
                 ),
                 InlineKeyboardButton(
