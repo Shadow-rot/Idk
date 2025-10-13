@@ -17,8 +17,8 @@ from shivu import (
 from shivu.modules import ALL_MODULES
 
 # Import custom modules
-from remove_character import register_remove_handlers
-from rarity_control import register_rarity_handlers, spawn_settings_collection
+from shivu.remove import register_remove_handlers
+from shivu.rarity import register_rarity_handlers, spawn_settings_collection
 
 # Database collections
 collection = db['anime_characters_lol']
