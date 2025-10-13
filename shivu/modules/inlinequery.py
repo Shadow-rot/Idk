@@ -199,12 +199,12 @@ async def inlinequery(update: Update, context) -> None:
                 global_count = await get_global_count(char_id)
                 
                 caption = (
-                    f"<b>{to_small_caps('look at this waifu')}</b>\n\n"
-                    f"<b>{to_small_caps('id')}</b> <code>{char_id}</code>\n"
-                    f"<b>{to_small_caps('name')}</b> <code>{escape(char_name)}</code>\n"
-                    f"<b>{to_small_caps('anime')}</b> <code>{escape(char_anime)}</code>\n"
-                    f"<b>{rarity_emoji} {to_small_caps('rarity')}</b> <code>{to_small_caps(rarity_text)}</code>\n\n"
-                    f"<b>{to_small_caps('globally grabbed')} {global_count} {to_small_caps('times')}</b>"
+                    f"<b>🔮 {to_small_caps('look at this waifu')}</b>\n\n"
+                    f"<b>🆔 {to_small_caps('id')}</b> : <code>{char_id}</code>\n"
+                    f"<b>🧬 {to_small_caps('name')}</b> : <code>{escape(char_name)}</code>\n"
+                    f"<b>📺 {to_small_caps('anime')}</b> : <code>{escape(char_anime)}</code>\n"
+                    f"<b>{rarity_emoji} {to_small_caps('rarity')}</b> : <code>{to_small_caps(rarity_text)}</code>\n\n"
+                    f"<b>🌍 {to_small_caps('globally grabbed')} {global_count} {to_small_caps('times')}</b>"
                 )
 
             # Inline button
