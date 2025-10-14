@@ -21,7 +21,6 @@ from shivu.modules.remove import register_remove_handlers
 from shivu.modules.rarity import register_rarity_handlers, spawn_settings_collection
 from shivu.modules.ckill import register_ckill_handler
 from shivu.modules.kill import register_kill_handler
-from shivu.modules.inlinequery import inlinequery
 
 # Database collections
 collection = db['anime_characters_lol']
@@ -422,7 +421,6 @@ def main() -> None:
         register_rarity_handlers()
         register_ckill_handler()
         register_kill_handler()
-        inlinequery()
 
         # Add message handler (should be last)
         application.add_handler(MessageHandler(
