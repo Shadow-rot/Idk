@@ -3,6 +3,7 @@ import time
 import random
 import re
 import asyncio
+import traceback
 from html import escape
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters
@@ -15,13 +16,6 @@ from shivu import (
     LOGGER
 )
 from shivu.modules import ALL_MODULES
-
-# Import custom modules
-from shivu.modules.remove import register_remove_handlers
-from shivu.modules.rarity import register_rarity_handlers, spawn_settings_collection
-from shivu.modules.ckill import register_ckill_handler
-from shivu.modules.kill import register_kill_handler
-from shivu.modules.hclaim import register_hclaim_handler
 
 # Database collections
 collection = db['anime_characters_lol']
@@ -47,13 +41,56 @@ warned_users = {}
 # Default spawn frequency
 DEFAULT_MESSAGE_FREQUENCY = 50
 
-# Import all modules
+# Import all standard modules first
+LOGGER.info("="*50)
+LOGGER.info("STARTING MODULE IMPORTS")
+LOGGER.info("="*50)
+
 for module_name in ALL_MODULES:
     try:
         imported_module = importlib.import_module("shivu.modules." + module_name)
-        LOGGER.info(f"Successfully imported module: {module_name}")
+        LOGGER.info(f"✅ Successfully imported: {module_name}")
     except Exception as e:
-        LOGGER.error(f"Failed to import module {module_name}: {e}")
+        LOGGER.error(f"❌ Failed to import {module_name}: {e}")
+        LOGGER.error(traceback.format_exc())
+
+# Import custom modules
+LOGGER.info("="*50)
+LOGGER.info("IMPORTING CUSTOM MODULES")
+LOGGER.info("="*50)
+
+try:
+    from shivu.modules.rarity import register_rarity_handlers, spawn_settings_collection
+    LOGGER.info("✅ Imported: rarity module")
+except Exception as e:
+    LOGGER.error(f"❌ Failed to import rarity: {e}")
+    spawn_settings_collection = None
+
+try:
+    from shivu.modules.remove import register_remove_handlers
+    LOGGER.info("✅ Imported: remove module")
+except Exception as e:
+    LOGGER.error(f"❌ Failed to import remove: {e}")
+
+try:
+    from shivu.modules.ckill import register_ckill_handler
+    LOGGER.info("✅ Imported: ckill module")
+except Exception as e:
+    LOGGER.error(f"❌ Failed to import ckill: {e}")
+
+try:
+    from shivu.modules.kill import register_kill_handler
+    LOGGER.info("✅ Imported: kill module")
+except Exception as e:
+    LOGGER.error(f"❌ Failed to import kill: {e}")
+
+try:
+    from shivu.modules.hclaim import register_hclaim_handler
+    LOGGER.info("✅ Imported: hclaim module")
+except Exception as e:
+    LOGGER.error(f"❌ Failed to import hclaim: {e}")
+
+LOGGER.info("="*50)
 
 
 def escape_markdown(text):
@@ -69,26 +106,27 @@ async def is_character_allowed(character):
         if character.get('removed', False):
             return False
 
-        settings = await spawn_settings_collection.find_one({'type': 'global'})
-        if not settings:
-            return True
+        if spawn_settings_collection:
+            settings = await spawn_settings_collection.find_one({'type': 'global'})
+            if not settings:
+                return True
 
-        # Check if rarity is disabled
-        disabled_rarities = settings.get('disabled_rarities', [])
-        char_rarity = character.get('rarity', '🟢 Common')
+            # Check if rarity is disabled
+            disabled_rarities = settings.get('disabled_rarities', [])
+            char_rarity = character.get('rarity', '🟢 Common')
 
-        # Extract emoji from rarity
-        rarity_emoji = char_rarity.split(' ')[0] if ' ' in char_rarity else char_rarity
+            # Extract emoji from rarity
+            rarity_emoji = char_rarity.split(' ')[0] if ' ' in char_rarity else char_rarity
 
-        if rarity_emoji in disabled_rarities:
-            return False
+            if rarity_emoji in disabled_rarities:
+                return False
 
-        # Check if anime is disabled
-        disabled_animes = settings.get('disabled_animes', [])
-        char_anime = character.get('anime', '').lower()
+            # Check if anime is disabled
+            disabled_animes = settings.get('disabled_animes', [])
+            char_anime = character.get('anime', '').lower()
 
-        if char_anime in [anime.lower() for anime in disabled_animes]:
-            return False
+            if char_anime in [anime.lower() for anime in disabled_animes]:
+                return False
 
         return True
     except Exception as e:
@@ -98,72 +136,81 @@ async def is_character_allowed(character):
 
 async def message_counter(update: Update, context: CallbackContext) -> None:
     """Count messages and spawn characters at intervals"""
-    # Ignore non-group messages
-    if update.effective_chat.type not in ['group', 'supergroup']:
-        return
+    try:
+        # Ignore non-group messages
+        if update.effective_chat.type not in ['group', 'supergroup']:
+            return
 
-    # Ignore bot messages and commands
-    if not update.message or not update.message.text:
-        return
+        # Ignore bot messages and commands
+        if not update.message or not update.message.text:
+            return
 
-    if update.message.text.startswith('/'):
-        return
+        if update.message.text.startswith('/'):
+            return
 
-    chat_id = str(update.effective_chat.id)
-    user_id = update.effective_user.id
+        chat_id = str(update.effective_chat.id)
+        user_id = update.effective_user.id
 
-    # Initialize lock for this chat
-    if chat_id not in locks:
-        locks[chat_id] = asyncio.Lock()
-    lock = locks[chat_id]
+        # Initialize lock for this chat
+        if chat_id not in locks:
+            locks[chat_id] = asyncio.Lock()
+        lock = locks[chat_id]
 
-    async with lock:
-        # Get message frequency from database or use default
-        try:
-            chat_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
-            if chat_frequency:
-                message_frequency = chat_frequency.get('message_frequency', DEFAULT_MESSAGE_FREQUENCY)
-            else:
-                message_frequency = DEFAULT_MESSAGE_FREQUENCY
-                # Initialize chat settings in database
-                await user_totals_collection.insert_one({
-                    'chat_id': chat_id,
-                    'message_frequency': DEFAULT_MESSAGE_FREQUENCY
-                })
-        except Exception as e:
-            LOGGER.error(f"Error fetching chat frequency: {e}")
-            message_frequency = DEFAULT_MESSAGE_FREQUENCY
-
-        # Anti-spam check
-        if chat_id in last_user and last_user[chat_id]['user_id'] == user_id:
-            last_user[chat_id]['count'] += 1
-            if last_user[chat_id]['count'] >= 10:
-                # Check if user was recently warned
-                if user_id in warned_users and time.time() - warned_users[user_id] < 600:
-                    return
+        async with lock:
+            # Get message frequency from database or use default
+            try:
+                chat_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
+                if chat_frequency:
+                    message_frequency = chat_frequency.get('message_frequency', DEFAULT_MESSAGE_FREQUENCY)
                 else:
-                    try:
-                        await update.message.reply_text(
-                            f"⚠️ 𝘿𝙤𝙣'𝙩 𝙎𝙥𝙖𝙢 {escape(update.effective_user.first_name)}...\n"
-                            "𝙔𝙤𝙪𝙧 𝙈𝙚𝙨𝙨𝙖𝙜𝙚𝙨 𝙒𝙞𝙡𝙡 𝙗𝙚 𝙞𝙜𝙣𝙤𝙧𝙚𝙙 𝙛𝙤𝙧 10 𝙈𝙞𝙣𝙪𝙩𝙚𝙨..."
-                        )
-                    except Exception as e:
-                        LOGGER.error(f"Error sending spam warning: {e}")
-                    warned_users[user_id] = time.time()
-                    return
-        else:
-            last_user[chat_id] = {'user_id': user_id, 'count': 1}
+                    message_frequency = DEFAULT_MESSAGE_FREQUENCY
+                    # Initialize chat settings in database
+                    await user_totals_collection.insert_one({
+                        'chat_id': chat_id,
+                        'message_frequency': DEFAULT_MESSAGE_FREQUENCY
+                    })
+            except Exception as e:
+                LOGGER.error(f"Error fetching chat frequency: {e}")
+                message_frequency = DEFAULT_MESSAGE_FREQUENCY
 
-        # Increment message count
-        if chat_id not in message_counts:
-            message_counts[chat_id] = 0
+            # Anti-spam check
+            if chat_id in last_user and last_user[chat_id]['user_id'] == user_id:
+                last_user[chat_id]['count'] += 1
+                if last_user[chat_id]['count'] >= 10:
+                    # Check if user was recently warned
+                    if user_id in warned_users and time.time() - warned_users[user_id] < 600:
+                        return
+                    else:
+                        try:
+                            await update.message.reply_text(
+                                f"⚠️ 𝘿𝙤𝙣'𝙩 𝙎𝙥𝙖𝙢 {escape(update.effective_user.first_name)}...\n"
+                                "𝙔𝙤𝙪𝙧 𝙈𝙚𝙨𝙨𝙖𝙜𝙚𝙨 𝙒𝙞𝙡𝙡 𝙗𝙚 𝙞𝙜𝙣𝙤𝙧𝙚𝙙 𝙛𝙤𝙧 10 𝙈𝙞𝙣𝙪𝙩𝙚𝙨..."
+                            )
+                        except Exception as e:
+                            LOGGER.error(f"Error sending spam warning: {e}")
+                        warned_users[user_id] = time.time()
+                        return
+            else:
+                last_user[chat_id] = {'user_id': user_id, 'count': 1}
 
-        message_counts[chat_id] += 1
+            # Initialize message count for this chat
+            if chat_id not in message_counts:
+                message_counts[chat_id] = 0
 
-        # Check if it's time to spawn
-        if message_counts[chat_id] >= message_frequency:
-            await send_image(update, context)
-            message_counts[chat_id] = 0
+            # Increment message count
+            message_counts[chat_id] += 1
+
+            LOGGER.debug(f"Chat {chat_id}: Message {message_counts[chat_id]}/{message_frequency}")
+
+            # Check if it's time to spawn
+            if message_counts[chat_id] >= message_frequency:
+                LOGGER.info(f"🎯 Spawning character in chat {chat_id} (reached {message_frequency} messages)")
+                await send_image(update, context)
+                message_counts[chat_id] = 0  # Reset counter
+
+    except Exception as e:
+        LOGGER.error(f"Error in message_counter: {e}")
+        LOGGER.error(traceback.format_exc())
 
 
 async def send_image(update: Update, context: CallbackContext) -> None:
@@ -171,12 +218,16 @@ async def send_image(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
 
     try:
+        LOGGER.info(f"[SPAWN] Starting spawn process for chat {chat_id}")
+
         # Fetch all characters
         all_characters = list(await collection.find({}).to_list(length=None))
 
         if not all_characters:
-            LOGGER.error("No characters found in database")
+            LOGGER.error("[SPAWN] No characters found in database")
             return
+
+        LOGGER.info(f"[SPAWN] Total characters in database: {len(all_characters)}")
 
         # Initialize sent characters list for this chat
         if chat_id not in sent_characters:
@@ -184,9 +235,10 @@ async def send_image(update: Update, context: CallbackContext) -> None:
 
         # Reset if all characters have been sent
         if len(sent_characters[chat_id]) >= len(all_characters):
+            LOGGER.info(f"[SPAWN] Resetting sent characters for chat {chat_id}")
             sent_characters[chat_id] = []
 
-        # Filter characters that haven't been sent yet and are allowed
+        # Filter characters that haven't been sent yet
         available_characters = [
             c for c in all_characters
             if 'id' in c and c.get('id') not in sent_characters[chat_id]
@@ -196,14 +248,18 @@ async def send_image(update: Update, context: CallbackContext) -> None:
             available_characters = all_characters
             sent_characters[chat_id] = []
 
+        LOGGER.info(f"[SPAWN] Available characters before filtering: {len(available_characters)}")
+
         # Filter by spawn settings
         allowed_characters = []
         for char in available_characters:
             if await is_character_allowed(char):
                 allowed_characters.append(char)
 
+        LOGGER.info(f"[SPAWN] Allowed characters after filtering: {len(allowed_characters)}")
+
         if not allowed_characters:
-            LOGGER.info(f"No allowed characters to spawn in chat {chat_id}")
+            LOGGER.warning(f"[SPAWN] No allowed characters to spawn in chat {chat_id}")
             return
 
         # Select random character
@@ -237,10 +293,11 @@ async def send_image(update: Update, context: CallbackContext) -> None:
             parse_mode='Markdown'
         )
 
-        LOGGER.info(f"Character spawned in chat {chat_id}: {character.get('name', 'Unknown')}")
+        LOGGER.info(f"[SPAWN] ✅ Character spawned: {character.get('name', 'Unknown')} (ID: {character.get('id')}) in chat {chat_id}")
 
     except Exception as e:
-        LOGGER.error(f"Error sending character image: {e}")
+        LOGGER.error(f"[SPAWN ERROR] {e}")
+        LOGGER.error(traceback.format_exc())
 
 
 async def guess(update: Update, context: CallbackContext) -> None:
@@ -248,46 +305,46 @@ async def guess(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
 
-    # Check if there's an active character
-    if chat_id not in last_characters:
-        return
+    try:
+        # Check if there's an active character
+        if chat_id not in last_characters:
+            return
 
-    # Check if already guessed
-    if chat_id in first_correct_guesses:
-        await update.message.reply_text(
-            '🚫 𝙒ᴀɪғᴜ ᴀʟʀᴇᴀᴅʏ ɢʀᴀʙʙᴇᴅ ʙʏ 𝙨ᴏᴍᴇᴏɴᴇ ᴇʟ𝙨ᴇ ⚡, '
-            '𝘽ᴇᴛᴛᴇʀ 𝙇ᴜᴄᴋ 𝙉ᴇ𝙭ᴛ 𝙏ɪᴍᴇ'
+        # Check if already guessed
+        if chat_id in first_correct_guesses:
+            await update.message.reply_text(
+                '🚫 𝙒ᴀɪғᴜ ᴀʟʀᴇᴀᴅʏ ɢʀᴀʙʙᴇᴅ ʙʏ 𝙨ᴏᴍᴇᴏɴᴇ ᴇʟ𝙨ᴇ ⚡, '
+                '𝘽ᴇᴛᴛᴇʀ 𝙇ᴜᴄᴋ 𝙉ᴇ𝙭ᴛ 𝙏ɪᴍᴇ'
+            )
+            return
+
+        # Get user's guess
+        guess_text = ' '.join(context.args).lower() if context.args else ''
+
+        # Validate guess
+        if not guess_text:
+            await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙥𝙧𝙤𝙫𝙞𝙙𝙚 𝙖 𝙣𝙖𝙢𝙚!')
+            return
+
+        if "()" in guess_text or "&" in guess_text:
+            await update.message.reply_text("𝙉𝙖𝙝𝙝 𝙔𝙤𝙪 𝘾𝙖𝙣'𝙩 𝙪𝙨𝙚 𝙏𝙝𝙞𝙨 𝙏𝙮𝙥𝙚𝙨 𝙤𝙛 𝙬𝙤𝙧𝙙𝙨 ❌️")
+            return
+
+        # Get character name parts
+        character_name = last_characters[chat_id].get('name', '').lower()
+        name_parts = character_name.split()
+
+        # Check if guess matches
+        is_correct = (
+            sorted(name_parts) == sorted(guess_text.split()) or
+            any(part == guess_text for part in name_parts) or
+            guess_text == character_name
         )
-        return
 
-    # Get user's guess
-    guess_text = ' '.join(context.args).lower() if context.args else ''
+        if is_correct:
+            # Mark as guessed
+            first_correct_guesses[chat_id] = user_id
 
-    # Validate guess
-    if not guess_text:
-        await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙥𝙧𝙤𝙫𝙞𝙙𝙚 𝙖 𝙣𝙖𝙢𝙚!')
-        return
-
-    if "()" in guess_text or "&" in guess_text:
-        await update.message.reply_text("𝙉𝙖𝙝𝙝 𝙔𝙤𝙪 𝘾𝙖𝙣'𝙩 𝙪𝙨𝙚 𝙏𝙝𝙞𝙨 𝙏𝙮𝙥𝙚𝙨 𝙤𝙛 𝙬𝙤𝙧𝙙𝙨 ❌️")
-        return
-
-    # Get character name parts
-    character_name = last_characters[chat_id].get('name', '').lower()
-    name_parts = character_name.split()
-
-    # Check if guess matches
-    is_correct = (
-        sorted(name_parts) == sorted(guess_text.split()) or
-        any(part == guess_text for part in name_parts) or
-        guess_text == character_name
-    )
-
-    if is_correct:
-        # Mark as guessed
-        first_correct_guesses[chat_id] = user_id
-
-        try:
             # Update or create user
             user = await user_collection.find_one({'id': user_id})
             if user:
@@ -404,63 +461,110 @@ async def guess(update: Update, context: CallbackContext) -> None:
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
 
-        except Exception as e:
-            LOGGER.error(f"Error processing correct guess: {e}")
-            await update.message.reply_text('An error occurred while processing your guess.')
-    else:
-        await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙒𝙧𝙞𝙩𝙚 𝘾𝙤𝙧𝙧𝙚𝙘𝙩 𝙉𝙖𝙢𝙚... ❌️')
+            LOGGER.info(f"[GRAB] User {user_id} grabbed {character.get('name')} in chat {chat_id}")
+
+        else:
+            await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙒𝙧𝙞𝙩𝙚 𝘾𝙤𝙧𝙧𝙚𝙘𝙩 𝙉𝙖𝙢𝙚... ❌️')
+
+    except Exception as e:
+        LOGGER.error(f"[GRAB ERROR] {e}")
+        LOGGER.error(traceback.format_exc())
+        await update.message.reply_text('An error occurred while processing your guess.')
 
 
 def main() -> None:
     """Run bot"""
     try:
+        LOGGER.info("="*50)
+        LOGGER.info("REGISTERING HANDLERS")
+        LOGGER.info("="*50)
+
         # Add command handlers
         application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
+        LOGGER.info("✅ Registered: /grab, /g commands")
 
         # Register custom module handlers
-        register_remove_handlers()
-        register_rarity_handlers()
-        register_ckill_handler()
-        register_kill_handler()
-        register_hclaim_handler()
+        try:
+            register_remove_handlers()
+            LOGGER.info("✅ Registered: remove handlers")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register remove handlers: {e}")
 
-        # Add message handler (should be last)
+        try:
+            register_rarity_handlers()
+            LOGGER.info("✅ Registered: rarity handlers")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register rarity handlers: {e}")
+
+        try:
+            register_ckill_handler()
+            LOGGER.info("✅ Registered: ckill handler")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register ckill handler: {e}")
+
+        try:
+            register_kill_handler()
+            LOGGER.info("✅ Registered: kill handler")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register kill handler: {e}")
+
+        try:
+            register_hclaim_handler()
+            LOGGER.info("✅ Registered: hclaim handler")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register hclaim handler: {e}")
+
+        # Add message handler (MUST BE LAST!)
         application.add_handler(MessageHandler(
             filters.TEXT & ~filters.COMMAND,
             message_counter,
             block=False
         ))
+        LOGGER.info("✅ Registered: message counter (spawn handler)")
 
-        LOGGER.info("All handlers registered successfully")
+        LOGGER.info("="*50)
+        LOGGER.info(f"✅ ALL HANDLERS REGISTERED SUCCESSFULLY")
+        LOGGER.info(f"📊 Spawn frequency: {DEFAULT_MESSAGE_FREQUENCY} messages")
+        LOGGER.info("="*50)
 
         # Start polling
+        LOGGER.info("🚀 Starting bot polling...")
         application.run_polling(
             drop_pending_updates=True,
             allowed_updates=Update.ALL_TYPES
         )
 
     except Exception as e:
-        LOGGER.error(f"Error in main: {e}")
+        LOGGER.error(f"❌ Error in main: {e}")
+        LOGGER.error(traceback.format_exc())
         raise
 
 
 if __name__ == "__main__":
     try:
+        LOGGER.info("="*50)
+        LOGGER.info("🤖 SHIVU BOT STARTING")
+        LOGGER.info("="*50)
+
         # Start the client
         shivuu.start()
-        LOGGER.info("Shivuu client started successfully")
+        LOGGER.info("✅ Pyrogram client started successfully")
 
         # Run the bot
         main()
 
     except KeyboardInterrupt:
-        LOGGER.info("Bot stopped by user")
+        LOGGER.info("⚠️ Bot stopped by user (Ctrl+C)")
     except Exception as e:
-        LOGGER.error(f"Fatal error: {e}")
+        LOGGER.error(f"❌ Fatal error: {e}")
+        LOGGER.error(traceback.format_exc())
         raise
     finally:
         try:
             shivuu.stop()
-            LOGGER.info("Shivuu client stopped")
+            LOGGER.info("✅ Pyrogram client stopped")
         except:
             pass
+        LOGGER.info("="*50)
+        LOGGER.info("🛑 BOT SHUTDOWN COMPLETE")
+        LOGGER.info("="*50)
