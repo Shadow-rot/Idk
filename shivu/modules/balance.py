@@ -1,220 +1,243 @@
 import math
-import asyncio
-from datetime import datetime, timedelta
-from telegram.ext import CommandHandler
-from shivu import application, user_collection
-import math
 import random
 import time
+import asyncio
+from datetime import datetime, timedelta
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CommandHandler
+from shivu import application, user_collection
 
+# Cooldowns and helpers
 pay_cooldown = {}
 
+# ──────────────────────────────
+# Helper Functions
+# ──────────────────────────────
+
+def to_small_caps(text):
+    smallcaps = str.maketrans(
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+        "ᴀʙᴄᴅᴇғɢʜɪᴊᴋʟᴍɴᴏᴘǫʀsᴛᴜᴠᴡxʏᴢᴀʙᴄᴅᴇғɢʜɪᴊᴋʟᴍɴᴏᴘǫʀsᴛᴜᴠᴡxʏᴢ"
+    )
+    return text.translate(smallcaps)
+
+async def format_time_delta(delta):
+    seconds = int(delta.total_seconds())
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours}ʜ {minutes}ᴍ {seconds}s"
+
+# ──────────────────────────────
+# ʙᴀʟᴀɴᴄᴇ ᴄᴏᴍᴍᴀɴᴅ
+# ──────────────────────────────
 
 async def balance(update, context):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    user_id = user.id
 
     user_data = await user_collection.find_one({'id': user_id})
 
-    if user_data:
-        # Safely fetch balance and bank values
-        balance_amount = math.floor(user_data.get('balance', 0))
-        bank_balance = math.floor(user_data.get('bank', 0))
-
-        balance_message = (
-            f"🏦 **Hunter Balance Report** 🏦\n\n"
-            f"💰 Wallet: `{balance_amount}` Gold Coins\n"
-            f"💳 Bank: `{bank_balance}` Gold Coins\n\n"
-            f"Keep hunting, warrior! 🍂"
+    if not user_data:
+        keyboard = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("🌸 sᴛᴀʀᴛ ᴡᴀɪꜰᴜᴋᴜɴ ʙᴏᴛ", url="https://t.me/waifukunbot")]]
         )
-    else:
-        balance_message = "You are not eligible to be a Hunter 🍂"
+        await update.message.reply_text(
+            f"🌸 ʜᴇʏ {user.first_name}, ʏᴏᴜ'ʀᴇ ɴᴏᴛ ʏᴇᴛ ᴀ ʀᴇɢɪꜱᴛᴇʀᴇᴅ ʜᴜɴᴛᴇʀ.\n\n"
+            f"ᴄʟɪᴄᴋ ᴛʜᴇ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ꜱᴛᴀʀᴛ ʏᴏᴜʀ ᴊᴏᴜʀɴᴇʏ ᴡɪᴛʜ ᴡᴀɪꜰᴜᴋᴜɴ ʙᴏᴛ 🌸",
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        return
 
+    balance_amount = math.floor(user_data.get('balance', 0))
+    bank_balance = math.floor(user_data.get('bank', 0))
+
+    balance_message = (
+        f"🏦 **{to_small_caps('hunter balance report')}** 🏦\n\n"
+        f"💰 ᴡᴀʟʟᴇᴛ: `{balance_amount}` ɢᴏʟᴅ ᴄᴏɪɴꜱ\n"
+        f"💳 ʙᴀɴᴋ: `{bank_balance}` ɢᴏʟᴅ ᴄᴏɪɴꜱ\n\n"
+        f"ᴋᴇᴇᴘ ʜᴜɴᴛɪɴɢ, ᴡᴀʀʀɪᴏʀ 🍂"
+    )
     await update.message.reply_markdown(balance_message)
 
+# ──────────────────────────────
+# ᴘᴀʏ ᴄᴏᴍᴍᴀɴᴅ
+# ──────────────────────────────
 
 async def pay(update, context):
     sender_id = update.effective_user.id
 
     if not update.message.reply_to_message:
-        await update.message.reply_text("Please reply to a Hunter to /pay.")
+        await update.message.reply_text(f"ᴘʟᴇᴀꜱᴇ ʀᴇᴘʟʏ ᴛᴏ ᴀ ʜᴜɴᴛᴇʀ ᴛᴏ ᴜꜱᴇ `/pay`.", parse_mode="Markdown")
         return
 
     recipient = update.message.reply_to_message.from_user
 
     if recipient.id == sender_id:
-        await update.message.reply_text("You can't give Gold coins to yourself!")
+        await update.message.reply_text("ʏᴏᴜ ᴄᴀɴ'ᴛ ᴘᴀʏ ʏᴏᴜʀꜱᴇʟꜰ!")
         return
 
-    # Cooldown check
+    # Cooldown
     if sender_id in pay_cooldown:
         last_time = pay_cooldown[sender_id]
         if (datetime.utcnow() - last_time) < timedelta(minutes=30):
-            await update.message.reply_text("You can use /pay again after 30 minutes.")
+            await update.message.reply_text("⏳ ʏᴏᴜ ᴄᴀɴ ᴜꜱᴇ /pay ᴀɢᴀɪɴ ᴀꜰᴛᴇʀ 30 ᴍɪɴᴜᴛᴇꜱ.")
             return
 
-    # Amount validation
     try:
         amount = int(context.args[0])
     except (IndexError, ValueError):
-        await update.message.reply_text("Invalid amount. Usage: `/pay <amount>`", parse_mode="Markdown")
+        await update.message.reply_text("ᴜꜱᴀɢᴇ: `/pay <amount>`", parse_mode="Markdown")
         return
 
     if amount <= 0:
-        await update.message.reply_text("Amount must be positive.")
+        await update.message.reply_text("ᴀᴍᴏᴜɴᴛ ᴍᴜꜱᴛ ʙᴇ ᴘᴏꜱɪᴛɪᴠᴇ.")
         return
     elif amount > 1_000_000:
-        await update.message.reply_text("You can only pay up to `1,000,000` Gold coins at once.", parse_mode="Markdown")
+        await update.message.reply_text("ʏᴏᴜ ᴄᴀɴ ᴏɴʟʏ ᴘᴀʏ ᴜᴘ ᴛᴏ `1,000,000` ɢᴏʟᴅ ᴄᴏɪɴꜱ.", parse_mode="Markdown")
         return
 
-    # Database checks
     sender_data = await user_collection.find_one({'id': sender_id})
     if not sender_data or sender_data.get('balance', 0) < amount:
-        await update.message.reply_text("Insufficient funds.")
+        await update.message.reply_text("ɪɴꜱᴜꜰꜰɪᴄɪᴇɴᴛ ꜰᴜɴᴅꜱ.")
         return
 
-    # Perform transaction
     await user_collection.update_one({'id': sender_id}, {'$inc': {'balance': -amount}})
     await user_collection.update_one({'id': recipient.id}, {'$inc': {'balance': amount}})
 
     pay_cooldown[sender_id] = datetime.utcnow()
-
     recipient_link = f"[{recipient.first_name}](https://t.me/{recipient.username})" if recipient.username else recipient.first_name
-    success_message = f"✅ You paid **${amount}** Gold coins to {recipient_link}!"
 
-    await update.message.reply_markdown(success_message)
+    await update.message.reply_markdown(
+        f"✅ ʏᴏᴜ ᴘᴀɪᴅ **${amount}** ɢᴏʟᴅ ᴄᴏɪɴꜱ ᴛᴏ {recipient_link}!"
+    )
+
+# ──────────────────────────────
+# ᴛᴏᴘʜᴜɴᴛᴇʀꜱ ᴄᴏᴍᴍᴀɴᴅ
+# ──────────────────────────────
 
 async def mtop(update, context):
-    # Retrieve the top 10 users with the highest balance
-    top_users = await user_collection.find({}, projection={'id': 1, 'first_name': 1, 'last_name': 1, 'balance': 1}).sort('balance', -1).limit(10).to_list(10)
+    top_users = await user_collection.find(
+        {}, projection={'id': 1, 'first_name': 1, 'last_name': 1, 'balance': 1}
+    ).sort('balance', -1).limit(10).to_list(10)
 
-    # Create a message with the top users
-    top_users_message = "Top 10 Rich Hunters data.\n\n"
+    message = f"🏆 **{to_small_caps('top 10 rich hunters')}** 🏆\n\n"
     for i, user in enumerate(top_users, start=1):
-        first_name = user.get('first_name', 'Unknown')
+        first_name = user.get('first_name', 'ᴜɴᴋɴᴏᴡɴ')
         last_name = user.get('last_name', '')
-        user_id = user.get('id', 'Unknown')
+        full_name = f"{first_name} {last_name}".strip()
+        user_id = user.get('id')
+        balance = user.get('balance', 0)
+        message += f"{i}. <a href='tg://user?id={user_id}'>{full_name}</a> — `{balance}` ɢᴏʟᴅ ᴄᴏɪɴꜱ\n"
 
-        full_name = f"{first_name} {last_name}" if last_name else first_name
+    await update.message.reply_photo(
+        photo='https://telegra.ph/file/07283c3102ae87f3f2833.png',
+        caption=message,
+        parse_mode="HTML"
+    )
 
-        top_users_message += f"{i}. <a href='tg://user?id={user_id}'>{full_name}</a>, $ `{user.get('balance', 0)}` Gold Coins\n"
-
-    photo_path = 'https://telegra.ph/file/07283c3102ae87f3f2833.png'
-    await update.message.reply_photo(photo=photo_path, caption=top_users_message, parse_mode='HTML')
-
-
-from datetime import datetime, timedelta
-
-async def format_time_delta(delta):
-    seconds = delta.total_seconds()
-    hours, remainder = divmod(seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+# ──────────────────────────────
+# ᴅᴀɪʟʏ ᴄʟᴀɪᴍ ᴄᴏᴍᴍᴀɴᴅ
+# ──────────────────────────────
 
 async def daily_reward(update, context):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    user_id = user.id
+
     user_data = await user_collection.find_one({'id': user_id}, projection={'last_daily_reward': 1, 'balance': 1})
 
-    if user_data:
-        last_claimed_date = user_data.get('last_daily_reward')
+    if not user_data:
+        keyboard = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("🌸 sᴛᴀʀᴛ ᴡᴀɪꜰᴜᴋᴜɴ ʙᴏᴛ", url="https://t.me/waifukunbot")]]
+        )
+        await update.message.reply_text(
+            f"🌸 ʜᴇʏ {user.first_name}, ʏᴏᴜ'ʀᴇ ɴᴏᴛ ʏᴇᴛ ᴀ ʜᴜɴᴛᴇʀ.\n\n"
+            f"ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ʙᴇɢɪɴ ᴡɪᴛʜ ᴡᴀɪꜰᴜᴋᴜɴ ʙᴏᴛ 🌸",
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        return
 
-        if last_claimed_date and last_claimed_date.date() == datetime.utcnow().date():
-            remaining_time = timedelta(days=1) - (datetime.utcnow() - last_claimed_date)
-            formatted_time = await format_time_delta(remaining_time)
-            await update.message.reply_text(f"Soory ! hunter but you already claimed . Next reward in: `{formatted_time}`.")
-            return
+    last_claimed = user_data.get('last_daily_reward')
+    if last_claimed and last_claimed.date() == datetime.utcnow().date():
+        remaining = timedelta(days=1) - (datetime.utcnow() - last_claimed)
+        formatted = await format_time_delta(remaining)
+        await update.message.reply_text(
+            f"⏳ ʏᴏᴜ ᴀʟʀᴇᴀᴅʏ ᴄʟᴀɪᴍᴇᴅ ᴛᴏᴅᴀʏ.\nɴᴇxᴛ ʀᴇᴡᴀʀᴅ ɪɴ: `{formatted}`",
+            parse_mode="Markdown"
+        )
+        return
 
     await user_collection.update_one(
         {'id': user_id},
         {'$inc': {'balance': 2000}, '$set': {'last_daily_reward': datetime.utcnow()}}
     )
+    await update.message.reply_text("🎉 ʏᴏᴜ ᴄʟᴀɪᴍᴇᴅ `$2000` ɢᴏʟᴅ ᴄᴏɪɴꜱ ᴀꜱ ʏᴏᴜʀ ᴅᴀɪʟʏ ʀᴇᴡᴀʀᴅ!", parse_mode="Markdown")
 
-    await update.message.reply_text("Congratulations! You claim $ `2000` Gold coins as a daily reward.")
+# ──────────────────────────────
+# ʀᴏʟʟ ᴄᴏᴍᴍᴀɴᴅ
+# ──────────────────────────────
 
 async def roll(update, context):
     user_id = update.effective_user.id
     try:
         amount = int(context.args[0])
-        choice = context.args[1].upper()  # Assuming the second argument is ODD or EVEN
+        choice = context.args[1].upper()
     except (IndexError, ValueError):
-        await update.message.reply_text("Invalid usage, please use /roll <amount> <ODD/EVEN>")
-        return
-
-    if amount < 0:
-        await update.message.reply_text("Amount must be positive.")
+        await update.message.reply_text("ᴜꜱᴀɢᴇ: `/roll <amount> <ODD/EVEN>`", parse_mode="Markdown")
         return
 
     user_data = await user_collection.find_one({'id': user_id})
     if not user_data:
-        await update.message.reply_text("User data not found.")
+        await update.message.reply_text("ᴜꜱᴇʀ ᴅᴀᴛᴀ ɴᴏᴛ ꜰᴏᴜɴᴅ.")
         return
 
-    balance_amount = user_data.get('balance', 0)
-    if amount < balance_amount * 0.07:
-        await update.message.reply_text("You can bet more than 7% of your balance.")
+    balance = user_data.get('balance', 0)
+    if balance < amount:
+        await update.message.reply_text("ɪɴꜱᴜꜰꜰɪᴄɪᴇɴᴛ ʙᴀʟᴀɴᴄᴇ.")
         return
 
-    if balance_amount < amount:
-        await update.message.reply_text("Insufficient balance to place the bet.")
-        return
-
-    # Send the dice emoji
     dice_message = await context.bot.send_dice(update.effective_chat.id, "🎲")
-
-    # Extract the dice value
     dice_value = dice_message.dice.value
+    result = "ODD" if dice_value % 2 != 0 else "EVEN"
 
-    # Check if the dice roll is odd or even
-    dice_result = "ODD" if dice_value % 2 != 0 else "EVEN"
+    xp_change = 4 if choice == result else -2
+    balance_change = amount if choice == result else -amount
+    await user_collection.update_one({'id': user_id}, {'$inc': {'balance': balance_change, 'user_xp': xp_change}})
 
-    xp_change = 0  # Initialize XP change
+    msg = (
+        f"🎲 ᴅɪᴄᴇ: `{dice_value}`\n"
+        f"{'🟢 ʏᴏᴜ ᴡᴏɴ!' if choice == result else '🔴 ʏᴏᴜ ʟᴏꜱᴛ!'}\n"
+        f"ʙᴀʟᴀɴᴄᴇ ᴄʜᴀɴɢᴇ: `{balance_change}`\n"
+        f"XP ᴄʜᴀɴɢᴇ: `{xp_change}`"
+    )
+    await update.message.reply_markdown(msg)
 
-    if choice == dice_result:
-        # User wins, update balance and add XP
-        xp_change = 4
-        await user_collection.update_one(
-            {'id': user_id},
-            {'$inc': {'balance': amount, 'user_xp': xp_change}}
-        )
-        await update.message.reply_text(f"Dice roll: {dice_value}\nYou won! Your balance increased by {amount * 2}.")
-    else:
-        # User loses, deduct bet amount from balance and subtract XP
-        xp_change = -2
-        await user_collection.update_one(
-            {'id': user_id},
-            {'$inc': {'balance': -amount, 'user_xp': xp_change}}
-        )
-        await update.message.reply_text(f"Dice roll: {dice_value}\nYou lost! {amount} deducted from your balance.")
-
-    # Notify user about XP change
-    await update.message.reply_text(f"XP change: {xp_change}")
-
-application.add_handler(CommandHandler("roll", roll, block=False))
+# ──────────────────────────────
+# XP ᴄᴏᴍᴍᴀɴᴅ
+# ──────────────────────────────
 
 async def xp(update, context):
     user_id = update.effective_user.id
     user_data = await user_collection.find_one({'id': user_id})
-
     if not user_data:
-        await update.message.reply_text("User data not found.")
+        await update.message.reply_text("ᴜꜱᴇʀ ᴅᴀᴛᴀ ɴᴏᴛ ꜰᴏᴜɴᴅ.")
         return
 
     xp = user_data.get('user_xp', 0)
-    level = math.floor(math.sqrt(xp / 100)) + 1
-
-    if level > 100:
-        level = 100
-
+    level = min(math.floor(math.sqrt(xp / 100)) + 1, 100)
     ranks = {1: "E", 10: "D", 30: "C", 50: "B", 70: "A", 90: "S"}
-    rank = next((rank for xp_limit, rank in ranks.items() if level <= xp_limit), None)
+    rank = next((r for lim, r in ranks.items() if level <= lim), "S")
 
-    message = f"Your current level is `{level}`\nand your rank is `{rank}`."
+    await update.message.reply_text(f"⚡ ʏᴏᴜʀ ʟᴇᴠᴇʟ: `{level}`\nʀᴀɴᴋ: `{rank}`", parse_mode="Markdown")
 
-    await update.message.reply_text(message)
+# ──────────────────────────────
+# ʜᴀɴᴅʟᴇʀꜱ
+# ──────────────────────────────
 
-application.add_handler(CommandHandler("xp", xp, block=False))
-application.add_handler(CommandHandler("roll", roll, block=False))
 application.add_handler(CommandHandler("bal", balance, block=False))
 application.add_handler(CommandHandler("pay", pay, block=False))
-
 application.add_handler(CommandHandler("Tophunters", mtop, block=False))
 application.add_handler(CommandHandler("cclaim", daily_reward, block=False))
+application.add_handler(CommandHandler("roll", roll, block=False))
+application.add_handler(CommandHandler("xp", xp, block=False))
