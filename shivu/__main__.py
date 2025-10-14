@@ -44,7 +44,7 @@ last_user = {}
 warned_users = {}
 
 # Default spawn frequency
-DEFAULT_MESSAGE_FREQUENCY = 70
+DEFAULT_MESSAGE_FREQUENCY = 50
 
 # Import all modules
 for module_name in ALL_MODULES:
