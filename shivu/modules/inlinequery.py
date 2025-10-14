@@ -397,6 +397,7 @@ async def show_smashers_callback(update: Update, context) -> None:
         except:
             pass
 
+def inlinequery():
 
 # Add handlers
 application.add_handler(InlineQueryHandler(inlinequery, block=False))
