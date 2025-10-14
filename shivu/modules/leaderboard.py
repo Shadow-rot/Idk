@@ -138,7 +138,7 @@ async def send_groups_document(update: Update, context: CallbackContext) -> None
     os.remove('groups.txt')
 
 async def stats(update: Update, context: CallbackContext) -> None:
-    OWNER_ID = 5147822244  # Define your OWNER_ID here
+    OWNER_ID = 8420981179  # Define your OWNER_ID here
 
     if update.effective_user.id != OWNER_ID:
         await update.message.reply_text("You are not authorized to use this command.")
