@@ -6,7 +6,7 @@ from telegram.ext import CommandHandler, CallbackContext
 from shivu import application, user_collection, LOGGER
 
 # Owner ID
-OWNER_ID = 5147822244
+OWNER_ID = 8420981179
 
 # Log chat ID
 LOG_CHAT_ID = -1003071132623
