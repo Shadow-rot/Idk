@@ -174,13 +174,13 @@ def get_category_caption(action):
 ━━━━━━━━━━━━━━━━━━━
 🎯 <b>{to_small_caps('catching')}</b>
 ━━━━━━━━━━━━━━━━━━━
-• <code>/slave name</code> → {to_small_caps('catch slave')}
+• <code>/grab name</code> → {to_small_caps('catch slave')}
 • {to_small_caps('spawns every 100 messages')}
 
 ━━━━━━━━━━━━━━━━━━━
 👤 <b>{to_small_caps('view collection')}</b>
 ━━━━━━━━━━━━━━━━━━━
-• <code>/myslave</code> → {to_small_caps('your slaves')}
+• <code>/harem</code> → {to_small_caps('your slaves')}
 • <code>/slaves</code> → {to_small_caps('all slaves')}
 • <code>/smode</code> → {to_small_caps('sort by rank')}
 
