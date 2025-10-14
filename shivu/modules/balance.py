@@ -148,7 +148,7 @@ async def daily_reward(update, context):
 
     if not user_data:
         keyboard = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("🌸 sᴛᴀʀᴛ ᴡᴀɪꜰᴜᴋᴜɴ ʙᴏᴛ", url="https://t.me/waifukunbot")]]
+            [[InlineKeyboardButton("🌸 sᴛᴀʀᴛ Jᴏɪɴ ɢʀᴏᴜᴘ", url="https://t.me/PICK_X_SUPPORT")]]
         )
         await update.message.reply_text(
             f"🌸 ʜᴇʏ {user.first_name}, ʏᴏᴜ'ʀᴇ ɴᴏᴛ ʏᴇᴛ ᴀ ʜᴜɴᴛᴇʀ.\n\n"
