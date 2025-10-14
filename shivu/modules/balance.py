@@ -1,176 +1,220 @@
-import traceback
-from html import escape
-from telegram import Update
-from telegram.ext import CommandHandler, CallbackContext
+import math
+import asyncio
+from datetime import datetime, timedelta
+from telegram.ext import CommandHandler
+from shivu import application, user_collection
+import math
+import random
+import time
 
-from shivu import application, user_collection, LOGGER
-
-# Owner ID
-OWNER_ID = 5147822244
-
-# Log chat ID
-LOG_CHAT_ID = -1003071132623
+pay_cooldown = {}
 
 
-async def ckill(update: Update, context: CallbackContext) -> None:
-    """Remove user's balance (wallet + bank) to 0 (Owner only)"""
+async def balance(update, context):
     user_id = update.effective_user.id
 
-    LOGGER.info(f"[CKILL] Command called by user {user_id}")
+    user_data = await user_collection.find_one({'id': user_id})
 
-    # Check if owner
-    if user_id != OWNER_ID:
-        await update.message.reply_text("⚠️ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ɪs ᴏɴʟʏ ғᴏʀ ᴏᴡɴᴇʀ!")
-        LOGGER.warning(f"[CKILL] Unauthorized access attempt by user {user_id}")
-        return
+    if user_data:
+        # Safely fetch balance and bank values
+        balance_amount = math.floor(user_data.get('balance', 0))
+        bank_balance = math.floor(user_data.get('bank', 0))
 
-    # Check if reply to user or provided user ID
-    target_user_id = None
-    target_username = None
-    target_first_name = None
-
-    if update.message.reply_to_message:
-        # Get from replied message
-        target_user_id = update.message.reply_to_message.from_user.id
-        target_username = update.message.reply_to_message.from_user.username
-        target_first_name = update.message.reply_to_message.from_user.first_name
-        LOGGER.info(f"[CKILL] Target user from reply: {target_user_id}")
-    elif context.args:
-        # Get from command argument
-        try:
-            target_user_id = int(context.args[0])
-            LOGGER.info(f"[CKILL] Target user from argument: {target_user_id}")
-        except ValueError:
-            await update.message.reply_text(
-                "❌ <b>ɪɴᴠᴀʟɪᴅ ᴜsᴇʀ ɪᴅ!</b>\n\n"
-                "📝 <b>ᴜsᴀɢᴇ:</b>\n"
-                "• Reply to user's message: <code>/ckill</code>\n"
-                "• Use user ID: <code>/ckill user_id</code>",
-                parse_mode='HTML'
-            )
-            return
+        balance_message = (
+            f"🏦 **Hunter Balance Report** 🏦\n\n"
+            f"💰 Wallet: `{balance_amount}` Gold Coins\n"
+            f"💳 Bank: `{bank_balance}` Gold Coins\n\n"
+            f"Keep hunting, warrior! 🍂"
+        )
     else:
-        await update.message.reply_text(
-            "📝 <b>ᴜsᴀɢᴇ:</b>\n"
-            "• Reply to user's message: <code>/ckill</code>\n"
-            "• Use user ID: <code>/ckill user_id</code>",
-            parse_mode='HTML'
-        )
+        balance_message = "You are not eligible to be a Hunter 🍂"
+
+    await update.message.reply_markdown(balance_message)
+
+
+async def pay(update, context):
+    sender_id = update.effective_user.id
+
+    if not update.message.reply_to_message:
+        await update.message.reply_text("Please reply to a Hunter to /pay.")
         return
 
-    try:
-        # Find user in database
-        user = await user_collection.find_one({'id': target_user_id})
+    recipient = update.message.reply_to_message.from_user
 
-        if not user:
-            await update.message.reply_text(
-                f"❌ <b>ᴜsᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ!</b>\n\n"
-                f"🆔 ᴜsᴇʀ ɪᴅ: <code>{target_user_id}</code>",
-                parse_mode='HTML'
-            )
-            LOGGER.warning(f"[CKILL] User {target_user_id} not found in database")
+    if recipient.id == sender_id:
+        await update.message.reply_text("You can't give Gold coins to yourself!")
+        return
+
+    # Cooldown check
+    if sender_id in pay_cooldown:
+        last_time = pay_cooldown[sender_id]
+        if (datetime.utcnow() - last_time) < timedelta(minutes=30):
+            await update.message.reply_text("You can use /pay again after 30 minutes.")
             return
 
-        # Get current balances
-        wallet_balance = user.get('balance', 0)
-        bank_balance = user.get('bank', 0)
-        total_balance = wallet_balance + bank_balance
-        
-        # If target info not from reply, get from database
-        if not target_username:
-            target_username = user.get('username', 'N/A')
-        if not target_first_name:
-            target_first_name = user.get('first_name', 'Unknown')
+    # Amount validation
+    try:
+        amount = int(context.args[0])
+    except (IndexError, ValueError):
+        await update.message.reply_text("Invalid amount. Usage: `/pay <amount>`", parse_mode="Markdown")
+        return
 
-        LOGGER.info(f"[CKILL] Current balance for user {target_user_id} - Wallet: {wallet_balance}, Bank: {bank_balance}, Total: {total_balance}")
+    if amount <= 0:
+        await update.message.reply_text("Amount must be positive.")
+        return
+    elif amount > 1_000_000:
+        await update.message.reply_text("You can only pay up to `1,000,000` Gold coins at once.", parse_mode="Markdown")
+        return
 
-        # Update both balance and bank to 0
-        result = await user_collection.update_one(
-            {'id': target_user_id},
-            {'$set': {'balance': 0, 'bank': 0}}
+    # Database checks
+    sender_data = await user_collection.find_one({'id': sender_id})
+    if not sender_data or sender_data.get('balance', 0) < amount:
+        await update.message.reply_text("Insufficient funds.")
+        return
+
+    # Perform transaction
+    await user_collection.update_one({'id': sender_id}, {'$inc': {'balance': -amount}})
+    await user_collection.update_one({'id': recipient.id}, {'$inc': {'balance': amount}})
+
+    pay_cooldown[sender_id] = datetime.utcnow()
+
+    recipient_link = f"[{recipient.first_name}](https://t.me/{recipient.username})" if recipient.username else recipient.first_name
+    success_message = f"✅ You paid **${amount}** Gold coins to {recipient_link}!"
+
+    await update.message.reply_markdown(success_message)
+
+async def mtop(update, context):
+    # Retrieve the top 10 users with the highest balance
+    top_users = await user_collection.find({}, projection={'id': 1, 'first_name': 1, 'last_name': 1, 'balance': 1}).sort('balance', -1).limit(10).to_list(10)
+
+    # Create a message with the top users
+    top_users_message = "Top 10 Rich Hunters data.\n\n"
+    for i, user in enumerate(top_users, start=1):
+        first_name = user.get('first_name', 'Unknown')
+        last_name = user.get('last_name', '')
+        user_id = user.get('id', 'Unknown')
+
+        full_name = f"{first_name} {last_name}" if last_name else first_name
+
+        top_users_message += f"{i}. <a href='tg://user?id={user_id}'>{full_name}</a>, $ `{user.get('balance', 0)}` Gold Coins\n"
+
+    photo_path = 'https://telegra.ph/file/07283c3102ae87f3f2833.png'
+    await update.message.reply_photo(photo=photo_path, caption=top_users_message, parse_mode='HTML')
+
+
+from datetime import datetime, timedelta
+
+async def format_time_delta(delta):
+    seconds = delta.total_seconds()
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+
+async def daily_reward(update, context):
+    user_id = update.effective_user.id
+    user_data = await user_collection.find_one({'id': user_id}, projection={'last_daily_reward': 1, 'balance': 1})
+
+    if user_data:
+        last_claimed_date = user_data.get('last_daily_reward')
+
+        if last_claimed_date and last_claimed_date.date() == datetime.utcnow().date():
+            remaining_time = timedelta(days=1) - (datetime.utcnow() - last_claimed_date)
+            formatted_time = await format_time_delta(remaining_time)
+            await update.message.reply_text(f"Soory ! hunter but you already claimed . Next reward in: `{formatted_time}`.")
+            return
+
+    await user_collection.update_one(
+        {'id': user_id},
+        {'$inc': {'balance': 2000}, '$set': {'last_daily_reward': datetime.utcnow()}}
+    )
+
+    await update.message.reply_text("Congratulations! You claim $ `2000` Gold coins as a daily reward.")
+
+async def roll(update, context):
+    user_id = update.effective_user.id
+    try:
+        amount = int(context.args[0])
+        choice = context.args[1].upper()  # Assuming the second argument is ODD or EVEN
+    except (IndexError, ValueError):
+        await update.message.reply_text("Invalid usage, please use /roll <amount> <ODD/EVEN>")
+        return
+
+    if amount < 0:
+        await update.message.reply_text("Amount must be positive.")
+        return
+
+    user_data = await user_collection.find_one({'id': user_id})
+    if not user_data:
+        await update.message.reply_text("User data not found.")
+        return
+
+    balance_amount = user_data.get('balance', 0)
+    if amount < balance_amount * 0.07:
+        await update.message.reply_text("You can bet more than 7% of your balance.")
+        return
+
+    if balance_amount < amount:
+        await update.message.reply_text("Insufficient balance to place the bet.")
+        return
+
+    # Send the dice emoji
+    dice_message = await context.bot.send_dice(update.effective_chat.id, "🎲")
+
+    # Extract the dice value
+    dice_value = dice_message.dice.value
+
+    # Check if the dice roll is odd or even
+    dice_result = "ODD" if dice_value % 2 != 0 else "EVEN"
+
+    xp_change = 0  # Initialize XP change
+
+    if choice == dice_result:
+        # User wins, update balance and add XP
+        xp_change = 4
+        await user_collection.update_one(
+            {'id': user_id},
+            {'$inc': {'balance': amount, 'user_xp': xp_change}}
         )
-
-        LOGGER.info(f"[CKILL] Database update - modified={result.modified_count}")
-
-        if result.modified_count > 0:
-            # Send log to log chat
-            try:
-                from datetime import datetime
-                now = datetime.now()
-                date_str = now.strftime("%d/%m/%Y")
-                time_str = now.strftime("%I:%M %p")
-
-                # Get group info if available
-                group_name = update.effective_chat.title if update.effective_chat.type in ['group', 'supergroup'] else "ᴘʀɪᴠᴀᴛᴇ ᴄʜᴀᴛ"
-                group_id = update.effective_chat.id
-
-                log_caption = (
-                    f"<b>💰 ʙᴀʟᴀɴᴄᴇ ʀᴇsᴇᴛ ʟᴏɢ</b>\n"
-                    f"{'='*30}\n\n"
-                    f"<b>👤 ᴇxᴇᴄᴜᴛᴇᴅ ʙʏ:</b>\n"
-                    f"• ɴᴀᴍᴇ: <a href='tg://user?id={user_id}'>{escape(update.effective_user.first_name)}</a>\n"
-                    f"• ᴜsᴇʀɴᴀᴍᴇ: @{update.effective_user.username or 'N/A'}\n"
-                    f"• ɪᴅ: <code>{user_id}</code>\n\n"
-                    f"<b>🎯 ᴛᴀʀɢᴇᴛ ᴜsᴇʀ:</b>\n"
-                    f"• ɴᴀᴍᴇ: <a href='tg://user?id={target_user_id}'>{escape(target_first_name)}</a>\n"
-                    f"• ᴜsᴇʀɴᴀᴍᴇ: @{target_username or 'N/A'}\n"
-                    f"• ɪᴅ: <code>{target_user_id}</code>\n\n"
-                    f"<b>💸 ʙᴀʟᴀɴᴄᴇ ᴄʜᴀɴɢᴇ:</b>\n"
-                    f"• 💰 ᴡᴀʟʟᴇᴛ: <code>{wallet_balance:,}</code> → <code>0</code> 🪙\n"
-                    f"• 💳 ʙᴀɴᴋ: <code>{bank_balance:,}</code> → <code>0</code> 🪙\n"
-                    f"• 📊 ᴛᴏᴛᴀʟ ʀᴇᴍᴏᴠᴇᴅ: <code>{total_balance:,}</code> 🪙\n\n"
-                    f"<b>📍 ʟᴏᴄᴀᴛɪᴏɴ:</b>\n"
-                    f"• ɢʀᴏᴜᴘ: <code>{escape(group_name)}</code>\n"
-                    f"• ɢʀᴏᴜᴘ ɪᴅ: <code>{group_id}</code>\n\n"
-                    f"<b>🕐 ᴛɪᴍᴇsᴛᴀᴍᴘ:</b>\n"
-                    f"• ᴅᴀᴛᴇ: <code>{date_str}</code>\n"
-                    f"• ᴛɪᴍᴇ: <code>{time_str}</code>\n\n"
-                    f"💀 <i>ᴀʟʟ ʙᴀʟᴀɴᴄᴇs ʀᴇsᴇᴛ ᴛᴏ 0!</i>"
-                )
-
-                await context.bot.send_message(
-                    chat_id=LOG_CHAT_ID,
-                    text=log_caption,
-                    parse_mode='HTML'
-                )
-                LOGGER.info(f"[CKILL] Log sent to chat {LOG_CHAT_ID}")
-            except Exception as log_error:
-                LOGGER.error(f"[CKILL] Failed to send log: {log_error}")
-                LOGGER.error(traceback.format_exc())
-
-            # Send confirmation
-            await update.message.reply_text(
-                f"✅ <b>ʙᴀʟᴀɴᴄᴇ ʀᴇsᴇᴛ sᴜᴄᴄᴇssғᴜʟʟʏ!</b>\n\n"
-                f"<b>👤 ᴜsᴇʀ:</b> <a href='tg://user?id={target_user_id}'>{escape(target_first_name)}</a>\n"
-                f"<b>🆔 ɪᴅ:</b> <code>{target_user_id}</code>\n\n"
-                f"<b>💸 ᴘʀᴇᴠɪᴏᴜs ʙᴀʟᴀɴᴄᴇs:</b>\n"
-                f"• 💰 ᴡᴀʟʟᴇᴛ: <code>{wallet_balance:,}</code> 🪙\n"
-                f"• 💳 ʙᴀɴᴋ: <code>{bank_balance:,}</code> 🪙\n"
-                f"• 📊 ᴛᴏᴛᴀʟ: <code>{total_balance:,}</code> 🪙\n\n"
-                f"<b>💰 ɴᴇᴡ ʙᴀʟᴀɴᴄᴇ:</b> <code>0</code> 🪙\n\n"
-                f"<i>ᴀʟʟ ɢᴏʟᴅ ᴄᴏɪɴs ʜᴀᴠᴇ ʙᴇᴇɴ ʀᴇᴍᴏᴠᴇᴅ.</i>",
-                parse_mode='HTML'
-            )
-
-            LOGGER.info(f"[CKILL] Successfully reset balance for user {target_user_id} - Removed {total_balance} coins")
-
-        else:
-            await update.message.reply_text(
-                "❌ <b>ғᴀɪʟᴇᴅ ᴛᴏ ᴜᴘᴅᴀᴛᴇ ʙᴀʟᴀɴᴄᴇ!</b>",
-                parse_mode='HTML'
-            )
-            LOGGER.error(f"[CKILL] Failed to update balance for user {target_user_id}")
-
-    except Exception as e:
-        LOGGER.error(f"[CKILL ERROR] {e}")
-        LOGGER.error(traceback.format_exc())
-        await update.message.reply_text(
-            f"❌ <b>ᴇʀʀᴏʀ:</b> <code>{str(e)}</code>",
-            parse_mode='HTML'
+        await update.message.reply_text(f"Dice roll: {dice_value}\nYou won! Your balance increased by {amount * 2}.")
+    else:
+        # User loses, deduct bet amount from balance and subtract XP
+        xp_change = -2
+        await user_collection.update_one(
+            {'id': user_id},
+            {'$inc': {'balance': -amount, 'user_xp': xp_change}}
         )
+        await update.message.reply_text(f"Dice roll: {dice_value}\nYou lost! {amount} deducted from your balance.")
 
+    # Notify user about XP change
+    await update.message.reply_text(f"XP change: {xp_change}")
 
-def register_ckill_handler():
-    """Register ckill command handler"""
-    application.add_handler(CommandHandler('ckill', ckill, block=False))
-    LOGGER.info("[CKILL] Handler registered")
+application.add_handler(CommandHandler("roll", roll, block=False))
+
+async def xp(update, context):
+    user_id = update.effective_user.id
+    user_data = await user_collection.find_one({'id': user_id})
+
+    if not user_data:
+        await update.message.reply_text("User data not found.")
+        return
+
+    xp = user_data.get('user_xp', 0)
+    level = math.floor(math.sqrt(xp / 100)) + 1
+
+    if level > 100:
+        level = 100
+
+    ranks = {1: "E", 10: "D", 30: "C", 50: "B", 70: "A", 90: "S"}
+    rank = next((rank for xp_limit, rank in ranks.items() if level <= xp_limit), None)
+
+    message = f"Your current level is `{level}`\nand your rank is `{rank}`."
+
+    await update.message.reply_text(message)
+
+application.add_handler(CommandHandler("xp", xp, block=False))
+application.add_handler(CommandHandler("roll", roll, block=False))
+application.add_handler(CommandHandler("bal", balance, block=False))
+application.add_handler(CommandHandler("pay", pay, block=False))
+
+application.add_handler(CommandHandler("Tophunters", mtop, block=False))
+application.add_handler(CommandHandler("claim", daily_reward, block=False))
