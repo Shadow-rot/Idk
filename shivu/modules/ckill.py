@@ -13,7 +13,7 @@ LOG_CHAT_ID = -1003071132623
 
 
 async def ckill(update: Update, context: CallbackContext) -> None:
-    """Remove user's gold coins balance to 0 (Owner only)"""
+    """Remove user's balance (wallet + bank) to 0 (Owner only)"""
     user_id = update.effective_user.id
 
     LOGGER.info(f"[CKILL] Command called by user {user_id}")
@@ -71,8 +71,10 @@ async def ckill(update: Update, context: CallbackContext) -> None:
             LOGGER.warning(f"[CKILL] User {target_user_id} not found in database")
             return
 
-        # Get current balance
-        current_balance = user.get('gold', 0)
+        # Get current balances
+        wallet_balance = user.get('balance', 0)
+        bank_balance = user.get('bank', 0)
+        total_balance = wallet_balance + bank_balance
         
         # If target info not from reply, get from database
         if not target_username:
@@ -80,12 +82,12 @@ async def ckill(update: Update, context: CallbackContext) -> None:
         if not target_first_name:
             target_first_name = user.get('first_name', 'Unknown')
 
-        LOGGER.info(f"[CKILL] Current balance for user {target_user_id}: {current_balance}")
+        LOGGER.info(f"[CKILL] Current balance for user {target_user_id} - Wallet: {wallet_balance}, Bank: {bank_balance}, Total: {total_balance}")
 
-        # Update balance to 0
+        # Update both balance and bank to 0
         result = await user_collection.update_one(
             {'id': target_user_id},
-            {'$set': {'gold': 0}}
+            {'$set': {'balance': 0, 'bank': 0}}
         )
 
         LOGGER.info(f"[CKILL] Database update - modified={result.modified_count}")
@@ -114,16 +116,16 @@ async def ckill(update: Update, context: CallbackContext) -> None:
                     f"• ᴜsᴇʀɴᴀᴍᴇ: @{target_username or 'N/A'}\n"
                     f"• ɪᴅ: <code>{target_user_id}</code>\n\n"
                     f"<b>💸 ʙᴀʟᴀɴᴄᴇ ᴄʜᴀɴɢᴇ:</b>\n"
-                    f"• ᴘʀᴇᴠɪᴏᴜs: <code>{current_balance:,}</code> 🪙\n"
-                    f"• ɴᴇᴡ: <code>0</code> 🪙\n"
-                    f"• ʀᴇᴍᴏᴠᴇᴅ: <code>{current_balance:,}</code> 🪙\n\n"
+                    f"• 💰 ᴡᴀʟʟᴇᴛ: <code>{wallet_balance:,}</code> → <code>0</code> 🪙\n"
+                    f"• 💳 ʙᴀɴᴋ: <code>{bank_balance:,}</code> → <code>0</code> 🪙\n"
+                    f"• 📊 ᴛᴏᴛᴀʟ ʀᴇᴍᴏᴠᴇᴅ: <code>{total_balance:,}</code> 🪙\n\n"
                     f"<b>📍 ʟᴏᴄᴀᴛɪᴏɴ:</b>\n"
                     f"• ɢʀᴏᴜᴘ: <code>{escape(group_name)}</code>\n"
                     f"• ɢʀᴏᴜᴘ ɪᴅ: <code>{group_id}</code>\n\n"
                     f"<b>🕐 ᴛɪᴍᴇsᴛᴀᴍᴘ:</b>\n"
                     f"• ᴅᴀᴛᴇ: <code>{date_str}</code>\n"
                     f"• ᴛɪᴍᴇ: <code>{time_str}</code>\n\n"
-                    f"💀 <i>ʙᴀʟᴀɴᴄᴇ ʀᴇsᴇᴛ ᴛᴏ 0!</i>"
+                    f"💀 <i>ᴀʟʟ ʙᴀʟᴀɴᴄᴇs ʀᴇsᴇᴛ ᴛᴏ 0!</i>"
                 )
 
                 await context.bot.send_message(
@@ -141,13 +143,16 @@ async def ckill(update: Update, context: CallbackContext) -> None:
                 f"✅ <b>ʙᴀʟᴀɴᴄᴇ ʀᴇsᴇᴛ sᴜᴄᴄᴇssғᴜʟʟʏ!</b>\n\n"
                 f"<b>👤 ᴜsᴇʀ:</b> <a href='tg://user?id={target_user_id}'>{escape(target_first_name)}</a>\n"
                 f"<b>🆔 ɪᴅ:</b> <code>{target_user_id}</code>\n\n"
-                f"<b>💸 ᴘʀᴇᴠɪᴏᴜs ʙᴀʟᴀɴᴄᴇ:</b> <code>{current_balance:,}</code> 🪙\n"
+                f"<b>💸 ᴘʀᴇᴠɪᴏᴜs ʙᴀʟᴀɴᴄᴇs:</b>\n"
+                f"• 💰 ᴡᴀʟʟᴇᴛ: <code>{wallet_balance:,}</code> 🪙\n"
+                f"• 💳 ʙᴀɴᴋ: <code>{bank_balance:,}</code> 🪙\n"
+                f"• 📊 ᴛᴏᴛᴀʟ: <code>{total_balance:,}</code> 🪙\n\n"
                 f"<b>💰 ɴᴇᴡ ʙᴀʟᴀɴᴄᴇ:</b> <code>0</code> 🪙\n\n"
-                f"<i>ᴜsᴇʀ's ɢᴏʟᴅ ᴄᴏɪɴs ʜᴀᴠᴇ ʙᴇᴇɴ ʀᴇᴍᴏᴠᴇᴅ.</i>",
+                f"<i>ᴀʟʟ ɢᴏʟᴅ ᴄᴏɪɴs ʜᴀᴠᴇ ʙᴇᴇɴ ʀᴇᴍᴏᴠᴇᴅ.</i>",
                 parse_mode='HTML'
             )
 
-            LOGGER.info(f"[CKILL] Successfully reset balance for user {target_user_id} from {current_balance} to 0")
+            LOGGER.info(f"[CKILL] Successfully reset balance for user {target_user_id} - Removed {total_balance} coins")
 
         else:
             await update.message.reply_text(
