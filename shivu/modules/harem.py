@@ -52,14 +52,21 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
             await message.reply_text("You don't have any characters yet! Use /grab to catch some.")
             return
 
-        # Get favorite character
-        fav_character_id = user.get('favorites', None)
+        # Get favorite character (supports dict or string ID)
+        fav_data = user.get('favorites', None)
         fav_character = None
-        if fav_character_id:
-            fav_character = next(
-                (c for c in characters if isinstance(c, dict) and c.get('id') == fav_character_id),
-                None
-            )
+        if fav_data:
+            if isinstance(fav_data, dict):
+                # Prefer the instance from the user's characters if present; fallback to stored dict
+                fav_character = next(
+                    (c for c in characters if isinstance(c, dict) and c.get('id') == fav_data.get('id')),
+                    fav_data
+                )
+            elif isinstance(fav_data, str):
+                fav_character = next(
+                    (c for c in characters if isinstance(c, dict) and c.get('id') == fav_data),
+                    None
+                )
 
         # Get harem mode
         hmode = user.get('smode', 'default')
@@ -179,9 +186,9 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
         reply_markup = InlineKeyboardMarkup(keyboard)
         message = update.message or update.callback_query.message
 
-        # Determine which image to show
+        # Determine which image to show (favorite on first page; otherwise random)
         display_img = None
-        if fav_character and 'img_url' in fav_character:
+        if page == 0 and fav_character and fav_character.get('img_url'):
             display_img = fav_character['img_url']
         elif filtered_chars:
             random_char = random.choice(filtered_chars)
