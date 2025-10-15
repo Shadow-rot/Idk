@@ -426,7 +426,7 @@ def main() -> None:
         register_kill_handler()
         register_hclaim_handler()
         register_gift_handlers()
-        register_restart_handlers  # Register gift handlers
+        register_restart_handlers()  # Register gift handlers
 
         # Add message handler (should be last)
         application.add_handler(MessageHandler(
