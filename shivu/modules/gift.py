@@ -147,18 +147,33 @@ async def handle_gift_callback(update: Update, context: CallbackContext):
     """Handle gift confirmation callbacks"""
     query = update.callback_query
     
+    # CRITICAL: Log everything for debugging
+    LOGGER.info(f"[GIFT CALLBACK DEBUG] Query object exists: {query is not None}")
+    LOGGER.info(f"[GIFT CALLBACK DEBUG] Callback data: '{query.data}'")
+    LOGGER.info(f"[GIFT CALLBACK DEBUG] From user: {query.from_user.id}")
+    
     try:
-        await query.answer()  # Answer immediately to remove loading state
-        
-        LOGGER.info(f"[GIFT CALLBACK] Received: {query.data} from user {query.from_user.id}")
-
         # Parse callback data
         data = query.data
+        
+        # Check if this is a gift callback
+        if not data.startswith('gc_') and not data.startswith('gx_'):
+            LOGGER.info(f"[GIFT CALLBACK] Not a gift callback, ignoring: {data}")
+            return
+        
+        # Answer the callback FIRST
+        try:
+            await query.answer()
+            LOGGER.info(f"[GIFT CALLBACK] Successfully answered callback")
+        except Exception as answer_error:
+            LOGGER.error(f"[GIFT CALLBACK] Failed to answer callback: {answer_error}")
+        
+        LOGGER.info(f"[GIFT CALLBACK] Processing: {data} from user {query.from_user.id}")
+
         parts = data.split('_', 1)
         
         if len(parts) != 2:
             LOGGER.error(f"[GIFT CALLBACK] Malformed data: {data}")
-            await query.answer("❌ Invalid callback data!", show_alert=True)
             return
 
         action_code = parts[0]  # 'gc' (confirm) or 'gx' (cancel)
@@ -316,14 +331,15 @@ def register_gift_handlers():
     # Add command handler
     application.add_handler(CommandHandler("gift", handle_gift_command, block=False))
 
-    # Add callback handler - IMPORTANT: Add this BEFORE any catch-all handlers
-    # The pattern matches: gc_123456 or gx_123456
+    # CRITICAL: Register callback handler WITHOUT pattern to catch everything for testing
+    # Once it works, you can add the pattern back
     application.add_handler(
         CallbackQueryHandler(
-            handle_gift_callback, 
-            pattern=r"^g[cx]_\d+$",  # More specific pattern
+            handle_gift_callback,
             block=False
-        )
+        ),
+        group=-1  # Use negative group to ensure it runs early
     )
 
     LOGGER.info("[GIFT] Handlers registered successfully")
+    LOGGER.info(f"[GIFT] Total handlers: {len(application.handlers)}")
