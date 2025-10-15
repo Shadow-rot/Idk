@@ -115,7 +115,7 @@ async def handle_gift_command(update: Update, context: CallbackContext):
             f"<i>Are you sure you want to gift this character?</i>"
         )
 
-        # Create confirmation buttons - FIXED: Use consistent callback data format
+        # Create confirmation buttons with consistent format
         keyboard = [
             [
                 InlineKeyboardButton("✅ Confirm", callback_data=f"gc_{sender_id}"),
@@ -146,20 +146,16 @@ async def handle_gift_command(update: Update, context: CallbackContext):
 async def handle_gift_callback(update: Update, context: CallbackContext):
     """Handle gift confirmation callbacks"""
     query = update.callback_query
-
+    
     try:
+        await query.answer()  # Answer immediately to remove loading state
+        
         LOGGER.info(f"[GIFT CALLBACK] Received: {query.data} from user {query.from_user.id}")
 
         # Parse callback data
         data = query.data
-        
-        # Check if it's a gift callback
-        if not (data.startswith('gc_') or data.startswith('gx_')):
-            LOGGER.info(f"[GIFT CALLBACK] Not a gift callback: {data}")
-            return
-
-        # Extract action and user ID
         parts = data.split('_', 1)
+        
         if len(parts) != 2:
             LOGGER.error(f"[GIFT CALLBACK] Malformed data: {data}")
             await query.answer("❌ Invalid callback data!", show_alert=True)
@@ -184,9 +180,6 @@ async def handle_gift_callback(update: Update, context: CallbackContext):
 
         gift_data = pending_gifts[user_id]
         character = gift_data['character']
-
-        # Answer callback immediately to remove loading state
-        await query.answer()
 
         if action_code == "gc":  # Confirm
             LOGGER.info(f"[GIFT CALLBACK] Processing confirmation for user {user_id}")
@@ -323,7 +316,14 @@ def register_gift_handlers():
     # Add command handler
     application.add_handler(CommandHandler("gift", handle_gift_command, block=False))
 
-    # Add callback handler with specific pattern
-    application.add_handler(CallbackQueryHandler(handle_gift_callback, pattern="^g[cx]_", block=False))
+    # Add callback handler - IMPORTANT: Add this BEFORE any catch-all handlers
+    # The pattern matches: gc_123456 or gx_123456
+    application.add_handler(
+        CallbackQueryHandler(
+            handle_gift_callback, 
+            pattern=r"^g[cx]_\d+$",  # More specific pattern
+            block=False
+        )
+    )
 
     LOGGER.info("[GIFT] Handlers registered successfully")
