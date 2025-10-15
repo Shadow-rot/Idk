@@ -285,7 +285,7 @@ async def stour(update: Update, context: CallbackContext):
     await ensure_user_doc(user_id, update.effective_user.first_name, update.effective_user.username)
     user = await get_user_doc(user_id)
 
-    entry_fee = 250  # cost to play
+    entry_fee = 300  # cost to play
 
     # Check balance
     if user.get('balance', 0) < entry_fee:
@@ -297,7 +297,7 @@ async def stour(update: Update, context: CallbackContext):
 
     # 50/50 chance
     outcome = random.random()
-    if outcome < 0.9:
+    if outcome < 0.1:
         # Success — reward
         reward_type = random.choice(["coins", "tokens"])
 
