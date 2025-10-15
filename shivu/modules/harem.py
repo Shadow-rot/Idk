@@ -52,14 +52,17 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
             await message.reply_text("You don't have any characters yet! Use /grab to catch some.")
             return
 
-        # Get favorite character
-        fav_character_id = user.get('favorites', None)
+        # Get favorite character (supports storing as dict or as character ID)
+        favorite_data = user.get('favorites', None)
         fav_character = None
-        if fav_character_id:
-            fav_character = next(
-                (c for c in characters if isinstance(c, dict) and c.get('id') == fav_character_id),
-                None
-            )
+        if favorite_data:
+            if isinstance(favorite_data, dict):
+                fav_character = favorite_data
+            elif isinstance(favorite_data, str):
+                fav_character = next(
+                    (c for c in characters if isinstance(c, dict) and c.get('id') == favorite_data),
+                    None
+                )
 
         # Get harem mode
         hmode = user.get('smode', 'default')
@@ -179,13 +182,13 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
         reply_markup = InlineKeyboardMarkup(keyboard)
         message = update.message or update.callback_query.message
 
-        # Determine which image to show
+        # Determine which image to show (favorite first on first page, otherwise random)
         display_img = None
-        if fav_character and 'img_url' in fav_character:
-            display_img = fav_character['img_url']
-        elif filtered_chars:
+        if page == 0 and fav_character:
+            display_img = fav_character.get('img_url') or fav_character.get('image_url')
+        if display_img is None and filtered_chars:
             random_char = random.choice(filtered_chars)
-            display_img = random_char.get('img_url')
+            display_img = random_char.get('img_url') or random_char.get('image_url')
 
         # Send or edit message
         if display_img:
