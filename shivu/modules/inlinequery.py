@@ -17,7 +17,7 @@ from telegram.ext import (
 )
 
 # Your own imports
-from shivu import application, db
+from shivu import application, db, LOGGER
 
 # Database collections
 collection = db['anime_characters_lol']
@@ -122,6 +122,31 @@ async def inlinequery(update: Update, context) -> None:
                             characters_dict[c.get('id')] = c
                     all_characters = list(characters_dict.values())
 
+                    # Get favorite character - handle both dict and string
+                    favorite_char_data = user.get('favorites')
+                    favorite_char = None
+
+                    if favorite_char_data:
+                        if isinstance(favorite_char_data, dict):
+                            # Favorite is stored as character object
+                            favorite_char = favorite_char_data
+                            LOGGER.info(f"[INLINE] Favorite is dict: {favorite_char.get('name')}")
+                        elif isinstance(favorite_char_data, str):
+                            # Favorite is stored as character ID
+                            favorite_char = next(
+                                (c for c in all_characters if c.get('id') == favorite_char_data),
+                                None
+                            )
+                            LOGGER.info(f"[INLINE] Favorite is string ID, found: {favorite_char.get('name') if favorite_char else 'None'}")
+
+                    # If no search terms and user has favorite, show favorite FIRST
+                    if not search_terms and favorite_char:
+                        LOGGER.info(f"[INLINE] Moving favorite to first position: {favorite_char.get('name')}")
+                        # Remove favorite from list if it exists
+                        all_characters = [c for c in all_characters if c.get('id') != favorite_char.get('id')]
+                        # Insert at beginning
+                        all_characters.insert(0, favorite_char)
+
                     # Apply search filter
                     if search_terms:
                         regex = re.compile(search_terms, re.IGNORECASE)
@@ -177,6 +202,15 @@ async def inlinequery(update: Update, context) -> None:
                 rarity_emoji = '🟢'
                 rarity_text = 'Common'
 
+            # Check if this is user's favorite
+            is_favorite = False
+            if user and user.get('favorites'):
+                fav = user.get('favorites')
+                if isinstance(fav, dict) and fav.get('id') == char_id:
+                    is_favorite = True
+                elif isinstance(fav, str) and fav == char_id:
+                    is_favorite = True
+
             # Build caption based on query type
             if query.startswith('collection.') and user:
                 # User collection caption
@@ -187,13 +221,19 @@ async def inlinequery(update: Update, context) -> None:
                 user_first_name = user.get('first_name', 'User')
                 user_id_int = user.get('id')
 
+                # Add favorite indicator
+                fav_indicator = "💖 " if is_favorite else ""
+
                 caption = (
-                    f"<b>🔮 {to_small_caps('look at')} <a href='tg://user?id={user_id_int}'>{escape(user_first_name)}</a>{to_small_caps('s waifu')}</b>\n\n"
+                    f"<b>{fav_indicator}🔮 {to_small_caps('look at')} <a href='tg://user?id={user_id_int}'>{escape(user_first_name)}</a>{to_small_caps('s waifu')}</b>\n\n"
                     f"<b>🆔 {to_small_caps('id')}</b> <code>{char_id}</code>\n"
                     f"<b>🧬 {to_small_caps('name')}</b> <code>{escape(char_name)}</code> x{user_character_count}\n"
                     f"<b>📺 {to_small_caps('anime')}</b> <code>{escape(char_anime)}</code> {user_anime_count}/{anime_total}\n"
                     f"<b>{rarity_emoji} {to_small_caps('rarity')}</b> <code>{to_small_caps(rarity_text)}</code>"
                 )
+
+                if is_favorite:
+                    caption += f"\n\n💖 <b>{to_small_caps('favorite character')}</b>"
             else:
                 # Global search caption
                 global_count = await get_global_count(char_id)
@@ -401,3 +441,5 @@ async def show_smashers_callback(update: Update, context) -> None:
 # Add handlers
 application.add_handler(InlineQueryHandler(inlinequery, block=False))
 application.add_handler(CallbackQueryHandler(show_smashers_callback, pattern=r'^show_smashers_', block=False))
+
+LOGGER.info("[INLINE] Handlers registered successfully")
