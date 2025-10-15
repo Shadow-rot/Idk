@@ -181,7 +181,8 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
 
         # Determine which image to show
         display_img = None
-        if fav_character and 'img_url' in fav_character:
+        # Show favorite character only on first page (page 0)
+        if page == 0 and fav_character and 'img_url' in fav_character:
             display_img = fav_character['img_url']
         elif filtered_chars:
             random_char = random.choice(filtered_chars)
