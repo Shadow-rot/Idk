@@ -10,7 +10,7 @@ dice_cooldowns = {}
 propose_cooldowns = {}
 
 # Proposal cost
-PROPOSAL_COST = 500  # coins to spend per proposal
+PROPOSAL_COST = 2000  # coins to spend per proposal
 
 # Small caps conversion function
 def to_small_caps(text):
