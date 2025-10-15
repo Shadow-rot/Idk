@@ -215,11 +215,11 @@ async def inlinequery(update: Update, context) -> None:
                 # Add favorite indicator
                 fav_indicator = "💖 " if is_favorite else ""
 
-                caption = (
-                    f"<b>{fav_indicator}{to_small_caps('look at')} <a href='tg://user?id={user_id_int}'>{escape(user_first_name)}</a>{to_small_caps('s waifu')}</b>\n\n"
-                    f"<b>{to_small_caps('id')}</b> <code>{char_id}</code>\n"
-                    f"<b>{to_small_caps('name')}</b> <code>{escape(char_name)}</code> x{user_character_count}\n"
-                    f"<b>{to_small_caps('anime')}</b> <code>{escape(char_anime)}</code> {user_anime_count}/{anime_total}\n"
+                                caption = (
+                    f"<b>{fav_indicator}🔮 {to_small_caps('look at')} <a href='tg://user?id={user_id_int}'>{escape(user_first_name)}</a>{to_small_caps('s waifu')}</b>\n\n"
+                    f"<b>🆔 {to_small_caps('id')}</b> <code>{char_id}</code>\n"
+                    f"<b>🧬 {to_small_caps('name')}</b> <code>{escape(char_name)}</code> x{user_character_count}\n"
+                    f"<b>📺 {to_small_caps('anime')}</b> <code>{escape(char_anime)}</code> {user_anime_count}/{anime_total}\n"
                     f"<b>{rarity_emoji} {to_small_caps('rarity')}</b> <code>{to_small_caps(rarity_text)}</code>"
                 )
                 
