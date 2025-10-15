@@ -23,6 +23,7 @@ from shivu.modules.ckill import register_ckill_handler
 from shivu.modules.kill import register_kill_handler
 from shivu.modules.hclaim import register_hclaim_handler
 from shivu.modules.gift import register_gift_handlers
+from shivu.modules.fav import register_favorite_handlers
 
 # Database collections
 collection = db['anime_characters_lol']
@@ -425,6 +426,7 @@ def main() -> None:
         register_kill_handler()
         register_hclaim_handler()
         register_gift_handlers()
+        register_favorite_handlers()
 
         # Add message handler (should be last)
         application.add_handler(MessageHandler(
