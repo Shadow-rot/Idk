@@ -1,5 +1,6 @@
 """
 """
+"""
 import re
 import time
 from html import escape
@@ -445,5 +446,6 @@ application.add_handler(InlineQueryHandler(inlinequery, block=False))
 application.add_handler(CallbackQueryHandler(show_smashers_callback, pattern=r'^show_smashers_', block=False))
 
 LOGGER.info("[INLINE] Handlers registered successfully")
+"""
 """
 """
