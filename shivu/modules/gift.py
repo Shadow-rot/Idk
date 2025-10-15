@@ -115,7 +115,7 @@ async def handle_gift_command(update: Update, context: CallbackContext):
             f"<i>Are you sure you want to gift this character?</i>"
         )
 
-        # Create confirmation buttons
+        # Create confirmation buttons - FIXED: Use consistent callback data format
         keyboard = [
             [
                 InlineKeyboardButton("✅ Confirm", callback_data=f"gc_{sender_id}"),
@@ -146,14 +146,11 @@ async def handle_gift_command(update: Update, context: CallbackContext):
 async def handle_gift_callback(update: Update, context: CallbackContext):
     """Handle gift confirmation callbacks"""
     query = update.callback_query
-    
+
     try:
         LOGGER.info(f"[GIFT CALLBACK] Received: {query.data} from user {query.from_user.id}")
-        
-        # Answer callback immediately
-        await query.answer()
 
-        # Extract data from callback
+        # Parse callback data
         data = query.data
         
         # Check if it's a gift callback
@@ -161,7 +158,7 @@ async def handle_gift_callback(update: Update, context: CallbackContext):
             LOGGER.info(f"[GIFT CALLBACK] Not a gift callback: {data}")
             return
 
-        # Parse callback data
+        # Extract action and user ID
         parts = data.split('_', 1)
         if len(parts) != 2:
             LOGGER.error(f"[GIFT CALLBACK] Malformed data: {data}")
@@ -173,20 +170,23 @@ async def handle_gift_callback(update: Update, context: CallbackContext):
 
         LOGGER.info(f"[GIFT CALLBACK] Action: {action_code}, User: {user_id}")
 
-        # Verify user
+        # Verify user authorization
         if query.from_user.id != user_id:
-            LOGGER.warning(f"[GIFT CALLBACK] Unauthorized user {query.from_user.id} tried to access {user_id}'s gift")
+            LOGGER.warning(f"[GIFT CALLBACK] Unauthorized: {query.from_user.id} tried to access {user_id}'s gift")
             await query.answer("⚠️ This is not your gift confirmation!", show_alert=True)
             return
 
         # Check if pending gift exists
         if user_id not in pending_gifts:
             LOGGER.warning(f"[GIFT CALLBACK] No pending gift for user {user_id}")
-            await query.answer("❌ No pending gift found!", show_alert=True)
+            await query.answer("❌ No pending gift found or already processed!", show_alert=True)
             return
 
         gift_data = pending_gifts[user_id]
         character = gift_data['character']
+
+        # Answer callback immediately to remove loading state
+        await query.answer()
 
         if action_code == "gc":  # Confirm
             LOGGER.info(f"[GIFT CALLBACK] Processing confirmation for user {user_id}")
@@ -316,18 +316,14 @@ async def handle_gift_callback(update: Update, context: CallbackContext):
         except:
             pass
 
-# Register handlers
-def register_handlers():
-    """Register command and callback handlers"""
+def register_gift_handlers():
+    """Register gift command and callback handlers"""
     LOGGER.info("[GIFT] Registering handlers...")
-    
-    # Add command handler
-    application.add_handler(CommandHandler("gift", handle_gift_command))
-    
-    # Add callback handler with specific pattern
-    application.add_handler(CallbackQueryHandler(handle_gift_callback, pattern="^g[cx]_"))
-    
-    LOGGER.info("[GIFT] Handlers registered successfully")
 
-# Initialize
-register_handlers()
+    # Add command handler
+    application.add_handler(CommandHandler("gift", handle_gift_command, block=False))
+
+    # Add callback handler with specific pattern
+    application.add_handler(CallbackQueryHandler(handle_gift_callback, pattern="^g[cx]_", block=False))
+
+    LOGGER.info("[GIFT] Handlers registered successfully")
