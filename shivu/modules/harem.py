@@ -176,8 +176,14 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
             if nav_buttons:
                 keyboard.append(nav_buttons)
 
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        message = update.message or update.callback_query.message
+        # Add total characters count as a footer button
+total_count = len(filtered_chars)
+keyboard.append([
+    InlineKeyboardButton(f"🧮 Total Characters: {total_count}", callback_data="noop")
+])
+
+reply_markup = InlineKeyboardMarkup(keyboard)
+message = update.message or update.callback_query.message
 
         # Determine which image to show
         display_img = None
@@ -220,6 +226,11 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
         print(f"Error in harem command: {e}")
         message = update.message or update.callback_query.message
         await message.reply_text("An error occurred while loading your collection.")
+
+
+async def noop_callback(update: Update, context: CallbackContext) -> None:
+    """A no-op callback for static buttons like total count"""
+    await update.callback_query.answer()
 
 
 async def harem_callback(update: Update, context: CallbackContext) -> None:
@@ -375,3 +386,4 @@ application.add_handler(CommandHandler(["harem"], harem, block=False))
 application.add_handler(CallbackQueryHandler(harem_callback, pattern='^harem:', block=False))
 application.add_handler( CommandHandler("smode", set_hmode, block=False))
 application.add_handler(CallbackQueryHandler(mode_button, pattern='^mode_', block=False))
+application.add_handler(CallbackQueryHandler(noop_callback, pattern='^noop$', block=False))
