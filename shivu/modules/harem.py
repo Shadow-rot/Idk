@@ -38,7 +38,7 @@ HAREM_MODE_MAPPING = {
 async def harem(update: Update, context: CallbackContext, page=0, edit=False) -> None:
     """Display user's character collection (harem)"""
     user_id = update.effective_user.id
-    
+
     try:
         user = await user_collection.find_one({'id': user_id})
         if not user:
@@ -63,7 +63,7 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
 
         # Get harem mode
         hmode = user.get('smode', 'default')
-        
+
         # Filter characters based on mode
         if hmode == "default" or hmode is None:
             filtered_chars = [char for char in characters if isinstance(char, dict)]
@@ -90,7 +90,7 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
 
         # Sort characters
         filtered_chars = sorted(filtered_chars, key=lambda x: (x.get('anime', ''), x.get('id', '')))
-        
+
         # Count characters
         character_counts = {}
         for char in filtered_chars:
@@ -130,28 +130,28 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
                 c for c in user['characters'] 
                 if isinstance(c, dict) and c.get('anime') == anime
             ])
-            
+
             # Count total characters in this anime
             total_anime_count = await collection.count_documents({"anime": anime})
-            
+
             harem_message += f'<b>➥ {anime} [{user_anime_count}/{total_anime_count}]</b>\n'
-            
+
             for char in chars:
                 char_id = char.get('id')
                 if char_id and char_id not in included:
                     count = character_counts.get(char_id, 1)
                     name = char.get('name', 'Unknown')
                     rarity = char.get('rarity', '🟢 Common')
-                    
+
                     # Get rarity emoji
                     if isinstance(rarity, str):
                         rarity_emoji = rarity.split(' ')[0]
                     else:
                         rarity_emoji = '🟢'
-                    
+
                     harem_message += f'  {rarity_emoji} <code>{char_id}</code> • <b>{escape(name)}</b> ×{count}\n'
                     included.add(char_id)
-            
+
             harem_message += '\n'
 
         # Create keyboard
@@ -176,14 +176,8 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
             if nav_buttons:
                 keyboard.append(nav_buttons)
 
-        # Add total characters count as a footer button
-total_count = len(filtered_chars)
-keyboard.append([
-    InlineKeyboardButton(f"🧮 Total Characters: {total_count}", callback_data="noop")
-])
-
-reply_markup = InlineKeyboardMarkup(keyboard)
-message = update.message or update.callback_query.message
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        message = update.message or update.callback_query.message
 
         # Determine which image to show
         display_img = None
@@ -228,29 +222,24 @@ message = update.message or update.callback_query.message
         await message.reply_text("An error occurred while loading your collection.")
 
 
-async def noop_callback(update: Update, context: CallbackContext) -> None:
-    """A no-op callback for static buttons like total count"""
-    await update.callback_query.answer()
-
-
 async def harem_callback(update: Update, context: CallbackContext) -> None:
     """Handle harem pagination callbacks"""
     query = update.callback_query
-    
+
     try:
         data = query.data
         _, page, user_id = data.split(':')
         page = int(page)
         user_id = int(user_id)
-        
+
         # Verify user
         if query.from_user.id != user_id:
             await query.answer("⚠️ This is not your collection!", show_alert=True)
             return
-        
+
         await query.answer()
         await harem(update, context, page, edit=True)
-        
+
     except Exception as e:
         print(f"Error in harem callback: {e}")
         await query.answer("Error loading page", show_alert=True)
@@ -265,7 +254,7 @@ async def set_hmode(update: Update, context: CallbackContext) -> None:
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     await update.message.reply_photo(
         photo="https://te.legra.ph/file/e714526fdc85b8800e1de.jpg",
         caption="<b>⚙️ Collection Display Mode</b>\n\nChoose how to display your collection:",
@@ -315,7 +304,7 @@ async def hmode_rarity(update: Update, context: CallbackContext) -> None:
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     query = update.callback_query
     await query.edit_message_caption(
         caption="<b>🔮 Filter by Rarity</b>\n\nSelect a rarity to display:",
@@ -330,7 +319,7 @@ async def mode_button(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     user_id = query.from_user.id
     data = query.data
-    
+
     try:
         if data == "mode_default":
             await user_collection.update_one(
@@ -342,10 +331,10 @@ async def mode_button(update: Update, context: CallbackContext) -> None:
                 caption="<b>✅ Display Mode Updated</b>\n\nShowing: <b>All Characters</b>",
                 parse_mode='HTML'
             )
-            
+
         elif data == "mode_rarity":
             await hmode_rarity(update, context)
-            
+
         elif data == "mode_back":
             keyboard = [
                 [
@@ -360,12 +349,12 @@ async def mode_button(update: Update, context: CallbackContext) -> None:
                 parse_mode='HTML'
             )
             await query.answer()
-            
+
         elif data.startswith("mode_"):
             # Extract mode name
             mode_name = data.replace("mode_", "")
             rarity_display = HAREM_MODE_MAPPING.get(mode_name, "Unknown")
-            
+
             await user_collection.update_one(
                 {'id': user_id}, 
                 {'$set': {'smode': mode_name}}
@@ -375,7 +364,7 @@ async def mode_button(update: Update, context: CallbackContext) -> None:
                 caption=f"<b>✅ Display Mode Updated</b>\n\nShowing: <b>{rarity_display}</b>",
                 parse_mode='HTML'
             )
-            
+
     except Exception as e:
         print(f"Error in mode button: {e}")
         await query.answer("Error updating mode", show_alert=True)
@@ -386,4 +375,3 @@ application.add_handler(CommandHandler(["harem"], harem, block=False))
 application.add_handler(CallbackQueryHandler(harem_callback, pattern='^harem:', block=False))
 application.add_handler( CommandHandler("smode", set_hmode, block=False))
 application.add_handler(CallbackQueryHandler(mode_button, pattern='^mode_', block=False))
-application.add_handler(CallbackQueryHandler(noop_callback, pattern='^noop$', block=False))
