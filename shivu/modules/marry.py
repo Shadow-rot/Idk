@@ -120,7 +120,7 @@ async def dice_marry(update: Update, context: CallbackContext):
     if user_id in dice_cooldowns:
         time_elapsed = time.time() - dice_cooldowns[user_id]
         if time_elapsed < 3600:
-            cooldown_remaining = int(60 - time_elapsed)
+            cooldown_remaining = int(3600 - time_elapsed)
             await update.message.reply_text(
                 f"{to_small_caps('wait')} <b>{cooldown_remaining}s</b> {to_small_caps('before rolling again')}",
                 parse_mode='HTML'
