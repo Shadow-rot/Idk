@@ -274,42 +274,58 @@ async def dart(update: Update, context: CallbackContext):
 
 # ---- stour: contract mini-game -----------------------------------------
 async def stour(update: Update, context: CallbackContext):
-    """/stour - small contract gamble that grants tokens or coins randomly"""
+    """/stour - 50/50 contract gamble that costs 50 coins"""
     user_id = update.effective_user.id
+
+    # Cooldown check
     if user_on_cooldown(user_id)[0]:
-        await update.message.reply_text("⌛ Wait a few seconds.")
+        await update.message.reply_text("⌛ Wait a few seconds before trying again.")
         return
 
     await ensure_user_doc(user_id, update.effective_user.first_name, update.effective_user.username)
-
-    # small upfront fee to enter the contract (optional)
-    entry_fee = 0
     user = await get_user_doc(user_id)
+
+    entry_fee = 50  # cost to play
+
+    # Check balance
     if user.get('balance', 0) < entry_fee:
-        await update.message.reply_text("Not enough coins to enter.")
+        await update.message.reply_text("💰 You need at least 50 coins to start a contract.")
         return
-    if entry_fee:
-        await change_balance(user_id, -entry_fee)
 
+    # Deduct entry fee
+    await change_balance(user_id, -entry_fee)
+
+    # 50/50 chance
     outcome = random.random()
-    if outcome < 0.60:
-        # small coin reward
-        reward = random.randint(100, 500)
-        await change_balance(user_id, reward)
-        text = f"🤝 Contract successful — you earned {reward} coins!"
-    elif outcome < 0.90:
-        # token reward
-        tokens = random.randint(1, 3)
-        await change_tokens(user_id, tokens)
-        text = f"🤝 Contract granted you {tokens} token(s)!"
-    else:
-        # rare big reward
-        reward = random.randint(1000, 5000)
-        await change_balance(user_id, reward)
-        text = f"🔥 Lucky contract! You received {reward} coins!"
+    if outcome < 0.5:
+        # Success — reward
+        reward_type = random.choice(["coins", "tokens"])
 
+        if reward_type == "coins":
+            reward = random.randint(100, 600)
+            await change_balance(user_id, reward)
+            text = f"🤝 Contract successful! You earned <b>{reward}</b> coins!"
+        else:
+            tokens = random.randint(1, 3)
+            await change_tokens(user_id, tokens)
+            text = f"🎯 Contract granted you <b>{tokens}</b> token(s)!"
+
+    else:
+        # Fail — lose entry fee
+        text = (
+            f"💥 Contract failed! You lost <b>{entry_fee}</b> coins.\n"
+            f"Try your luck again!"
+        )
+
+    # Set cooldown
     _user_cooldowns[user_id] = datetime.utcnow()
-    await update.message.reply_text(text, reply_markup=play_again_button("stour", ""))
+
+    # Send result
+    await update.message.reply_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=play_again_button("stour", "")
+    )
 
 # ---- riddle system -----------------------------------------------------
 async def riddle(update: Update, context: CallbackContext):
