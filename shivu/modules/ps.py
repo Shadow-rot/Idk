@@ -8,25 +8,27 @@ from telegram import (
     InputMediaPhoto,
 )
 from telegram.ext import CommandHandler, CallbackQueryHandler, CallbackContext
-from shivu import application, user_collection, db
 
+from shivu import user_collection, db
+
+# MongoDB collection for your characters
 characters_collection = db["anime_characters_lol"]
 
-# rarity config (editable anytime)
+# 🎲 Rarity configuration
 RARITY_CONFIG = {
-    "common": {"chance": 60, "min_price": 10000, "max_price": 20000},
-    "rare": {"chance": 25, "min_price": 20000, "max_price": 40000},
-    "legendary": {"chance": 10, "min_price": 40000, "max_price": 80000},
-    "special": {"chance": 4, "min_price": 100000, "max_price": 200000},
-    "neon": {"chance": 0.8, "min_price": 120000, "max_price": 250000},
-    "celestial": {"chance": 0.2, "min_price": 150000, "max_price": 300000},
+    "🟢 Common": {"chance": 60, "min_price": 10000, "max_price": 20000},
+    "🟣 Rare": {"chance": 25, "min_price": 20000, "max_price": 40000},
+    "🟡 Legendary": {"chance": 10, "min_price": 40000, "max_price": 80000},
+    "💮 Special Edition": {"chance": 4, "min_price": 100000, "max_price": 200000},
+    "💫 Neon": {"chance": 0.8, "min_price": 120000, "max_price": 250000},
+    "🎐 Celestial": {"chance": 0.2, "min_price": 150000, "max_price": 300000},
 }
 
 REFRESH_INTERVAL = 86400  # 24 hours
-ITEMS_PER_SESSION = 2
+ITEMS_PER_SESSION = 2  # number of characters per refresh
 
 
-# helper: random rarity
+# Random rarity selection
 def choose_rarity():
     roll = random.random() * 100
     cumulative = 0
@@ -34,10 +36,10 @@ def choose_rarity():
         cumulative += data["chance"]
         if roll <= cumulative:
             return rarity
-    return "common"
+    return "🟢 Common"
 
 
-# helper: random character
+# Pick random character from DB
 async def random_character():
     count = await characters_collection.count_documents({})
     if count == 0:
@@ -47,7 +49,7 @@ async def random_character():
     return char
 
 
-# helper: build caption (small-caps aesthetic)
+# Format caption
 def make_caption(char, rarity, price, page, total):
     wid = char.get("id", char.get("_id"))
     name = char.get("name", "unknown")
@@ -65,13 +67,15 @@ def make_caption(char, rarity, price, page, total):
     )
 
 
+# Command: /ps
 async def ps(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     now = time.time()
-    user_data = await user_collection.find_one({"id": user_id}) or {}
 
-    # check last refresh
+    user_data = await user_collection.find_one({"id": user_id}) or {}
     last_refresh = user_data.get("ps_refresh", 0)
+
+    # Refresh if expired or not set
     if now - last_refresh < REFRESH_INTERVAL and "ps_session" in user_data:
         session = user_data["ps_session"]
     else:
@@ -84,7 +88,12 @@ async def ps(update: Update, context: CallbackContext):
             cfg = RARITY_CONFIG[rarity]
             price = random.randint(cfg["min_price"], cfg["max_price"])
             session.append(
-                {"id": char["id"], "rarity": rarity, "price": price, "img": char.get("img_url")}
+                {
+                    "id": char["id"],
+                    "rarity": rarity,
+                    "price": price,
+                    "img": char.get("img_url"),
+                }
             )
         await user_collection.update_one(
             {"id": user_id},
@@ -100,6 +109,7 @@ async def ps(update: Update, context: CallbackContext):
     await show_ps_page(update, context, session, 0)
 
 
+# Show character page
 async def show_ps_page(update_or_query, context, session, page):
     if isinstance(update_or_query, Update):
         msg_func = update_or_query.message.reply_photo
@@ -136,14 +146,17 @@ async def show_ps_page(update_or_query, context, session, page):
             await update_or_query.edit_message_caption(caption=caption, reply_markup=markup)
 
 
+# Handle inline button callbacks
 async def ps_callback(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
     user_data = await user_collection.find_one({"id": user_id}) or {}
     session = user_data.get("ps_session", [])
+
     if not session:
         await query.answer("session expired. use /ps again.", show_alert=True)
         return
+
     data = query.data
 
     if data == "ps_refresh":
@@ -187,14 +200,14 @@ async def ps_callback(update: Update, context: CallbackContext):
         char = await characters_collection.find_one({"id": char_id})
         balance = user_data.get("balance", 0)
         owned = [c.get("id") for c in user_data.get("characters", [])]
+
         if char_id in owned:
             await query.answer("already owned.", show_alert=True)
             return
         if balance < item["price"]:
-            await query.edit_message_caption(
-                caption="ɴᴏᴛ ᴇɴᴏᴜɢʜ ɢᴏʟᴅ.", parse_mode="HTML"
-            )
+            await query.edit_message_caption(caption="ɴᴏᴛ ᴇɴᴏᴜɢʜ ɢᴏʟᴅ.", parse_mode="HTML")
             return
+
         await user_collection.update_one(
             {"id": user_id},
             {
@@ -203,8 +216,9 @@ async def ps_callback(update: Update, context: CallbackContext):
             },
             upsert=True,
         )
+
         await query.edit_message_caption(
-            caption=f"ᴘᴜʀᴄʜᴀꜱᴇ sᴜᴄᴄᴇss.\nʏᴏᴜ ʙᴏᴜɢʜᴛ {char['name'].lower()} ꜰᴏʀ {item['price']:,} ɢᴏʟᴅ.",
+            caption=f"✅ ᴘᴜʀᴄʜᴀꜱᴇ sᴜᴄᴄᴇssꜰᴜʟ!\nʏᴏᴜ ʙᴏᴜɢʜᴛ {char['name'].lower()} ꜰᴏʀ {item['price']:,} ɢᴏʟᴅ.",
             parse_mode="HTML",
         )
         await query.answer("bought successfully.", show_alert=False)
@@ -217,5 +231,7 @@ async def ps_callback(update: Update, context: CallbackContext):
         return
 
 
-application.add_handler(CommandHandler("ps", ps, block=False))
-application.add_handler(CallbackQueryHandler(ps_callback, pattern=r"^ps_", block=False))
+# 🔹 Register handlers function (to use in main.py)
+def ps_handlers(application):
+    application.add_handler(CommandHandler("ps", ps, block=False))
+    application.add_handler(CallbackQueryHandler(ps_callback, pattern=r"^ps_", block=False))
