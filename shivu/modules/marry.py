@@ -116,19 +116,22 @@ async def dice_marry(update: Update, context: CallbackContext):
     username = update.effective_user.username
     chat_id = update.effective_chat.id
 
-    # Cooldown 60 sec
-    if user_id in dice_cooldowns:
-    time_elapsed = time.time() - dice_cooldowns[user_id]
+    # Cooldown 30 minutes
     cooldown_seconds = 1800  # 30 minutes
-    if time_elapsed < cooldown_seconds:
-        cooldown_remaining = int((cooldown_seconds - time_elapsed) / 60)  # convert to minutes
-        await update.message.reply_text(
-            f"{to_small_caps('wait')} <b>{cooldown_remaining}m</b> {to_small_caps('before rolling again')}",
-            parse_mode='HTML'
-        )
+    if user_id in dice_cooldowns:
+        time_elapsed = time.time() - dice_cooldowns[user_id]
+        if time_elapsed < cooldown_seconds:
+            cooldown_remaining = int((cooldown_seconds - time_elapsed) / 60)  # remaining minutes
+            await update.message.reply_text(
+                f"{to_small_caps('wait')} <b>{cooldown_remaining}m</b> {to_small_caps('before rolling again')}",
+                parse_mode='HTML'
+            )
             return
+
+    # set new cooldown
     dice_cooldowns[user_id] = time.time()
 
+    # check if user has a character
     user_data = await user_collection.find_one({'id': user_id})
     if not user_data:
         await update.message.reply_text(
