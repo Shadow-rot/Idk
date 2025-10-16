@@ -80,8 +80,8 @@ async def pay(update, context):
     # Cooldown
     if sender_id in pay_cooldown:
         last_time = pay_cooldown[sender_id]
-        if (datetime.utcnow() - last_time) < timedelta(minutes=30):
-            await update.message.reply_text("⏳ ʏᴏᴜ ᴄᴀɴ ᴜꜱᴇ /pay ᴀɢᴀɪɴ ᴀꜰᴛᴇʀ 30 ᴍɪɴᴜᴛᴇꜱ.")
+        if (datetime.utcnow() - last_time) < timedelta(minutes=10):
+            await update.message.reply_text("⏳ ʏᴏᴜ ᴄᴀɴ ᴜꜱᴇ /pay ᴀɢᴀɪɴ ᴀꜰᴛᴇʀ 10 ᴍɪɴᴜᴛᴇꜱ.")
             return
 
     try:
