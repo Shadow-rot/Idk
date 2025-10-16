@@ -106,15 +106,15 @@ async def start(update: Update, context: CallbackContext) -> None:
             [InlineKeyboardButton(to_small_caps("start guessing"), url=f'https://t.me/{BOT_USERNAME}?startgroup=new')],
             [
                 InlineKeyboardButton(to_small_caps("support"), url=f'https://t.me/{SUPPORT_CHAT}'),
-                InlineKeyboardButton(to_small_caps("sensei"), url=f'https://t.me/I_shadwoo')
+                InlineKeyboardButton(to_small_caps("channel"), url=f'https://t.me/PICK_X_UPDATE')
             ],
             [InlineKeyboardButton(to_small_caps("help"), callback_data='help')],
             [InlineKeyboardButton(to_small_caps("referral"), callback_data='referral')],
             [
-                InlineKeyboardButton(to_small_caps("credits"), url=f'https://t.me/I_shadwoo'),
-                InlineKeyboardButton(to_small_caps("founders"), url=f'https://t.me/I_shadwoo')
+                InlineKeyboardButton(to_small_caps("credits"), callback_data='credits'),
+                InlineKeyboardButton(to_small_caps("sudo users"), callback_data='sudo')
             ],
-            [InlineKeyboardButton(to_small_caps("logs"), url=f'https://t.me/jfgjuhjjbh')]
+            [InlineKeyboardButton(to_small_caps("owner"), callback_data='owner')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         photo_url = random.choice(PHOTO_URL)
@@ -135,14 +135,14 @@ async def start(update: Update, context: CallbackContext) -> None:
             [InlineKeyboardButton(to_small_caps("start guessing"), url=f'https://t.me/{BOT_USERNAME}?startgroup=new')],
             [
                 InlineKeyboardButton(to_small_caps("support"), url=f'https://t.me/{SUPPORT_CHAT}'),
-                InlineKeyboardButton(to_small_caps("sensei"), url=f'https://t.me/I_shadwoo')
+                InlineKeyboardButton(to_small_caps("channel"), url=f'https://t.me/PICK_X_UPDATE')
             ],
             [InlineKeyboardButton(to_small_caps("help"), callback_data='help')],
             [
-                InlineKeyboardButton(to_small_caps("credits"), url=f'https://t.me/I_shadwoo'),
-                InlineKeyboardButton(to_small_caps("founders"), url=f'https://t.me/jfgjuhjjbh')
+                InlineKeyboardButton(to_small_caps("credits"), callback_data='credits'),
+                InlineKeyboardButton(to_small_caps("sudo users"), callback_data='sudo')
             ],
-            [InlineKeyboardButton(to_small_caps("logs"), url=f'https://t.me/jfgjuhjjbh')]
+            [InlineKeyboardButton(to_small_caps("owner"), callback_data='owner')]
         ]
 
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -238,6 +238,67 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
             parse_mode='HTML'
         )
 
+    elif query.data == 'credits':
+        credits_text = f"""
+<b>{to_small_caps('credits')}</b>
+
+{to_small_caps('this bot was created and maintained by our dedicated team')}
+
+{to_small_caps('special thanks to all contributors and users who made this project possible')}
+
+{to_small_caps('for more information contact the owner')}
+"""
+        credits_keyboard = [[InlineKeyboardButton(to_small_caps("back"), callback_data='back')]]
+        reply_markup = InlineKeyboardMarkup(credits_keyboard)
+
+        await query.edit_message_caption(
+            caption=credits_text,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+
+    elif query.data == 'sudo':
+        sudo_text = f"""
+<b>{to_small_caps('sudo users')}</b>
+
+{to_small_caps('these are the sudo users who help manage this bot')}
+
+{to_small_caps('tap on their names to contact them')}
+"""
+        sudo_keyboard = [
+            [InlineKeyboardButton("@ll_Yoichi_Isagi_ll", url='https://t.me/ll_Yoichi_Isagi_ll')],
+            [InlineKeyboardButton("@digital_paradoxx", url='https://t.me/digital_paradoxx')],
+            [InlineKeyboardButton("@notkilluafr", url='https://t.me/notkilluafr')],
+            [InlineKeyboardButton(to_small_caps("back"), callback_data='back')]
+        ]
+        reply_markup = InlineKeyboardMarkup(sudo_keyboard)
+
+        await query.edit_message_caption(
+            caption=sudo_text,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+
+    elif query.data == 'owner':
+        owner_text = f"""
+<b>{to_small_caps('owner')}</b>
+
+{to_small_caps('the owner of this bot is')}
+
+{to_small_caps('tap on the button below to contact the owner')}
+"""
+        owner_keyboard = [
+            [InlineKeyboardButton("@ll_Thorfinn_ll", url='https://t.me/ll_Thorfinn_ll')],
+            [InlineKeyboardButton(to_small_caps("back"), callback_data='back')]
+        ]
+        reply_markup = InlineKeyboardMarkup(owner_keyboard)
+
+        await query.edit_message_caption(
+            caption=owner_text,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+
     elif query.data == 'back':
         user_balance = user_data.get('balance', 0)
         total_characters = user_totals['count'] if user_totals else 0
@@ -266,15 +327,15 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
             [InlineKeyboardButton(to_small_caps("start guessing"), url=f'https://t.me/{BOT_USERNAME}?startgroup=new')],
             [
                 InlineKeyboardButton(to_small_caps("support"), url=f'https://t.me/{SUPPORT_CHAT}'),
-                InlineKeyboardButton(to_small_caps("sensei"), url=f'https://t.me/I_shadwoo')
+                InlineKeyboardButton(to_small_caps("channel"), url=f'https://t.me/PICK_X_UPDATE')
             ],
             [InlineKeyboardButton(to_small_caps("help"), callback_data='help')],
             [InlineKeyboardButton(to_small_caps("referral"), callback_data='referral')],
             [
-                InlineKeyboardButton(to_small_caps("credits"), url=f'https://t.me/I_shadwoo'),
-                InlineKeyboardButton(to_small_caps("founders"), url=f'https://t.me/I_shadwoo')
+                InlineKeyboardButton(to_small_caps("credits"), callback_data='credits'),
+                InlineKeyboardButton(to_small_caps("sudo users"), callback_data='sudo')
             ],
-            [InlineKeyboardButton(to_small_caps("logs"), url=f'https://t.me/jfgjuhjjbh')]
+            [InlineKeyboardButton(to_small_caps("owner"), callback_data='owner')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
