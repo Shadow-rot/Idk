@@ -186,7 +186,7 @@ async def dice_marry(update: Update, context: CallbackContext):
 {to_small_caps('player')} <a href='tg://user?id={user_id}'>{first_name}</a>
 {to_small_caps('needed')} <b>1</b> {to_small_caps('or')} <b>6</b>
 
-{to_small_caps('try again in 60 seconds')}
+{to_small_caps('try again in 30 minutes')}
 """
         await update.message.reply_text(caption, parse_mode='HTML')
 
