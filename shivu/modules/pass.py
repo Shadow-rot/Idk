@@ -546,7 +546,7 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
 def register_pass_handlers():
     """Register pass command handlers"""
     application.add_handler(CommandHandler('pass', pass_command, block=False))
-    application.add_handler(CommandHandler('pclaim', claim_command, block=False))
+    application.add_handler(CommandHandler('claim', claim_command, block=False))
     application.add_handler(CommandHandler('sweekly', sweekly_command, block=False))
     application.add_handler(CommandHandler('tasks', tasks_command, block=False))
     application.add_handler(CommandHandler('upgrade', upgrade_command, block=False))
