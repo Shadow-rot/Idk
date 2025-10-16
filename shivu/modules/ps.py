@@ -295,13 +295,21 @@ async def ps_callback(update: Update, context: CallbackContext):
         ]
         
         try:
-            await query.edit_message_caption(
-                caption=caption,
-                parse_mode="HTML",
-                reply_markup=InlineKeyboardMarkup(buttons)
-            )
-        except:
-            await query.answer("ᴇʀʀᴏʀ sʜᴏᴡɪɴɢ ᴄᴏɴғɪʀᴍᴀᴛɪᴏɴ.", show_alert=True)
+            # Edit as media since this is a photo message
+            media = InputMediaPhoto(media=item["img"], caption=caption, parse_mode="HTML")
+            await query.edit_message_media(media=media, reply_markup=InlineKeyboardMarkup(buttons))
+        except Exception as e:
+            print(f"Error showing confirmation: {e}")
+            # Fallback to just editing caption
+            try:
+                await query.edit_message_caption(
+                    caption=caption,
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup(buttons)
+                )
+            except Exception as e2:
+                print(f"Error editing caption: {e2}")
+                await query.answer("ᴇʀʀᴏʀ sʜᴏᴡɪɴɢ ᴄᴏɴғɪʀᴍᴀᴛɪᴏɴ.", show_alert=True)
         return
 
     # Confirm purchase
