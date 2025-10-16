@@ -1242,7 +1242,7 @@ async def start_handler(update: Update, context: CallbackContext) -> None:
     """Handle /start command with referral support"""
     await handle_start_referral(update, context)
 
-application.add_handler(CommandHandler("start", start_handler, block=False))
+application.add_handler(CommandHandler("st", start_handler, block=False))
 
 
 # IMPORTANT: Hook into your existing grab/gacha system
