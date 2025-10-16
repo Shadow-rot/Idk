@@ -77,7 +77,8 @@ async def generate_session(user_id):
             "id": char["id"],
             "rarity": rarity,
             "price": price,
-            "img": char.get("img_url")
+            "img": char.get("img_url"),
+            "purchased": False
         })
     
     await user_collection.update_one(
@@ -113,6 +114,21 @@ async def ps(update: Update, context: CallbackContext):
         await update.message.reply_text("ɴᴏ ᴄʜᴀʀᴀᴄᴛᴇʀs ᴀᴠᴀɪʟᴀʙʟᴇ ᴄᴜʀʀᴇɴᴛʟʏ.")
         return
 
+    # Check if all purchased
+    all_purchased = all(item.get("purchased", False) for item in session)
+    if all_purchased:
+        time_left = int(REFRESH_INTERVAL - (now - user_data.get("ps_refresh", 0)))
+        hours_left = time_left // 3600
+        mins_left = (time_left % 3600) // 60
+        await update.message.reply_text(
+            f"╭──────────────╮\n"
+            f"│  sᴛᴏʀᴇ ᴇᴍᴘᴛʏ │\n"
+            f"╰──────────────╯\n\n"
+            f"ʏᴏᴜ'ᴠᴇ ʙᴏᴜɢʜᴛ ᴀʟʟ ᴀᴠᴀɪʟᴀʙʟᴇ ᴄʜᴀʀᴀᴄᴛᴇʀs!\n\n"
+            f"⏰ ᴄᴏᴍᴇ ʙᴀᴄᴋ ɪɴ: {hours_left}ʜ {mins_left}ᴍ"
+        )
+        return
+
     context.user_data["ps_page"] = 0
     context.user_data["ps_user_id"] = user_id
     await show_ps_page(update, context, session, 0)
@@ -120,10 +136,29 @@ async def ps(update: Update, context: CallbackContext):
 
 async def show_ps_page(update_or_query, context, session, page):
     """Display a specific page of the private store"""
-    total = len(session)
-    if page >= total or page < 0:
-        page = 0
+    # Find first non-purchased item
+    available_items = [i for i, item in enumerate(session) if not item.get("purchased", False)]
     
+    if not available_items:
+        # All items purchased
+        caption = (
+            f"╭──────────────╮\n"
+            f"│  sᴛᴏʀᴇ ᴇᴍᴘᴛʏ │\n"
+            f"╰──────────────╯\n\n"
+            f"ʏᴏᴜ'ᴠᴇ ʙᴏᴜɢʜᴛ ᴀʟʟ ᴀᴠᴀɪʟᴀʙʟᴇ ᴄʜᴀʀᴀᴄᴛᴇʀs!\n\n"
+            f"⏰ ᴄᴏᴍᴇ ʙᴀᴄᴋ ᴀғᴛᴇʀ 24 ʜᴏᴜʀs"
+        )
+        if hasattr(update_or_query, "message"):
+            await update_or_query.message.reply_text(caption)
+        else:
+            await update_or_query.edit_message_caption(caption=caption, parse_mode="HTML")
+        return
+    
+    # Set page to first available item if current page is purchased
+    if page >= len(session) or session[page].get("purchased", False):
+        page = available_items[0]
+    
+    total = len(session)
     data = session[page]
     char = await characters_collection.find_one({"id": data["id"]})
     
@@ -139,15 +174,22 @@ async def show_ps_page(update_or_query, context, session, page):
     # Navigation buttons
     buttons = []
     nav = []
-    if page > 0:
-        nav.append(InlineKeyboardButton("◀", callback_data=f"ps_page_{page-1}"))
+    
+    # Find previous available item
+    prev_available = [i for i in range(page) if not session[i].get("purchased", False)]
+    if prev_available:
+        nav.append(InlineKeyboardButton("◀", callback_data=f"ps_page_{prev_available[-1]}"))
+    
     nav.append(InlineKeyboardButton("🔄 ʀᴇғʀᴇsʜ", callback_data="ps_refresh"))
-    if page < total - 1:
-        nav.append(InlineKeyboardButton("▶", callback_data=f"ps_page_{page+1}"))
+    
+    # Find next available item
+    next_available = [i for i in range(page + 1, len(session)) if not session[i].get("purchased", False)]
+    if next_available:
+        nav.append(InlineKeyboardButton("▶", callback_data=f"ps_page_{next_available[0]}"))
     
     if nav:
         buttons.append(nav)
-    buttons.append([InlineKeyboardButton("✅ ʙᴜʏ", callback_data=f"ps_buy_{data['id']}")])
+    buttons.append([InlineKeyboardButton("✅ ʙᴜʏ", callback_data=f"ps_buy_{data['id']}_{page}")])
     markup = InlineKeyboardMarkup(buttons)
 
     if hasattr(update_or_query, "message"):
@@ -215,11 +257,18 @@ async def ps_callback(update: Update, context: CallbackContext):
 
     # Buy button clicked
     if data.startswith("ps_buy_"):
-        char_id = data.split("_")[2]
+        parts = data.split("_")
+        char_id = parts[2]
+        page = int(parts[3]) if len(parts) > 3 else 0
+        
         item = next((x for x in session if x["id"] == char_id), None)
         
         if not item:
             await query.answer("ᴄʜᴀʀᴀᴄᴛᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ.", show_alert=True)
+            return
+        
+        if item.get("purchased", False):
+            await query.answer("ᴛʜɪs ᴄʜᴀʀᴀᴄᴛᴇʀ ᴀʟʀᴇᴀᴅʏ ᴘᴜʀᴄʜᴀsᴇᴅ.", show_alert=True)
             return
         
         char = await characters_collection.find_one({"id": char_id})
@@ -227,35 +276,49 @@ async def ps_callback(update: Update, context: CallbackContext):
             await query.answer("ᴄʜᴀʀᴀᴄᴛᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ ɪɴ ᴅᴀᴛᴀʙᴀsᴇ.", show_alert=True)
             return
         
+        balance = user_data.get("balance", 0)
         caption = (
             f"╭──────────────╮\n"
             f"│  ᴄᴏɴғɪʀᴍ ʙᴜʏ │\n"
             f"╰──────────────╯\n\n"
             f"⋄ ɴᴀᴍᴇ: {char['name'].lower()}\n"
             f"⋄ ʀᴀʀɪᴛʏ: {item['rarity']}\n"
-            f"⋄ ᴘʀɪᴄᴇ: {item['price']:,} ɢᴏʟᴅ\n\n"
+            f"⋄ ᴘʀɪᴄᴇ: {item['price']:,} ɢᴏʟᴅ\n"
+            f"⋄ ʏᴏᴜʀ ʙᴀʟᴀɴᴄᴇ: {balance:,} ɢᴏʟᴅ\n\n"
             f"ᴘʀᴇss ᴄᴏɴғɪʀᴍ ᴛᴏ ᴄᴏᴍᴘʟᴇᴛᴇ ᴘᴜʀᴄʜᴀsᴇ."
         )
         buttons = [
             [
-                InlineKeyboardButton("✅ ᴄᴏɴғɪʀᴍ", callback_data=f"ps_confirm_{char_id}"),
-                InlineKeyboardButton("❌ ᴄᴀɴᴄᴇʟ", callback_data="ps_cancel")
+                InlineKeyboardButton("✅ ᴄᴏɴғɪʀᴍ", callback_data=f"ps_confirm_{char_id}_{page}"),
+                InlineKeyboardButton("❌ ᴄᴀɴᴄᴇʟ", callback_data=f"ps_cancel_{page}")
             ]
         ]
-        await query.edit_message_caption(
-            caption=caption,
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(buttons)
-        )
+        
+        try:
+            await query.edit_message_caption(
+                caption=caption,
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
+        except:
+            await query.answer("ᴇʀʀᴏʀ sʜᴏᴡɪɴɢ ᴄᴏɴғɪʀᴍᴀᴛɪᴏɴ.", show_alert=True)
         return
 
     # Confirm purchase
     if data.startswith("ps_confirm_"):
-        char_id = data.split("_")[2]
-        item = next((x for x in session if x["id"] == char_id), None)
+        parts = data.split("_")
+        char_id = parts[2]
+        page = int(parts[3]) if len(parts) > 3 else 0
         
-        if not item:
+        item_index = next((i for i, x in enumerate(session) if x["id"] == char_id), None)
+        if item_index is None:
             await query.answer("ᴄʜᴀʀᴀᴄᴛᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ.", show_alert=True)
+            return
+        
+        item = session[item_index]
+        
+        if item.get("purchased", False):
+            await query.answer("ᴀʟʀᴇᴀᴅʏ ᴘᴜʀᴄʜᴀsᴇᴅ.", show_alert=True)
             return
         
         balance = user_data.get("balance", 0)
@@ -281,12 +344,16 @@ async def ps_callback(update: Update, context: CallbackContext):
             await query.answer("ᴄʜᴀʀᴀᴄᴛᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ.", show_alert=True)
             return
         
+        # Mark as purchased in session
+        session[item_index]["purchased"] = True
+        
         # Update user collection and balance
         await user_collection.update_one(
             {"id": user_id},
             {
                 "$inc": {"balance": -item["price"]},
-                "$push": {"characters": char}
+                "$push": {"characters": char},
+                "$set": {"ps_session": session}
             },
             upsert=True
         )
@@ -298,22 +365,53 @@ async def ps_callback(update: Update, context: CallbackContext):
             upsert=True
         )
         
-        # Success message
-        new_balance = balance - item["price"]
-        success_caption = (
-            f"✅ ᴘᴜʀᴄʜᴀsᴇ sᴜᴄᴄᴇssғᴜʟ!\n\n"
-            f"⋄ ʙᴏᴜɢʜᴛ: {char['name'].lower()}\n"
-            f"⋄ ᴘʀɪᴄᴇ: {item['price']:,} ɢᴏʟᴅ\n"
-            f"⋄ ɴᴇᴡ ʙᴀʟᴀɴᴄᴇ: {new_balance:,} ɢᴏʟᴅ\n\n"
-            f"ᴄʜᴀʀᴀᴄᴛᴇʀ ᴀᴅᴅᴇᴅ ᴛᴏ ʏᴏᴜʀ ᴄᴏʟʟᴇᴄᴛɪᴏɴ!"
-        )
-        await query.edit_message_caption(caption=success_caption, parse_mode="HTML")
-        await query.answer("ʙᴏᴜɢʜᴛ sᴜᴄᴄᴇssғᴜʟʟʏ!", show_alert=False)
+        # Check if there are more available items
+        available_items = [i for i, x in enumerate(session) if not x.get("purchased", False)]
+        
+        if available_items:
+            # Show next available character
+            new_balance = balance - item["price"]
+            success_caption = (
+                f"✅ ᴘᴜʀᴄʜᴀsᴇ sᴜᴄᴄᴇssғᴜʟ!\n\n"
+                f"⋄ ʙᴏᴜɢʜᴛ: {char['name'].lower()}\n"
+                f"⋄ ᴘʀɪᴄᴇ: {item['price']:,} ɢᴏʟᴅ\n"
+                f"⋄ ɴᴇᴡ ʙᴀʟᴀɴᴄᴇ: {new_balance:,} ɢᴏʟᴅ\n\n"
+                f"sʜᴏᴡɪɴɢ ɴᴇxᴛ ᴀᴠᴀɪʟᴀʙʟᴇ ᴄʜᴀʀᴀᴄᴛᴇʀ..."
+            )
+            await query.edit_message_caption(caption=success_caption, parse_mode="HTML")
+            await query.answer("ʙᴏᴜɢʜᴛ sᴜᴄᴄᴇssғᴜʟʟʏ!", show_alert=False)
+            
+            # Wait a moment then show next character
+            import asyncio
+            await asyncio.sleep(2)
+            
+            # Refresh user data
+            user_data = await user_collection.find_one({"id": user_id})
+            session = user_data.get("ps_session", [])
+            
+            await show_ps_page(query, context, session, available_items[0])
+        else:
+            # All items purchased
+            new_balance = balance - item["price"]
+            final_caption = (
+                f"✅ ᴘᴜʀᴄʜᴀsᴇ sᴜᴄᴄᴇssғᴜʟ!\n\n"
+                f"⋄ ʙᴏᴜɢʜᴛ: {char['name'].lower()}\n"
+                f"⋄ ᴘʀɪᴄᴇ: {item['price']:,} ɢᴏʟᴅ\n"
+                f"⋄ ɴᴇᴡ ʙᴀʟᴀɴᴄᴇ: {new_balance:,} ɢᴏʟᴅ\n\n"
+                f"╭──────────────╮\n"
+                f"│  sᴛᴏʀᴇ ᴇᴍᴘᴛʏ │\n"
+                f"╰──────────────╯\n\n"
+                f"ʏᴏᴜ'ᴠᴇ ʙᴏᴜɢʜᴛ ᴀʟʟ ᴄʜᴀʀᴀᴄᴛᴇʀs!\n"
+                f"⏰ ᴄᴏᴍᴇ ʙᴀᴄᴋ ᴀғᴛᴇʀ 24 ʜᴏᴜʀs"
+            )
+            await query.edit_message_caption(caption=final_caption, parse_mode="HTML")
+            await query.answer("ᴀʟʟ ᴄʜᴀʀᴀᴄᴛᴇʀs ᴘᴜʀᴄʜᴀsᴇᴅ!", show_alert=False)
         return
 
     # Cancel purchase
-    if data == "ps_cancel":
-        page = context.user_data.get("ps_page", 0)
+    if data.startswith("ps_cancel_"):
+        parts = data.split("_")
+        page = int(parts[2]) if len(parts) > 2 else 0
         await show_ps_page(query, context, session, page)
         await query.answer("ᴘᴜʀᴄʜᴀsᴇ ᴄᴀɴᴄᴇʟʟᴇᴅ.", show_alert=False)
         return
