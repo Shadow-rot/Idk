@@ -151,7 +151,7 @@ async def show_ps_page(update_or_query, context, session, page):
     markup = InlineKeyboardMarkup(buttons)
 
     if hasattr(update_or_query, "message"):
-        # Initial /ps command
+        # Initial /ps command - send new message
         await update_or_query.message.reply_photo(
             photo=data["img"],
             caption=caption,
@@ -159,12 +159,14 @@ async def show_ps_page(update_or_query, context, session, page):
             reply_markup=markup
         )
     else:
-        # CallbackQuery update
+        # CallbackQuery update - edit same message
         try:
+            # Try to edit the media (image + caption)
             media = InputMediaPhoto(media=data["img"], caption=caption, parse_mode="HTML")
             await update_or_query.edit_message_media(media=media, reply_markup=markup)
         except Exception as e:
             print(f"Error editing media: {e}")
+            # If media edit fails, just try to update caption
             try:
                 await update_or_query.edit_message_caption(
                     caption=caption,
@@ -173,6 +175,8 @@ async def show_ps_page(update_or_query, context, session, page):
                 )
             except Exception as e2:
                 print(f"Error editing caption: {e2}")
+                # If all else fails, answer the callback
+                await update_or_query.answer("ᴇʀʀᴏʀ ᴜᴘᴅᴀᴛɪɴɢ ᴘᴀɢᴇ.", show_alert=True)
 
 
 async def ps_callback(update: Update, context: CallbackContext):
