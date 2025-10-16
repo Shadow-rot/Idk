@@ -1,6 +1,5 @@
 import random
 import time
-from datetime import datetime
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -12,7 +11,6 @@ from shivu import application, user_collection, db
 
 characters_collection = db["anime_characters_lol"]
 
-# rarity config
 RARITY_CONFIG = {
     "🟢 Common": {"chance": 60, "min_price": 10000, "max_price": 20000},
     "🟣 Rare": {"chance": 25, "min_price": 20000, "max_price": 40000},
@@ -22,11 +20,10 @@ RARITY_CONFIG = {
     "🎐 Celestial": {"chance": 0.2, "min_price": 150000, "max_price": 300000},
 }
 
-REFRESH_INTERVAL = 86400  # 24 hours
+REFRESH_INTERVAL = 86400  # 24h
 ITEMS_PER_SESSION = 2
 
 
-# helper: choose rarity
 def choose_rarity():
     roll = random.random() * 100
     cumulative = 0
@@ -37,17 +34,15 @@ def choose_rarity():
     return "🟢 Common"
 
 
-# helper: random character
 async def random_character():
     count = await characters_collection.count_documents({})
     if count == 0:
         return None
     skip = random.randint(0, count - 1)
-    char = await characters_collection.find_one(skip=skip)
-    return char
+    chars = await characters_collection.find().skip(skip).limit(1).to_list(length=1)
+    return chars[0] if chars else None
 
 
-# build caption
 def make_caption(char, rarity, price, page, total):
     wid = char.get("id", char.get("_id"))
     name = char.get("name", "unknown")
@@ -65,32 +60,30 @@ def make_caption(char, rarity, price, page, total):
     )
 
 
+async def generate_session(user_id):
+    session = []
+    for _ in range(ITEMS_PER_SESSION):
+        char = await random_character()
+        if not char:
+            continue
+        rarity = choose_rarity()
+        cfg = RARITY_CONFIG[rarity]
+        price = random.randint(cfg["min_price"], cfg["max_price"])
+        session.append({"id": char["id"], "rarity": rarity, "price": price, "img": char.get("img_url")})
+    await user_collection.update_one(
+        {"id": user_id}, {"$set": {"ps_session": session, "ps_refresh": time.time()}}, upsert=True
+    )
+    return session
+
+
 async def ps(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    now = time.time()
     user_data = await user_collection.find_one({"id": user_id}) or {}
-
-    # check last refresh
-    last_refresh = user_data.get("ps_refresh", 0)
-    if now - last_refresh < REFRESH_INTERVAL and "ps_session" in user_data:
-        session = user_data["ps_session"]
+    now = time.time()
+    if now - user_data.get("ps_refresh", 0) >= REFRESH_INTERVAL or "ps_session" not in user_data:
+        session = await generate_session(user_id)
     else:
-        session = []
-        for _ in range(ITEMS_PER_SESSION):
-            char = await random_character()
-            if not char:
-                continue
-            rarity = choose_rarity()
-            cfg = RARITY_CONFIG[rarity]
-            price = random.randint(cfg["min_price"], cfg["max_price"])
-            session.append(
-                {"id": char["id"], "rarity": rarity, "price": price, "img": char.get("img_url")}
-            )
-        await user_collection.update_one(
-            {"id": user_id},
-            {"$set": {"ps_session": session, "ps_refresh": now}},
-            upsert=True,
-        )
+        session = user_data["ps_session"]
 
     if not session:
         await update.message.reply_text("no characters available currently.")
@@ -101,18 +94,10 @@ async def ps(update: Update, context: CallbackContext):
 
 
 async def show_ps_page(update_or_query, context, session, page):
-    if isinstance(update_or_query, Update):
-        msg_func = update_or_query.message.reply_photo
-    else:
-        msg_func = update_or_query.edit_message_media
-
     total = len(session)
     data = session[page]
     char = await characters_collection.find_one({"id": data["id"]})
-    rarity = data["rarity"]
-    price = data["price"]
-    img = data["img"]
-    caption = make_caption(char, rarity, price, page + 1, total)
+    caption = make_caption(char, data["rarity"], data["price"], page + 1, total)
 
     buttons = []
     nav = []
@@ -125,13 +110,14 @@ async def show_ps_page(update_or_query, context, session, page):
     buttons.append([InlineKeyboardButton("ʙᴜʏ", callback_data=f"ps_buy_{data['id']}")])
     markup = InlineKeyboardMarkup(buttons)
 
-    if isinstance(update_or_query, Update):
-        msg = await msg_func(photo=img, caption=caption, parse_mode="HTML", reply_markup=markup)
-        context.user_data["ps_msg"] = msg.message_id
+    if hasattr(update_or_query, "message"):
+        # Initial /ps command
+        await update_or_query.message.reply_photo(photo=data["img"], caption=caption, parse_mode="HTML", reply_markup=markup)
     else:
-        media = InputMediaPhoto(media=img, caption=caption, parse_mode="HTML")
+        # CallbackQuery update
         try:
-            await msg_func(media=media, reply_markup=markup)
+            media = InputMediaPhoto(media=data["img"], caption=caption, parse_mode="HTML")
+            await update_or_query.edit_message_media(media=media, reply_markup=markup)
         except:
             await update_or_query.edit_message_caption(caption=caption, reply_markup=markup)
 
@@ -143,83 +129,60 @@ async def ps_callback(update: Update, context: CallbackContext):
     user_data = await user_collection.find_one({"id": user_id}) or {}
     session = user_data.get("ps_session", [])
     if not session:
-        await query.answer("session expired. use /ps again.", show_alert=True)
+        await query.answer("Session expired. Use /ps again.", show_alert=True)
         return
     data = query.data
 
-    # Page navigation
     if data.startswith("ps_page_"):
         page = int(data.split("_")[2])
         context.user_data["ps_page"] = page
         await show_ps_page(query, context, session, page)
         return
 
-    # Refresh session
     if data == "ps_refresh":
-        await ps(update, context)
+        await ps(query, context)
         return
 
-    # Buy button
     if data.startswith("ps_buy_"):
         char_id = data.split("_")[2]
         item = next((x for x in session if x["id"] == char_id), None)
         if not item:
-            await query.answer("character not found.", show_alert=True)
+            await query.answer("Character not found.", show_alert=True)
             return
         char = await characters_collection.find_one({"id": char_id})
-        caption = (
-            f"╭──────────────╮\n"
-            f"│  ᴄᴏɴꜰɪʀᴍ ʙᴜʏ │\n"
-            f"╰──────────────╯\n\n"
-            f"⋄ {char['name']}\n"
-            f"⋄ ᴘʀɪᴄᴇ: {item['price']:,} ɢᴏʟᴅ\n\n"
-            f"ᴘʀᴇꜱꜱ ᴄᴏɴꜰɪʀᴍ ᴛᴏ ᴄᴏᴍᴘʟᴇᴛᴇ."
-        )
+        caption = f"╭──────────────╮\n│  ᴄᴏɴꜰɪʀᴍ ʙᴜʏ │\n╰──────────────╯\n\n⋄ {char['name']}\n⋄ ᴘʀɪᴄᴇ: {item['price']:,} ɢᴏʟᴅ\n\nᴘʀᴇꜱꜱ ᴄᴏɴꜰɪʀᴍ ᴛᴏ ᴄᴏᴍᴘʟᴇᴛᴇ."
         buttons = [
-            [
-                InlineKeyboardButton("✅ ᴄᴏɴꜰɪʀᴍ", callback_data=f"ps_confirm_{char_id}"),
-                InlineKeyboardButton("❌ ᴄᴀɴᴄᴇʟ", callback_data="ps_cancel"),
-            ]
+            [InlineKeyboardButton("✅ ᴄᴏɴꜰɪʀᴍ", callback_data=f"ps_confirm_{char_id}"),
+             InlineKeyboardButton("❌ ᴄᴀɴᴄᴇʟ", callback_data="ps_cancel")]
         ]
-        markup = InlineKeyboardMarkup(buttons)
-        await query.edit_message_caption(caption=caption, parse_mode="HTML", reply_markup=markup)
+        await query.edit_message_caption(caption=caption, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
         return
 
-    # Confirm buy
     if data.startswith("ps_confirm_"):
         char_id = data.split("_")[2]
         item = next((x for x in session if x["id"] == char_id), None)
-        char = await characters_collection.find_one({"id": char_id})
         balance = user_data.get("balance", 0)
         owned = [c.get("id") for c in user_data.get("characters", [])]
         if char_id in owned:
-            await query.answer("already owned.", show_alert=True)
+            await query.answer("Already owned.", show_alert=True)
             return
         if balance < item["price"]:
-            await query.edit_message_caption(
-                caption="ɴᴏᴛ ᴇɴᴏᴜɢʜ ɢᴏʟᴅ.", parse_mode="HTML"
-            )
+            await query.edit_message_caption("Not enough gold.", parse_mode="HTML")
             return
+        char = await characters_collection.find_one({"id": char_id})
         await user_collection.update_one(
             {"id": user_id},
-            {
-                "$inc": {"balance": -item["price"]},
-                "$push": {"characters": char},
-            },
+            {"$inc": {"balance": -item["price"]}, "$push": {"characters": char}},
             upsert=True,
         )
-        await query.edit_message_caption(
-            caption=f"ᴘᴜʀᴄʜᴀꜱᴇ sᴜᴄᴄᴇss.\nʏᴏᴜ ʙᴏᴜɢʜᴛ {char['name'].lower()} ꜰᴏʀ {item['price']:,} ɢᴏʟᴅ.",
-            parse_mode="HTML",
-        )
-        await query.answer("bought successfully.", show_alert=False)
+        await query.edit_message_caption(f"Purchase success! You bought {char['name']} for {item['price']:,} gold.", parse_mode="HTML")
+        await query.answer("Bought successfully.", show_alert=False)
         return
 
-    # Cancel buy
     if data == "ps_cancel":
         page = context.user_data.get("ps_page", 0)
         await show_ps_page(query, context, session, page)
-        await query.answer("cancelled.", show_alert=False)
+        await query.answer("Cancelled.", show_alert=False)
         return
 
 
