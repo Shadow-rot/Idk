@@ -265,6 +265,7 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
             [InlineKeyboardButton("lodu", url='https://t.me/ll_Yoichi_Isagi_ll')],
             [InlineKeyboardButton("꧁ღ⊱✨Kaizen ✨⊱ღ꧂", url='https://t.me/digital_paradoxx')],
             [InlineKeyboardButton("ｋｉｌｌｕａ", url='https://t.me/notkilluafr')],
+            [InlineKeyboardButton("─°✧Sʜ༏ᵏ༏ɱⲟɾ༏♡︎³↳°─⋆", url='https://t.me/avinashs_sun')],
             [InlineKeyboardButton(to_small_caps("back to credits"), callback_data='credits')]
         ]
         reply_markup = InlineKeyboardMarkup(sudo_keyboard)
