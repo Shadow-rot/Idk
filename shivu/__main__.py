@@ -430,7 +430,6 @@ def main() -> None:
         register_favorite_handlers()
         ps.register_handlers(application)
 
-        # Add message handler (should be last)
         application.add_handler(MessageHandler(
             filters.TEXT & ~filters.COMMAND,
             message_counter,
