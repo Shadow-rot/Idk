@@ -165,18 +165,18 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
 <b>{to_small_caps('help section')}</b>
 
 <b>{to_small_caps('gameplay commands')}</b>
-/guess - {to_small_caps('to guess character only works in group')}
+/grab - {to_small_caps('to guess character only works in group')}
 /fav - {to_small_caps('add your fav')}
-/collection - {to_small_caps('to see your collection')}
+/harem - {to_small_caps('to see your collection')}
 
 <b>{to_small_caps('trading commands')}</b>
 /trade - {to_small_caps('to trade characters')}
 /gift - {to_small_caps('give any character from your collection to another user only works in groups')}
 
 <b>{to_small_caps('leaderboard commands')}</b>
-/topgroups - {to_small_caps('see top groups ppl guesses most in that groups')}
-/top - {to_small_caps('to see top users')}
-/ctop - {to_small_caps('your chat top')}
+/gstop - {to_small_caps('see top groups ppl guesses most in that groups')}
+/tophunters - {to_small_caps('to see top users')}
+/ctop - {to_small_caps('your chat top adding soon')}
 
 <b>{to_small_caps('settings commands')}</b>
 /changetime - {to_small_caps('change character appear time only works in groups')}
