@@ -110,11 +110,7 @@ async def start(update: Update, context: CallbackContext) -> None:
             ],
             [InlineKeyboardButton(to_small_caps("help"), callback_data='help')],
             [InlineKeyboardButton(to_small_caps("referral"), callback_data='referral')],
-            [
-                InlineKeyboardButton(to_small_caps("credits"), callback_data='credits'),
-                InlineKeyboardButton(to_small_caps("sudo users"), callback_data='sudo')
-            ],
-            [InlineKeyboardButton(to_small_caps("owner"), callback_data='owner')]
+            [InlineKeyboardButton(to_small_caps("credits"), callback_data='credits')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         photo_url = random.choice(PHOTO_URL)
@@ -138,11 +134,7 @@ async def start(update: Update, context: CallbackContext) -> None:
                 InlineKeyboardButton(to_small_caps("channel"), url=f'https://t.me/PICK_X_UPDATE')
             ],
             [InlineKeyboardButton(to_small_caps("help"), callback_data='help')],
-            [
-                InlineKeyboardButton(to_small_caps("credits"), callback_data='credits'),
-                InlineKeyboardButton(to_small_caps("sudo users"), callback_data='sudo')
-            ],
-            [InlineKeyboardButton(to_small_caps("owner"), callback_data='owner')]
+            [InlineKeyboardButton(to_small_caps("credits"), callback_data='credits')]
         ]
 
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -246,9 +238,13 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
 
 {to_small_caps('special thanks to all contributors and users who made this project possible')}
 
-{to_small_caps('for more information contact the owner')}
+{to_small_caps('tap below to see owner and sudo users')}
 """
-        credits_keyboard = [[InlineKeyboardButton(to_small_caps("back"), callback_data='back')]]
+        credits_keyboard = [
+            [InlineKeyboardButton(to_small_caps("owner"), callback_data='owner')],
+            [InlineKeyboardButton(to_small_caps("sudo users"), callback_data='sudo')],
+            [InlineKeyboardButton(to_small_caps("back"), callback_data='back')]
+        ]
         reply_markup = InlineKeyboardMarkup(credits_keyboard)
 
         await query.edit_message_caption(
@@ -269,7 +265,7 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
             [InlineKeyboardButton("@ll_Yoichi_Isagi_ll", url='https://t.me/ll_Yoichi_Isagi_ll')],
             [InlineKeyboardButton("@digital_paradoxx", url='https://t.me/digital_paradoxx')],
             [InlineKeyboardButton("@notkilluafr", url='https://t.me/notkilluafr')],
-            [InlineKeyboardButton(to_small_caps("back"), callback_data='back')]
+            [InlineKeyboardButton(to_small_caps("back to credits"), callback_data='credits')]
         ]
         reply_markup = InlineKeyboardMarkup(sudo_keyboard)
 
@@ -289,7 +285,7 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
 """
         owner_keyboard = [
             [InlineKeyboardButton("@ll_Thorfinn_ll", url='https://t.me/ll_Thorfinn_ll')],
-            [InlineKeyboardButton(to_small_caps("back"), callback_data='back')]
+            [InlineKeyboardButton(to_small_caps("back to credits"), callback_data='credits')]
         ]
         reply_markup = InlineKeyboardMarkup(owner_keyboard)
 
@@ -331,11 +327,7 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
             ],
             [InlineKeyboardButton(to_small_caps("help"), callback_data='help')],
             [InlineKeyboardButton(to_small_caps("referral"), callback_data='referral')],
-            [
-                InlineKeyboardButton(to_small_caps("credits"), callback_data='credits'),
-                InlineKeyboardButton(to_small_caps("sudo users"), callback_data='sudo')
-            ],
-            [InlineKeyboardButton(to_small_caps("owner"), callback_data='owner')]
+            [InlineKeyboardButton(to_small_caps("credits"), callback_data='credits')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
