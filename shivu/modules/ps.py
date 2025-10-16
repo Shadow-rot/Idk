@@ -1,6 +1,6 @@
 import random
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -8,13 +8,11 @@ from telegram import (
     InputMediaPhoto,
 )
 from telegram.ext import CommandHandler, CallbackQueryHandler, CallbackContext
+from shivu import application, user_collection, db
 
-from shivu import user_collection, db
-
-# MongoDB collection for your characters
 characters_collection = db["anime_characters_lol"]
 
-# 🎲 Rarity configuration
+# rarity config
 RARITY_CONFIG = {
     "🟢 Common": {"chance": 60, "min_price": 10000, "max_price": 20000},
     "🟣 Rare": {"chance": 25, "min_price": 20000, "max_price": 40000},
@@ -25,10 +23,10 @@ RARITY_CONFIG = {
 }
 
 REFRESH_INTERVAL = 86400  # 24 hours
-ITEMS_PER_SESSION = 2  # number of characters per refresh
+ITEMS_PER_SESSION = 2
 
 
-# Random rarity selection
+# helper: choose rarity
 def choose_rarity():
     roll = random.random() * 100
     cumulative = 0
@@ -39,7 +37,7 @@ def choose_rarity():
     return "🟢 Common"
 
 
-# Pick random character from DB
+# helper: random character
 async def random_character():
     count = await characters_collection.count_documents({})
     if count == 0:
@@ -49,7 +47,7 @@ async def random_character():
     return char
 
 
-# Format caption
+# build caption
 def make_caption(char, rarity, price, page, total):
     wid = char.get("id", char.get("_id"))
     name = char.get("name", "unknown")
@@ -58,24 +56,22 @@ def make_caption(char, rarity, price, page, total):
         f"╭──────────────╮\n"
         f"│  ᴘʀɪᴠᴀᴛᴇ sᴛᴏʀᴇ │\n"
         f"╰──────────────╯\n\n"
-        f"⋄ ɴᴀᴍᴇ:  {name.lower()}\n"
-        f"⋄ ᴀɴɪᴍᴇ:  {anime.lower()}\n"
-        f"⋄ ʀᴀʀɪᴛʏ:  {rarity}\n"
-        f"⋄ ɪᴅ:  {wid}\n"
-        f"⋄ ᴘʀɪᴄᴇ:  {price:,} ɢᴏʟᴅ\n\n"
+        f"⋄ ɴᴀᴍᴇ: {name.lower()}\n"
+        f"⋄ ᴀɴɪᴍᴇ: {anime.lower()}\n"
+        f"⋄ ʀᴀʀɪᴛʏ: {rarity}\n"
+        f"⋄ ɪᴅ: {wid}\n"
+        f"⋄ ᴘʀɪᴄᴇ: {price:,} ɢᴏʟᴅ\n\n"
         f"ᴘᴀɢᴇ: {page}/{total}"
     )
 
 
-# Command: /ps
 async def ps(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     now = time.time()
-
     user_data = await user_collection.find_one({"id": user_id}) or {}
-    last_refresh = user_data.get("ps_refresh", 0)
 
-    # Refresh if expired or not set
+    # check last refresh
+    last_refresh = user_data.get("ps_refresh", 0)
     if now - last_refresh < REFRESH_INTERVAL and "ps_session" in user_data:
         session = user_data["ps_session"]
     else:
@@ -88,12 +84,7 @@ async def ps(update: Update, context: CallbackContext):
             cfg = RARITY_CONFIG[rarity]
             price = random.randint(cfg["min_price"], cfg["max_price"])
             session.append(
-                {
-                    "id": char["id"],
-                    "rarity": rarity,
-                    "price": price,
-                    "img": char.get("img_url"),
-                }
+                {"id": char["id"], "rarity": rarity, "price": price, "img": char.get("img_url")}
             )
         await user_collection.update_one(
             {"id": user_id},
@@ -109,7 +100,6 @@ async def ps(update: Update, context: CallbackContext):
     await show_ps_page(update, context, session, 0)
 
 
-# Show character page
 async def show_ps_page(update_or_query, context, session, page):
     if isinstance(update_or_query, Update):
         msg_func = update_or_query.message.reply_photo
@@ -127,12 +117,12 @@ async def show_ps_page(update_or_query, context, session, page):
     buttons = []
     nav = []
     if page > 0:
-        nav.append(InlineKeyboardButton("◀", callback_data=f"ps_prev_{page-1}"))
+        nav.append(InlineKeyboardButton("◀", callback_data=f"ps_page_{page-1}"))
     nav.append(InlineKeyboardButton("🔄", callback_data="ps_refresh"))
     if page < total - 1:
-        nav.append(InlineKeyboardButton("▶", callback_data=f"ps_next_{page+1}"))
+        nav.append(InlineKeyboardButton("▶", callback_data=f"ps_page_{page+1}"))
     buttons.append(nav)
-    buttons.append([InlineKeyboardButton("💳 ʙᴜʏ", callback_data=f"ps_buy_{data['id']}")])
+    buttons.append([InlineKeyboardButton("ʙᴜʏ", callback_data=f"ps_buy_{data['id']}")])
     markup = InlineKeyboardMarkup(buttons)
 
     if isinstance(update_or_query, Update):
@@ -146,30 +136,30 @@ async def show_ps_page(update_or_query, context, session, page):
             await update_or_query.edit_message_caption(caption=caption, reply_markup=markup)
 
 
-# Handle inline button callbacks
 async def ps_callback(update: Update, context: CallbackContext):
     query = update.callback_query
+    await query.answer()
     user_id = query.from_user.id
     user_data = await user_collection.find_one({"id": user_id}) or {}
     session = user_data.get("ps_session", [])
-
     if not session:
         await query.answer("session expired. use /ps again.", show_alert=True)
         return
-
     data = query.data
 
-    if data == "ps_refresh":
-        await query.answer("shop refreshed.", show_alert=False)
-        await ps(update, context)
-        return
-
-    if data.startswith("ps_prev_") or data.startswith("ps_next_"):
+    # Page navigation
+    if data.startswith("ps_page_"):
         page = int(data.split("_")[2])
         context.user_data["ps_page"] = page
         await show_ps_page(query, context, session, page)
         return
 
+    # Refresh session
+    if data == "ps_refresh":
+        await ps(update, context)
+        return
+
+    # Buy button
     if data.startswith("ps_buy_"):
         char_id = data.split("_")[2]
         item = next((x for x in session if x["id"] == char_id), None)
@@ -181,7 +171,8 @@ async def ps_callback(update: Update, context: CallbackContext):
             f"╭──────────────╮\n"
             f"│  ᴄᴏɴꜰɪʀᴍ ʙᴜʏ │\n"
             f"╰──────────────╯\n\n"
-            f"⋄ {char['name']}\n⋄ ᴘʀɪᴄᴇ: {item['price']:,} ɢᴏʟᴅ\n\n"
+            f"⋄ {char['name']}\n"
+            f"⋄ ᴘʀɪᴄᴇ: {item['price']:,} ɢᴏʟᴅ\n\n"
             f"ᴘʀᴇꜱꜱ ᴄᴏɴꜰɪʀᴍ ᴛᴏ ᴄᴏᴍᴘʟᴇᴛᴇ."
         )
         buttons = [
@@ -194,20 +185,21 @@ async def ps_callback(update: Update, context: CallbackContext):
         await query.edit_message_caption(caption=caption, parse_mode="HTML", reply_markup=markup)
         return
 
+    # Confirm buy
     if data.startswith("ps_confirm_"):
         char_id = data.split("_")[2]
         item = next((x for x in session if x["id"] == char_id), None)
         char = await characters_collection.find_one({"id": char_id})
         balance = user_data.get("balance", 0)
         owned = [c.get("id") for c in user_data.get("characters", [])]
-
         if char_id in owned:
             await query.answer("already owned.", show_alert=True)
             return
         if balance < item["price"]:
-            await query.edit_message_caption(caption="ɴᴏᴛ ᴇɴᴏᴜɢʜ ɢᴏʟᴅ.", parse_mode="HTML")
+            await query.edit_message_caption(
+                caption="ɴᴏᴛ ᴇɴᴏᴜɢʜ ɢᴏʟᴅ.", parse_mode="HTML"
+            )
             return
-
         await user_collection.update_one(
             {"id": user_id},
             {
@@ -216,14 +208,14 @@ async def ps_callback(update: Update, context: CallbackContext):
             },
             upsert=True,
         )
-
         await query.edit_message_caption(
-            caption=f"✅ ᴘᴜʀᴄʜᴀꜱᴇ sᴜᴄᴄᴇssꜰᴜʟ!\nʏᴏᴜ ʙᴏᴜɢʜᴛ {char['name'].lower()} ꜰᴏʀ {item['price']:,} ɢᴏʟᴅ.",
+            caption=f"ᴘᴜʀᴄʜᴀꜱᴇ sᴜᴄᴄᴇss.\nʏᴏᴜ ʙᴏᴜɢʜᴛ {char['name'].lower()} ꜰᴏʀ {item['price']:,} ɢᴏʟᴅ.",
             parse_mode="HTML",
         )
         await query.answer("bought successfully.", show_alert=False)
         return
 
+    # Cancel buy
     if data == "ps_cancel":
         page = context.user_data.get("ps_page", 0)
         await show_ps_page(query, context, session, page)
@@ -231,7 +223,6 @@ async def ps_callback(update: Update, context: CallbackContext):
         return
 
 
-# 🔹 Register handlers function (to use in main.py)
-def ps_handlers(application):
-    application.add_handler(CommandHandler("ps", ps, block=False))
-    application.add_handler(CallbackQueryHandler(ps_callback, pattern=r"^ps_", block=False))
+def register_handlers(app):
+    app.add_handler(CommandHandler("ps", ps, block=False))
+    app.add_handler(CallbackQueryHandler(ps_callback, pattern=r"^ps_", block=False))
