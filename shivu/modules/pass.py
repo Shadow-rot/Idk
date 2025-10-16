@@ -482,7 +482,7 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                 f"• /upgrade - {to_small_caps('upgrade to premium')}\n\n"
                 f"<b>{to_small_caps('how to unlock mythic')}:</b>\n"
                 f"1. {to_small_caps('invite 5 people')}\n"
-                f"2. {to_small_caps('claim 4 weekly rewards')}\n"
+                f"2. {to_small_caps('pclaim 4 weekly rewards')}\n"
                 f"3. {to_small_caps('win 10 battles')}\n"
                 f"4. {to_small_caps('grab 50 characters')}\n\n"
                 f"🏵 {to_small_caps('complete all tasks for free mythic')}!"
