@@ -131,10 +131,10 @@ async def ps(update: Update, context: CallbackContext):
 
     context.user_data["ps_page"] = 0
     context.user_data["ps_user_id"] = user_id
-    await show_ps_page(update, context, session, 0)
+    await show_ps_page(update.message, context, session, 0, is_new=True)
 
 
-async def show_ps_page(update_or_query, context, session, page):
+async def show_ps_page(message_or_query, context, session, page, is_new=False):
     """Display a specific page of the private store"""
     # Find first non-purchased item
     available_items = [i for i, item in enumerate(session) if not item.get("purchased", False)]
@@ -148,10 +148,10 @@ async def show_ps_page(update_or_query, context, session, page):
             f"ʏᴏᴜ'ᴠᴇ ʙᴏᴜɢʜᴛ ᴀʟʟ ᴀᴠᴀɪʟᴀʙʟᴇ ᴄʜᴀʀᴀᴄᴛᴇʀs!\n\n"
             f"⏰ ᴄᴏᴍᴇ ʙᴀᴄᴋ ᴀғᴛᴇʀ 24 ʜᴏᴜʀs"
         )
-        if hasattr(update_or_query, "message"):
-            await update_or_query.message.reply_text(caption)
+        if is_new:
+            await message_or_query.reply_text(caption)
         else:
-            await update_or_query.edit_message_caption(caption=caption, parse_mode="HTML")
+            await message_or_query.edit_message_caption(caption=caption, parse_mode="HTML")
         return
     
     # Set page to first available item if current page is purchased
@@ -163,10 +163,10 @@ async def show_ps_page(update_or_query, context, session, page):
     char = await characters_collection.find_one({"id": data["id"]})
     
     if not char:
-        if hasattr(update_or_query, "message"):
-            await update_or_query.message.reply_text("ᴄʜᴀʀᴀᴄᴛᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ.")
+        if is_new:
+            await message_or_query.reply_text("ᴄʜᴀʀᴀᴄᴛᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ.")
         else:
-            await update_or_query.answer("ᴄʜᴀʀᴀᴄᴛᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ.", show_alert=True)
+            await message_or_query.answer("ᴄʜᴀʀᴀᴄᴛᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ.", show_alert=True)
         return
     
     caption = make_caption(char, data["rarity"], data["price"], page + 1, total)
@@ -192,9 +192,9 @@ async def show_ps_page(update_or_query, context, session, page):
     buttons.append([InlineKeyboardButton("✅ ʙᴜʏ", callback_data=f"ps_buy_{data['id']}_{page}")])
     markup = InlineKeyboardMarkup(buttons)
 
-    if hasattr(update_or_query, "message"):
+    if is_new:
         # Initial /ps command - send new message
-        await update_or_query.message.reply_photo(
+        await message_or_query.reply_photo(
             photo=data["img"],
             caption=caption,
             parse_mode="HTML",
@@ -205,12 +205,12 @@ async def show_ps_page(update_or_query, context, session, page):
         try:
             # Try to edit the media (image + caption)
             media = InputMediaPhoto(media=data["img"], caption=caption, parse_mode="HTML")
-            await update_or_query.edit_message_media(media=media, reply_markup=markup)
+            await message_or_query.edit_message_media(media=media, reply_markup=markup)
         except Exception as e:
             print(f"Error editing media: {e}")
             # If media edit fails, just try to update caption
             try:
-                await update_or_query.edit_message_caption(
+                await message_or_query.edit_message_caption(
                     caption=caption,
                     parse_mode="HTML",
                     reply_markup=markup
@@ -218,7 +218,7 @@ async def show_ps_page(update_or_query, context, session, page):
             except Exception as e2:
                 print(f"Error editing caption: {e2}")
                 # If all else fails, answer the callback
-                await update_or_query.answer("ᴇʀʀᴏʀ ᴜᴘᴅᴀᴛɪɴɢ ᴘᴀɢᴇ.", show_alert=True)
+                await message_or_query.answer("ᴇʀʀᴏʀ ᴜᴘᴅᴀᴛɪɴɢ ᴘᴀɢᴇ.", show_alert=True)
 
 
 async def ps_callback(update: Update, context: CallbackContext):
@@ -240,18 +240,18 @@ async def ps_callback(update: Update, context: CallbackContext):
     
     data = query.data
 
-    # Page navigation
+    # Page navigation - edit the same message
     if data.startswith("ps_page_"):
         page = int(data.split("_")[2])
         context.user_data["ps_page"] = page
-        await show_ps_page(query, context, session, page)
+        await show_ps_page(query, context, session, page, is_new=False)
         return
 
-    # Refresh store
+    # Refresh store - edit the same message
     if data == "ps_refresh":
         new_session = await generate_session(user_id)
         context.user_data["ps_page"] = 0
-        await show_ps_page(query, context, new_session, 0)
+        await show_ps_page(query, context, new_session, 0, is_new=False)
         await query.answer("sᴛᴏʀᴇ ʀᴇғʀᴇsʜᴇᴅ!", show_alert=False)
         return
 
@@ -369,7 +369,7 @@ async def ps_callback(update: Update, context: CallbackContext):
         available_items = [i for i, x in enumerate(session) if not x.get("purchased", False)]
         
         if available_items:
-            # Show next available character
+            # Show next available character in the same message
             new_balance = balance - item["price"]
             success_caption = (
                 f"✅ ᴘᴜʀᴄʜᴀsᴇ sᴜᴄᴄᴇssғᴜʟ!\n\n"
@@ -381,7 +381,7 @@ async def ps_callback(update: Update, context: CallbackContext):
             await query.edit_message_caption(caption=success_caption, parse_mode="HTML")
             await query.answer("ʙᴏᴜɢʜᴛ sᴜᴄᴄᴇssғᴜʟʟʏ!", show_alert=False)
             
-            # Wait a moment then show next character
+            # Wait a moment then show next character in the same message
             import asyncio
             await asyncio.sleep(2)
             
@@ -389,7 +389,7 @@ async def ps_callback(update: Update, context: CallbackContext):
             user_data = await user_collection.find_one({"id": user_id})
             session = user_data.get("ps_session", [])
             
-            await show_ps_page(query, context, session, available_items[0])
+            await show_ps_page(query, context, session, available_items[0], is_new=False)
         else:
             # All items purchased
             new_balance = balance - item["price"]
@@ -412,7 +412,7 @@ async def ps_callback(update: Update, context: CallbackContext):
     if data.startswith("ps_cancel_"):
         parts = data.split("_")
         page = int(parts[2]) if len(parts) > 2 else 0
-        await show_ps_page(query, context, session, page)
+        await show_ps_page(query, context, session, page, is_new=False)
         await query.answer("ᴘᴜʀᴄʜᴀsᴇ ᴄᴀɴᴄᴇʟʟᴇᴅ.", show_alert=False)
         return
 
