@@ -428,7 +428,7 @@ def main() -> None:
         register_hclaim_handler()
         register_gift_handlers()
         register_favorite_handlers()
-     ps.register_handlers(application)
+   ps.register_handlers(application)
 
         application.add_handler(MessageHandler(
             filters.TEXT & ~filters.COMMAND,
