@@ -175,7 +175,7 @@ async def hclaim(update: Update, context: CallbackContext) -> None:
 # Add handler
 def register_hclaim_handler():
     """Register hclaim command handler"""
-    hclaim_handler = CommandHandler(['hclaim', 'claim'], hclaim, block=False)
+    hclaim_handler = CommandHandler(['hclaim'], hclaim, block=False)
     application.add_handler(hclaim_handler)
     LOGGER.info("[HCLAIM] Handler registered")
 
