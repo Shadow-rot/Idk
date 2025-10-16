@@ -421,6 +421,7 @@ def main() -> None:
         application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
 
         
+# Register custom module handlers
 register_remove_handlers()
 register_rarity_handlers()
 register_ckill_handler()
@@ -428,7 +429,7 @@ register_kill_handler()
 register_hclaim_handler()
 register_gift_handlers()
 register_favorite_handlers()
-ps.register_handlers(application)
+ps.register_handlers(application)  # ✅ Correct indentation
 
         application.add_handler(MessageHandler(
             filters.TEXT & ~filters.COMMAND,
