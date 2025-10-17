@@ -52,13 +52,13 @@ def import_custom_modules():
     try:
         from shivu.modules.rarity import register_rarity_handlers, spawn_settings_collection as ssc
         spawn_settings_collection = ssc
-        LOGGER.info("[SUCCESS] Imported: rarity module")
+        LOGGER.info("✅ Imported: rarity module")
         return True
     except ImportError as e:
-        LOGGER.warning(f"[WARNING] Rarity module not found: {e}")
+        LOGGER.warning(f"⚠️ Rarity module not found: {e}")
         return False
     except Exception as e:
-        LOGGER.error(f"[ERROR] Failed to import rarity: {e}")
+        LOGGER.error(f"❌ Failed to import rarity: {e}")
         LOGGER.error(traceback.format_exc())
         return False
 
@@ -75,14 +75,14 @@ def import_standard_modules():
     for module_name in ALL_MODULES:
         try:
             imported_module = importlib.import_module("shivu.modules." + module_name)
-            LOGGER.info(f"[SUCCESS] Imported: {module_name}")
+            LOGGER.info(f"✅ Successfully imported: {module_name}")
             success_count += 1
         except Exception as e:
-            LOGGER.error(f"[ERROR] Failed to import {module_name}: {e}")
+            LOGGER.error(f"❌ Failed to import {module_name}: {e}")
             LOGGER.error(traceback.format_exc())
             fail_count += 1
     
-    LOGGER.info(f"[SUMMARY] Module Import: {success_count} successful, {fail_count} failed")
+    LOGGER.info(f"📊 Module Import Summary: {success_count} successful, {fail_count} failed")
     return success_count, fail_count
 
 
@@ -190,8 +190,8 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
                     else:
                         try:
                             await update.message.reply_text(
-                                f"[WARNING] Don't Spam {escape(update.effective_user.first_name)}...\n"
-                                "Your Messages Will be ignored for 10 Minutes..."
+                                f"⚠️ 𝘿𝙤𝙣'𝙩 𝙎𝙥𝙖𝙢 {escape(update.effective_user.first_name)}...\n"
+                                "𝙔𝙤𝙪𝙧 𝙈𝙚𝙨𝙨𝙖𝙜𝙚𝙨 𝙒𝙞𝙡𝙡 𝙗𝙚 𝙞𝙜𝙣𝙤𝙧𝙚𝙙 𝙛𝙤𝙧 10 𝙈𝙞𝙣𝙪𝙩𝙚𝙨..."
                             )
                         except Exception as e:
                             LOGGER.error(f"Error sending spam warning: {e}")
@@ -290,8 +290,8 @@ async def send_image(update: Update, context: CallbackContext) -> None:
 
         # Send character image
         caption = (
-            f"***{rarity_emoji} Look a Waifu has spawned! "
-            f"Make her yours by giving\n/grab Waifu name***"
+            f"***{rarity_emoji} ʟᴏᴏᴋ ᴀ ᴡᴀɪғᴜ ʜᴀꜱ ꜱᴘᴀᴡɴᴇᴅ !! "
+            f"ᴍᴀᴋᴇ ʜᴇʀ ʏᴏᴜʀ'ꜱ ʙʏ ɢɪᴠɪɴɢ\n/grab 𝚆𝚊𝚒𝚏𝚞 𝚗𝚊𝚖𝚎***"
         )
 
         await context.bot.send_photo(
@@ -322,7 +322,8 @@ async def guess(update: Update, context: CallbackContext) -> None:
         # Check if already guessed
         if chat_id in first_correct_guesses:
             await update.message.reply_text(
-                '[TAKEN] Waifu already grabbed by someone else, Better Luck Next Time'
+                '🚫 𝙒ᴀɪғᴜ ᴀʟʀᴇᴀᴅʏ ɢʀᴀʙʙᴇᴅ ʙʏ 𝙨ᴏᴍᴇᴏɴᴇ ᴇʟ𝙨ᴇ ⚡, '
+                '𝘽ᴇᴛᴛᴇʀ 𝙇ᴜᴄᴋ 𝙉ᴇ𝙭ᴛ 𝙏ɪᴍᴇ'
             )
             return
 
@@ -331,11 +332,11 @@ async def guess(update: Update, context: CallbackContext) -> None:
 
         # Validate guess
         if not guess_text:
-            await update.message.reply_text('Please provide a name!')
+            await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙥𝙧𝙤𝙫𝙞𝙙𝙚 𝙖 𝙣𝙖𝙢𝙚!')
             return
 
         if "()" in guess_text or "&" in guess_text:
-            await update.message.reply_text("You can't use these types of words")
+            await update.message.reply_text("𝙉𝙖𝙝𝙝 𝙔𝙤𝙪 𝘾𝙖𝙣'𝙩 𝙪𝙨𝙚 𝙏𝙝𝙞𝙨 𝙏𝙮𝙥𝙚𝙨 𝙤𝙛 𝙬𝙤𝙧𝙙𝙨 ❌️")
             return
 
         # Get character name parts
@@ -439,28 +440,28 @@ async def guess(update: Update, context: CallbackContext) -> None:
             character = last_characters[chat_id]
             keyboard = [[
                 InlineKeyboardButton(
-                    "Harem",
+                    "🪼 ʜᴀʀᴇᴍ",
                     switch_inline_query_current_chat=f"collection.{user_id}"
                 )
             ]]
 
             # Get rarity properly
-            rarity = character.get('rarity', 'Common')
+            rarity = character.get('rarity', '🟢 Common')
             if isinstance(rarity, str) and ' ' in rarity:
                 rarity_parts = rarity.split(' ', 1)
                 rarity_emoji = rarity_parts[0]
                 rarity_text = rarity_parts[1] if len(rarity_parts) > 1 else 'Common'
             else:
-                rarity_emoji = ''
+                rarity_emoji = '🟢'
                 rarity_text = rarity
 
             success_message = (
                 f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> '
-                f'Congratulations! You grabbed a new Waifu!\n\n'
-                f'Name: <code>{character.get("name", "Unknown")}</code>\n'
-                f'Anime: <code>{character.get("anime", "Unknown")}</code>\n'
-                f'{rarity_emoji} Rarity: <code>{rarity_text}</code>\n\n'
-                f'Character successfully added to your harem'
+                f'Congratulations 🎊 You grabbed a new Waifu !!✅\n\n'
+                f'🍁 𝙉𝙖𝙢𝙚: <code>{character.get("name", "Unknown")}</code>\n'
+                f'⛩️ 𝘼𝙣𝙞𝙢𝙚: <code>{character.get("anime", "Unknown")}</code>\n'
+                f'{rarity_emoji} 𝙍𝙖𝙧𝙞𝙩𝙮: <code>{rarity_text}</code>\n\n'
+                f'✧⁠ Character successfully added in your harem'
             )
 
             await update.message.reply_text(
@@ -472,7 +473,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
             LOGGER.info(f"[GRAB] User {user_id} grabbed {character.get('name')} in chat {chat_id}")
 
         else:
-            await update.message.reply_text('Please write the correct name...')
+            await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙒𝙧𝙞𝙩𝙚 𝘾𝙤𝙧𝙧𝙚𝙘𝙩 𝙉𝙖𝙢𝙚... ❌️')
 
     except Exception as e:
         LOGGER.error(f"[GRAB ERROR] {e}")
@@ -490,53 +491,125 @@ def register_all_handlers():
     try:
         # Add grab command handlers
         application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
-        LOGGER.info("[SUCCESS] Registered: /grab, /g commands")
+        LOGGER.info("✅ Registered: /grab, /g commands")
 
         # Register custom module handlers
         try:
             from shivu.modules.remove import register_remove_handlers
             register_remove_handlers()
-            LOGGER.info("[SUCCESS] Registered: remove handlers")
+            LOGGER.info("✅ Registered: remove handlers")
         except ImportError:
-            LOGGER.warning("[WARNING] Remove module not found, skipping")
+            LOGGER.warning("⚠️ Remove module not found, skipping")
         except Exception as e:
-            LOGGER.error(f"[ERROR] Failed to register remove handlers: {e}")
+            LOGGER.error(f"❌ Failed to register remove handlers: {e}")
 
         try:
             from shivu.modules.rarity import register_rarity_handlers
             register_rarity_handlers()
-            LOGGER.info("[SUCCESS] Registered: rarity handlers")
+            LOGGER.info("✅ Registered: rarity handlers")
         except ImportError:
-            LOGGER.warning("[WARNING] Rarity module not found, skipping")
+            LOGGER.warning("⚠️ Rarity module not found, skipping")
         except Exception as e:
-            LOGGER.error(f"[ERROR] Failed to register rarity handlers: {e}")
+            LOGGER.error(f"❌ Failed to register rarity handlers: {e}")
 
         try:
             from shivu.modules.ckill import register_ckill_handler
             register_ckill_handler()
-            LOGGER.info("[SUCCESS] Registered: ckill handler")
+            LOGGER.info("✅ Registered: ckill handler")
         except ImportError:
-            LOGGER.warning("[WARNING] Ckill module not found, skipping")
+            LOGGER.warning("⚠️ Ckill module not found, skipping")
         except Exception as e:
-            LOGGER.error(f"[ERROR] Failed to register ckill handler: {e}")
+            LOGGER.error(f"❌ Failed to register ckill handler: {e}")
 
         try:
             from shivu.modules.kill import register_kill_handler
             register_kill_handler()
-            LOGGER.info("[SUCCESS] Registered: kill handler")
+            LOGGER.info("✅ Registered: kill handler")
         except ImportError:
-            LOGGER.warning("[WARNING] Kill module not found, skipping")
+            LOGGER.warning("⚠️ Kill module not found, skipping")
         except Exception as e:
-            LOGGER.error(f"[ERROR] Failed to register kill handler: {e}")
+            LOGGER.error(f"❌ Failed to register kill handler: {e}")
 
         try:
             from shivu.modules.hclaim import register_hclaim_handler
             register_hclaim_handler()
-            LOGGER.info("[SUCCESS] Registered: hclaim handler")
+            LOGGER.info("✅ Registered: hclaim handler")
         except ImportError:
-            LOGGER.warning("[WARNING] Hclaim module not found, skipping")
+            LOGGER.warning("⚠️ Hclaim module not found, skipping")
         except Exception as e:
-            LOGGER.error(f"[ERROR] Failed to register hclaim handler: {e}")
+            LOGGER.error(f"❌ Failed to register hclaim handler: {e}")
+
+        try:
+            from shivu.modules.favorite import register_favorite_handlers
+            register_favorite_handlers()
+            LOGGER.info("✅ Registered: favorite handlers")
+        except ImportError:
+            LOGGER.warning("⚠️ Favorite module not found, skipping")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register favorite handlers: {e}")
+
+        try:
+            from shivu.modules.gift import register_gift_handlers
+            register_gift_handlers()
+            LOGGER.info("✅ Registered: gift handlers")
+        except ImportError:
+            LOGGER.warning("⚠️ Gift module not found, skipping")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register gift handlers: {e}")
+
+        try:
+            from shivu.modules.trade import register_trade_handlers
+            register_trade_handlers()
+            LOGGER.info("✅ Registered: trade handlers")
+        except ImportError:
+            LOGGER.warning("⚠️ Trade module not found, skipping")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register trade handlers: {e}")
+
+        try:
+            from shivu.modules.upload import register_upload_handlers
+            register_upload_handlers()
+            LOGGER.info("✅ Registered: upload handlers")
+        except ImportError:
+            LOGGER.warning("⚠️ Upload module not found, skipping")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register upload handlers: {e}")
+
+        try:
+            from shivu.modules.leaderboard import register_leaderboard_handlers
+            register_leaderboard_handlers()
+            LOGGER.info("✅ Registered: leaderboard handlers")
+        except ImportError:
+            LOGGER.warning("⚠️ Leaderboard module not found, skipping")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register leaderboard handlers: {e}")
+
+        try:
+            from shivu.modules.collection import register_collection_handlers
+            register_collection_handlers()
+            LOGGER.info("✅ Registered: collection handlers")
+        except ImportError:
+            LOGGER.warning("⚠️ Collection module not found, skipping")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register collection handlers: {e}")
+
+        try:
+            from shivu.modules.change import register_change_handlers
+            register_change_handlers()
+            LOGGER.info("✅ Registered: change handlers")
+        except ImportError:
+            LOGGER.warning("⚠️ Change module not found, skipping")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register change handlers: {e}")
+
+        try:
+            from shivu.modules.sudo import register_sudo_handlers
+            register_sudo_handlers()
+            LOGGER.info("✅ Registered: sudo handlers")
+        except ImportError:
+            LOGGER.warning("⚠️ Sudo module not found, skipping")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register sudo handlers: {e}")
 
         # Add message handler (MUST BE LAST!)
         application.add_handler(MessageHandler(
@@ -544,15 +617,15 @@ def register_all_handlers():
             message_counter,
             block=False
         ))
-        LOGGER.info("[SUCCESS] Registered: message counter (spawn handler)")
+        LOGGER.info("✅ Registered: message counter (spawn handler)")
 
         LOGGER.info("="*50)
-        LOGGER.info("[SUCCESS] ALL HANDLERS REGISTERED")
-        LOGGER.info(f"[CONFIG] Spawn frequency: {DEFAULT_MESSAGE_FREQUENCY} messages")
+        LOGGER.info("✅ ALL HANDLERS REGISTERED SUCCESSFULLY")
+        LOGGER.info(f"📊 Spawn frequency: {DEFAULT_MESSAGE_FREQUENCY} messages")
         LOGGER.info("="*50)
 
     except Exception as e:
-        LOGGER.error(f"[ERROR] Failed to register handlers: {e}")
+        LOGGER.error(f"❌ Failed to register handlers: {e}")
         LOGGER.error(traceback.format_exc())
         raise
 
@@ -570,7 +643,7 @@ def main() -> None:
 
         # Start polling
         LOGGER.info("="*50)
-        LOGGER.info("[START] Starting bot polling...")
+        LOGGER.info("🚀 Starting bot polling...")
         LOGGER.info("="*50)
         
         application.run_polling(
@@ -588,28 +661,28 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         LOGGER.info("="*50)
-        LOGGER.info("[START] SHIVU BOT STARTING")
+        LOGGER.info("🤖 SHIVU BOT STARTING")
         LOGGER.info("="*50)
 
         # Start the Pyrogram client
         shivuu.start()
-        LOGGER.info("[SUCCESS] Pyrogram client started")
+        LOGGER.info("✅ Pyrogram client started successfully")
 
         # Run the bot
         main()
 
     except KeyboardInterrupt:
-        LOGGER.info("[STOP] Bot stopped by user (Ctrl+C)")
+        LOGGER.info("⚠️ Bot stopped by user (Ctrl+C)")
     except Exception as e:
-        LOGGER.error(f"[ERROR] Fatal error: {e}")
+        LOGGER.error(f"❌ Fatal error: {e}")
         LOGGER.error(traceback.format_exc())
         raise
     finally:
         try:
             shivuu.stop()
-            LOGGER.info("[SUCCESS] Pyrogram client stopped")
+            LOGGER.info("✅ Pyrogram client stopped")
         except:
             pass
         LOGGER.info("="*50)
-        LOGGER.info("[SHUTDOWN] BOT SHUTDOWN COMPLETE")
+        LOGGER.info("🛑 BOT SHUTDOWN COMPLETE")
         LOGGER.info("="*50)
