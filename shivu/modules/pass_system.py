@@ -557,7 +557,7 @@ async def upgrade_command(update: Update, context: CallbackContext) -> None:
 ━━━━━━━━━━━━━━━━━━━
 {to_small_caps('elite pass')}
 ━━━━━━━━━━━━━━━━━━━
-{to_small_caps('cost')}: 10 {to_small_caps('inr')}
+{to_small_caps('cost')}: 50 {to_small_caps('inr')}
 {to_small_caps('payment')}: UPI
 {to_small_caps('duration')}: 30 {to_small_caps('days')}
 
@@ -1070,7 +1070,7 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
 ━━━━━━━━━━━━━━━━━━━
 {to_small_caps('elite pass')}
 ━━━━━━━━━━━━━━━━━━━
-{to_small_caps('cost')}: 10 {to_small_caps('inr')}
+{to_small_caps('cost')}: 50 {to_small_caps('inr')}
 {to_small_caps('payment')}: UPI
 {to_small_caps('duration')}: 30 {to_small_caps('days')}
 
