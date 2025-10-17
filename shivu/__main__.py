@@ -611,6 +611,15 @@ def register_all_handlers():
         except Exception as e:
             LOGGER.error(f"❌ Failed to register sudo handlers: {e}")
 
+        try:
+            from shivu.modules.pass_system import register_pass_handlers
+            register_pass_handlers()
+            LOGGER.info("✅ Registered: pass handlers")
+        except ImportError:
+            LOGGER.warning("⚠️ Pass module not found, skipping")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register pass handlers: {e}")
+
         # Add message handler (MUST BE LAST!)
         application.add_handler(MessageHandler(
             filters.TEXT & ~filters.COMMAND,
