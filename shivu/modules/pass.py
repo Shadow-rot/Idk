@@ -1028,17 +1028,18 @@ sʜᴀʀᴇ ᴡɪᴛʜ ғʀɪᴇɴᴅs
         await query.answer(to_small_caps('error'), show_alert=True)
 
 
-# Register handlers
-application.add_handler(CommandHandler("pass", pass_command, block=False))
-application.add_handler(CommandHandler("pclaim", pclaim_command, block=False))
-application.add_handler(CommandHandler("sweekly", sweekly_command, block=False))
-application.add_handler(CommandHandler("tasks", tasks_command, block=False))
-application.add_handler(CommandHandler("upgrade", upgrade_command, block=False))
-application.add_handler(CommandHandler("invite", invite_command, block=False))
-application.add_handler(CommandHandler("approveelite", approve_elite_command, block=False))
-application.add_handler(CallbackQueryHandler(pass_callback, pattern=r"^pass_", block=False))
+def register_pass_handlers():
+    """Register all pass handlers"""
+    application.add_handler(CommandHandler("pass", pass_command, block=False))
+    application.add_handler(CommandHandler("pclaim", pclaim_command, block=False))
+    application.add_handler(CommandHandler("sweekly", sweekly_command, block=False))
+    application.add_handler(CommandHandler("tasks", tasks_command, block=False))
+    application.add_handler(CommandHandler("upgrade", upgrade_command, block=False))
+    application.add_handler(CommandHandler("invite", invite_command, block=False))
+    application.add_handler(CommandHandler("approveelite", approve_elite_command, block=False))
+    application.add_handler(CallbackQueryHandler(pass_callback, pattern=r"^pass_", block=False))
+    LOGGER.info("✅ Pass system handlers registered")
 
-LOGGER.info("✅ Pass system handlers registered")
 
 # Export functions
 __all__ = ['register_pass_handlers', 'handle_grab_task', 'handle_referral']
