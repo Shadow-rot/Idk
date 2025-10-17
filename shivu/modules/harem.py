@@ -162,13 +162,25 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
 
             harem_message += '\n'
 
-        # Create keyboard
-        keyboard = [[
-            InlineKeyboardButton(
-                "🎭 View All", 
-                switch_inline_query_current_chat=f"collection.{user_id}"
-            )
-        ]]
+        # Calculate total character count
+        total_char_count = len(filtered_chars)
+        unique_char_count = len(character_counts)
+        
+        # Create keyboard with character count
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "🎭 View All", 
+                    switch_inline_query_current_chat=f"collection.{user_id}"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    f"📊 Total: {total_char_count} | Unique: {unique_char_count}", 
+                    callback_data="char_count_info"
+                )
+            ]
+        ]
 
         # Add navigation buttons
         if total_pages > 1:
@@ -274,11 +286,11 @@ async def unfav(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text('💔 𝙔𝙤𝙪 𝙙𝙤𝙣\'𝙩 𝙝𝙖𝙫𝙚 𝙖 𝙛𝙖𝙫𝙤𝙧𝙞𝙩𝙚 𝙘𝙝𝙖𝙧𝙖𝙘𝙩𝙚𝙧 𝙨𝙚𝙩!')
             return
 
-        # Create confirmation buttons
+        # Create confirmation buttons with proper format
         buttons = [
             [
-                InlineKeyboardButton("✅ ʏᴇs", callback_data=f"ufc_{user_id}"),
-                InlineKeyboardButton("❌ ɴᴏ", callback_data=f"ufx_{user_id}")
+                InlineKeyboardButton("✅ ʏᴇs", callback_data=f"unfav_confirm:{user_id}"),
+                InlineKeyboardButton("❌ ɴᴏ", callback_data=f"unfav_cancel:{user_id}")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(buttons)
@@ -310,24 +322,20 @@ async def handle_unfav_callback(update: Update, context: CallbackContext) -> Non
         data = query.data
         await query.answer()
 
-        # Check if it's an unfav callback
-        if not (data.startswith('ufc_') or data.startswith('ufx_')):
-            return
-
-        parts = data.split('_', 1)
-        if len(parts) < 2:
+        # Parse callback data
+        if ':' not in data:
             await query.answer("❌ ɪɴᴠᴀʟɪᴅ ᴄᴀʟʟʙᴀᴄᴋ ᴅᴀᴛᴀ!", show_alert=True)
             return
 
-        action_code = parts[0]  # 'ufc' (confirm) or 'ufx' (cancel)
-        user_id = int(parts[1])
+        action, user_id_str = data.split(':', 1)
+        user_id = int(user_id_str)
 
         # Verify user
         if query.from_user.id != user_id:
             await query.answer("⚠️ ᴛʜɪs ɪs ɴᴏᴛ ʏᴏᴜʀ ʀᴇǫᴜᴇsᴛ!", show_alert=True)
             return
 
-        if action_code == 'ufc':  # Confirm unfavorite
+        if action == 'unfav_confirm':  # Confirm unfavorite
             user = await user_collection.find_one({'id': user_id})
             if not user:
                 await query.answer("❌ ᴜsᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ!", show_alert=True)
@@ -355,7 +363,7 @@ async def handle_unfav_callback(update: Update, context: CallbackContext) -> Non
                 parse_mode='HTML'
             )
 
-        elif action_code == 'ufx':  # Cancel
+        elif action == 'unfav_cancel':  # Cancel
             await query.edit_message_caption(
                 caption="❌ ᴀᴄᴛɪᴏɴ ᴄᴀɴᴄᴇʟᴇᴅ. ғᴀᴠᴏʀɪᴛᴇ ᴋᴇᴘᴛ.",
                 parse_mode='HTML'
@@ -497,10 +505,21 @@ async def mode_button(update: Update, context: CallbackContext) -> None:
         await query.answer("Error updating mode", show_alert=True)
 
 
+async def handle_char_count_info(update: Update, context: CallbackContext) -> None:
+    """Handle character count info button"""
+    query = update.callback_query
+    await query.answer(
+        "📊 Total: All characters you own\n"
+        "🎯 Unique: Different characters (no duplicates)",
+        show_alert=True
+    )
+
+
 # Register handlers
 application.add_handler(CommandHandler(["harem"], harem, block=False))
 application.add_handler(CallbackQueryHandler(harem_callback, pattern='^harem:', block=False))
 application.add_handler(CommandHandler("smode", set_hmode, block=False))
 application.add_handler(CallbackQueryHandler(mode_button, pattern='^mode_', block=False))
 application.add_handler(CommandHandler("unfav", unfav, block=False))
-application.add_handler(CallbackQueryHandler(handle_unfav_callback, pattern="^uf[cx]_", block=False))
+application.add_handler(CallbackQueryHandler(handle_unfav_callback, pattern="^unfav_", block=False))
+application.add_handler(CallbackQueryHandler(handle_char_count_info, pattern="^char_count_info$", block=False))
