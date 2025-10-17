@@ -6,7 +6,7 @@ import asyncio
 import traceback
 from html import escape
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters, Application
+from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters, Application, CallbackQueryHandler
 from telegram.error import BadRequest, Forbidden
 
 from shivu import (
@@ -38,147 +38,8 @@ last_user = {}
 warned_users = {}
 
 # ==================== CUSTOM MODULE IMPORTS ====================
-spawn_settings_collection = def register_all_handlers():
-    """Register all bot handlers"""
-    LOGGER.info("="*50)
-    LOGGER.info("REGISTERING HANDLERS")
-    LOGGER.info("="*50)
+spawn_settings_collection = None
 
-    try:
-        # Add grab command handlers
-        application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
-        LOGGER.info("✅ Registered: /grab, /g commands")
-
-        # Register pass system handlers
-        try:
-            from shivu.modules.pass_system import (
-                pass_command,
-                pclaim_command,
-                sweekly_command,
-                tasks_command,
-                upgrade_command,
-                invite_command,
-                passhelp_command,
-                addinvite_command,
-                addgrab_command,
-                approve_elite_command,
-                pass_callback
-            )
-            
-            application.add_handler(CommandHandler("pass", pass_command, block=False))
-            application.add_handler(CommandHandler("pclaim", pclaim_command, block=False))
-            application.add_handler(CommandHandler("sweekly", sweekly_command, block=False))
-            application.add_handler(CommandHandler("tasks", tasks_command, block=False))
-            application.add_handler(CommandHandler("upgrade", upgrade_command, block=False))
-            application.add_handler(CommandHandler("invite", invite_command, block=False))
-            application.add_handler(CommandHandler("passhelp", passhelp_command, block=False))
-            application.add_handler(CommandHandler("addinvite", addinvite_command, block=False))
-            application.add_handler(CommandHandler("addgrab", addgrab_command, block=False))
-            application.add_handler(CommandHandler("approveelite", approve_elite_command, block=False))
-            
-            from telegram.ext import CallbackQueryHandler
-            application.add_handler(CallbackQueryHandler(pass_callback, pattern=r"^pass_", block=False))
-            
-            LOGGER.info("✅ Registered: pass system handlers")
-        except ImportError:
-            LOGGER.warning("⚠️ Pass system module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register pass system handlers: {e}")
-
-        # Register custom module handlers
-        try:
-            from shivu.modules.remove import register_remove_handlers
-            register_remove_handlers()
-            LOGGER.info("✅ Registered: remove handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Remove module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register remove handlers: {e}")
-
-        try:
-            from shivu.modules.rarity import register_rarity_handlers
-            register_rarity_handlers()
-            LOGGER.info("✅ Registered: rarity handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Rarity module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register rarity handlers: {e}")
-
-        try:
-            from shivu.modules.ckill import register_ckill_handler
-            register_ckill_handler()
-            LOGGER.info("✅ Registered: ckill handler")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Ckill module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register ckill handler: {e}")
-
-        try:
-            from shivu.modules.kill import register_kill_handler
-            register_kill_handler()
-            LOGGER.info("✅ Registered: kill handler")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Kill module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register kill handler: {e}")
-
-        try:
-            from shivu.modules.hclaim import register_hclaim_handler
-            register_hclaim_handler()
-            LOGGER.info("✅ Registered: hclaim handler")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Hclaim module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register hclaim handler: {e}")
-
-        try:
-            from shivu.modules.favorite import register_favorite_handlers
-            register_favorite_handlers()
-            LOGGER.info("✅ Registered: favorite handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Favorite module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register favorite handlers: {e}")
-
-        try:
-            from shivu.modules.gift import register_gift_handlers
-            register_gift_handlers()
-            LOGGER.info("✅ Registered: gift handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Gift module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register gift handlers: {e}")
-
-        try:
-            from shivu.modules.trade import register_trade_handlers
-            register_trade_handlers()
-            LOGGER.info("✅ Registered: trade handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Trade module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register trade handlers: {e}")
-
-        try:
-            from shivu.modules.upload import register_upload_handlers
-            register_upload_handlers()
-            LOGGER.info("✅ Registered: upload handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Upload module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register upload handlers: {e}")
-
-        try:
-            from shivu.modules.leaderboard import register_leaderboard_handlers
-            register_leaderboard_handlers()
-            LOGGER.info("✅ Registered: leaderboard handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Leaderboard module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register leaderboard handlers: {e}")
-
-        try:
-            from shivu.modules.collection import register_collection_handlers
-            register
 
 def import_custom_modules():
     """Import all custom modules with error handling"""
@@ -651,46 +512,7 @@ def register_all_handlers():
 
     try:
         # Add grab command handlers
-        application.run_polling(
-            drop_pending_updates=True,
-            allowed_updates=Update.ALL_TYPES
-        )
-
-    except Exception as e:
-        LOGGER.error(f"[ERROR] Error in main: {e}")
-        LOGGER.error(traceback.format_exc())
-        raise
-
-
-# ==================== ENTRY POINT ====================
-if __name__ == "__main__":
-    try:
-        LOGGER.info("="*50)
-        LOGGER.info("🤖 SHIVU BOT STARTING")
-        LOGGER.info("="*50)
-
-        # Start the Pyrogram client
-        shivuu.start()
-        LOGGER.info("✅ Pyrogram client started successfully")
-
-        # Run the bot
-        main()
-
-    except KeyboardInterrupt:
-        LOGGER.info("⚠️ Bot stopped by user (Ctrl+C)")
-    except Exception as e:
-        LOGGER.error(f"❌ Fatal error: {e}")
-        LOGGER.error(traceback.format_exc())
-        raise
-    finally:
-        try:
-            shivuu.stop()
-            LOGGER.info("✅ Pyrogram client stopped")
-        except:
-            pass
-        LOGGER.info("="*50)
-        LOGGER.info("🛑 BOT SHUTDOWN COMPLETE")
-        LOGGER.info("="*50)add_handler(CommandHandler(["grab", "g"], guess, block=False))
+        application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
         LOGGER.info("✅ Registered: /grab, /g commands")
 
         # Register pass system handlers
@@ -708,7 +530,7 @@ if __name__ == "__main__":
                 approve_elite_command,
                 pass_callback
             )
-            
+
             application.add_handler(CommandHandler("pass", pass_command, block=False))
             application.add_handler(CommandHandler("pclaim", pclaim_command, block=False))
             application.add_handler(CommandHandler("sweekly", sweekly_command, block=False))
@@ -719,10 +541,8 @@ if __name__ == "__main__":
             application.add_handler(CommandHandler("addinvite", addinvite_command, block=False))
             application.add_handler(CommandHandler("addgrab", addgrab_command, block=False))
             application.add_handler(CommandHandler("approveelite", approve_elite_command, block=False))
-            
-            from telegram.ext import CallbackQueryHandler
             application.add_handler(CallbackQueryHandler(pass_callback, pattern=r"^pass_", block=False))
-            
+
             LOGGER.info("✅ Registered: pass system handlers")
         except ImportError:
             LOGGER.warning("⚠️ Pass system module not found, skipping")
@@ -734,7 +554,7 @@ if __name__ == "__main__":
             from shivu.modules.remove import register_remove_handlers
             register_remove_handlers()
             LOGGER.info("✅ Registered: remove handlers")
-        except ImportError:
+        except (ImportError, AttributeError):
             LOGGER.warning("⚠️ Remove module not found, skipping")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register remove handlers: {e}")
@@ -743,7 +563,7 @@ if __name__ == "__main__":
             from shivu.modules.rarity import register_rarity_handlers
             register_rarity_handlers()
             LOGGER.info("✅ Registered: rarity handlers")
-        except ImportError:
+        except (ImportError, AttributeError):
             LOGGER.warning("⚠️ Rarity module not found, skipping")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register rarity handlers: {e}")
@@ -752,7 +572,7 @@ if __name__ == "__main__":
             from shivu.modules.ckill import register_ckill_handler
             register_ckill_handler()
             LOGGER.info("✅ Registered: ckill handler")
-        except ImportError:
+        except (ImportError, AttributeError):
             LOGGER.warning("⚠️ Ckill module not found, skipping")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register ckill handler: {e}")
@@ -761,7 +581,7 @@ if __name__ == "__main__":
             from shivu.modules.kill import register_kill_handler
             register_kill_handler()
             LOGGER.info("✅ Registered: kill handler")
-        except ImportError:
+        except (ImportError, AttributeError):
             LOGGER.warning("⚠️ Kill module not found, skipping")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register kill handler: {e}")
@@ -770,7 +590,7 @@ if __name__ == "__main__":
             from shivu.modules.hclaim import register_hclaim_handler
             register_hclaim_handler()
             LOGGER.info("✅ Registered: hclaim handler")
-        except ImportError:
+        except (ImportError, AttributeError):
             LOGGER.warning("⚠️ Hclaim module not found, skipping")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register hclaim handler: {e}")
@@ -779,7 +599,7 @@ if __name__ == "__main__":
             from shivu.modules.favorite import register_favorite_handlers
             register_favorite_handlers()
             LOGGER.info("✅ Registered: favorite handlers")
-        except ImportError:
+        except (ImportError, AttributeError):
             LOGGER.warning("⚠️ Favorite module not found, skipping")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register favorite handlers: {e}")
@@ -788,7 +608,7 @@ if __name__ == "__main__":
             from shivu.modules.gift import register_gift_handlers
             register_gift_handlers()
             LOGGER.info("✅ Registered: gift handlers")
-        except ImportError:
+        except (ImportError, AttributeError):
             LOGGER.warning("⚠️ Gift module not found, skipping")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register gift handlers: {e}")
@@ -797,7 +617,7 @@ if __name__ == "__main__":
             from shivu.modules.trade import register_trade_handlers
             register_trade_handlers()
             LOGGER.info("✅ Registered: trade handlers")
-        except ImportError:
+        except (ImportError, AttributeError):
             LOGGER.warning("⚠️ Trade module not found, skipping")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register trade handlers: {e}")
@@ -806,7 +626,7 @@ if __name__ == "__main__":
             from shivu.modules.upload import register_upload_handlers
             register_upload_handlers()
             LOGGER.info("✅ Registered: upload handlers")
-        except ImportError:
+        except (ImportError, AttributeError):
             LOGGER.warning("⚠️ Upload module not found, skipping")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register upload handlers: {e}")
@@ -815,7 +635,7 @@ if __name__ == "__main__":
             from shivu.modules.leaderboard import register_leaderboard_handlers
             register_leaderboard_handlers()
             LOGGER.info("✅ Registered: leaderboard handlers")
-        except ImportError:
+        except (ImportError, AttributeError):
             LOGGER.warning("⚠️ Leaderboard module not found, skipping")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register leaderboard handlers: {e}")
@@ -824,7 +644,7 @@ if __name__ == "__main__":
             from shivu.modules.collection import register_collection_handlers
             register_collection_handlers()
             LOGGER.info("✅ Registered: collection handlers")
-        except ImportError:
+        except (ImportError, AttributeError):
             LOGGER.warning("⚠️ Collection module not found, skipping")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register collection handlers: {e}")
@@ -833,7 +653,7 @@ if __name__ == "__main__":
             from shivu.modules.change import register_change_handlers
             register_change_handlers()
             LOGGER.info("✅ Registered: change handlers")
-        except ImportError:
+        except (ImportError, AttributeError):
             LOGGER.warning("⚠️ Change module not found, skipping")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register change handlers: {e}")
@@ -842,7 +662,7 @@ if __name__ == "__main__":
             from shivu.modules.sudo import register_sudo_handlers
             register_sudo_handlers()
             LOGGER.info("✅ Registered: sudo handlers")
-        except ImportError:
+        except (ImportError, AttributeError):
             LOGGER.warning("⚠️ Sudo module not found, skipping")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register sudo handlers: {e}")
@@ -882,4 +702,43 @@ def main() -> None:
         LOGGER.info("🚀 Starting bot polling...")
         LOGGER.info("="*50)
 
-        application.
+        application.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES
+        )
+
+    except Exception as e:
+        LOGGER.error(f"[ERROR] Error in main: {e}")
+        LOGGER.error(traceback.format_exc())
+        raise
+
+
+# ==================== ENTRY POINT ====================
+if __name__ == "__main__":
+    try:
+        LOGGER.info("="*50)
+        LOGGER.info("🤖 SHIVU BOT STARTING")
+        LOGGER.info("="*50)
+
+        # Start the Pyrogram client
+        shivuu.start()
+        LOGGER.info("✅ Pyrogram client started successfully")
+
+        # Run the bot
+        main()
+
+    except KeyboardInterrupt:
+        LOGGER.info("⚠️ Bot stopped by user (Ctrl+C)")
+    except Exception as e:
+        LOGGER.error(f"❌ Fatal error: {e}")
+        LOGGER.error(traceback.format_exc())
+        raise
+    finally:
+        try:
+            shivuu.stop()
+            LOGGER.info("✅ Pyrogram client stopped")
+        except:
+            pass
+        LOGGER.info("="*50)
+        LOGGER.info("🛑 BOT SHUTDOWN COMPLETE")
+        LOGGER.info("="*50)
