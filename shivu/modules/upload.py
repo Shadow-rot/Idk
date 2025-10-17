@@ -62,7 +62,7 @@ RARITY_MAP = {
     16: "🎄 Christmas",
     17: "🏵 Mythic",
     18: "🎗 Special Events",
-    19: "🎥 AMV"
+    19: "🎥 AMV",
     20: "👼 Tiny"
 }
 
