@@ -31,6 +31,7 @@ HAREM_MODE_MAPPING = {
     "mythic": "🏵 Mythic",
     "events": "🎗 Special Events",
     "amv": "🎥 Amv",
+    "tiny": "👼 Tiny",
     "default": None
 }
 
@@ -298,6 +299,7 @@ async def hmode_rarity(update: Update, context: CallbackContext) -> None:
         ],
         [
             InlineKeyboardButton("🎥 Amv", callback_data="mode_amv"),
+            InlineKeyboardButton("👼 Tiny", callback_data="mode_tiny"),
         ],
         [
             InlineKeyboardButton("⬅️ Back", callback_data="mode_back"),
