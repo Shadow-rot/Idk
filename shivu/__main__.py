@@ -43,11 +43,11 @@ spawn_settings_collection = None
 def import_custom_modules():
     """Import all custom modules with error handling"""
     global spawn_settings_collection
-    
+
     LOGGER.info("="*50)
     LOGGER.info("IMPORTING CUSTOM MODULES")
     LOGGER.info("="*50)
-    
+
     # Import rarity module
     try:
         from shivu.modules.rarity import register_rarity_handlers, spawn_settings_collection as ssc
@@ -68,10 +68,10 @@ def import_standard_modules():
     LOGGER.info("="*50)
     LOGGER.info("STARTING STANDARD MODULE IMPORTS")
     LOGGER.info("="*50)
-    
+
     success_count = 0
     fail_count = 0
-    
+
     for module_name in ALL_MODULES:
         try:
             imported_module = importlib.import_module("shivu.modules." + module_name)
@@ -81,9 +81,25 @@ def import_standard_modules():
             LOGGER.error(f"❌ Failed to import {module_name}: {e}")
             LOGGER.error(traceback.format_exc())
             fail_count += 1
-    
+
     LOGGER.info(f"📊 Module Import Summary: {success_count} successful, {fail_count} failed")
     return success_count, fail_count
+
+
+# ==================== PASS SYSTEM INTEGRATION ====================
+async def update_grab_task(user_id: int):
+    """Update grab task count for pass system"""
+    try:
+        # Check if user has pass_data
+        user = await user_collection.find_one({'id': user_id})
+        if user and 'pass_data' in user:
+            await user_collection.update_one(
+                {'id': user_id},
+                {'$inc': {'pass_data.tasks.grabs': 1}}
+            )
+            LOGGER.info(f"[PASS] Grab task updated for user {user_id}")
+    except Exception as e:
+        LOGGER.error(f"[PASS] Error updating grab task: {e}")
 
 
 # ==================== HELPER FUNCTIONS ====================
@@ -110,25 +126,25 @@ async def is_character_allowed(character):
                 # Check disabled rarities
                 disabled_rarities = settings.get('disabled_rarities', [])
                 char_rarity = character.get('rarity', 'Common')
-                
+
                 # Extract emoji from rarity
                 if isinstance(char_rarity, str) and ' ' in char_rarity:
                     rarity_emoji = char_rarity.split(' ')[0]
                 else:
                     rarity_emoji = char_rarity
-                
+
                 if rarity_emoji in disabled_rarities:
                     LOGGER.debug(f"Character {character.get('id')} has disabled rarity: {rarity_emoji}")
                     return False
-                
+
                 # Check disabled animes
                 disabled_animes = settings.get('disabled_animes', [])
                 char_anime = character.get('anime', '').lower()
-                
+
                 if char_anime in [anime.lower() for anime in disabled_animes]:
                     LOGGER.debug(f"Character {character.get('id')} is from disabled anime: {char_anime}")
                     return False
-        
+
         return True
     except Exception as e:
         LOGGER.error(f"Error checking character spawn permission: {e}")
@@ -379,6 +395,11 @@ async def guess(update: Update, context: CallbackContext) -> None:
                     'characters': [last_characters[chat_id]],
                 })
 
+            # ==================== PASS SYSTEM INTEGRATION ====================
+            # Update grab task for pass system
+            await update_grab_task(user_id)
+            # ================================================================
+
             # Update group user totals
             group_user_total = await group_user_totals_collection.find_one({
                 'user_id': user_id,
@@ -490,8 +511,83 @@ def register_all_handlers():
 
     try:
         # Add grab command handlers
-        application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
+        application.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES
+        )
+
+    except Exception as e:
+        LOGGER.error(f"[ERROR] Error in main: {e}")
+        LOGGER.error(traceback.format_exc())
+        raise
+
+
+# ==================== ENTRY POINT ====================
+if __name__ == "__main__":
+    try:
+        LOGGER.info("="*50)
+        LOGGER.info("🤖 SHIVU BOT STARTING")
+        LOGGER.info("="*50)
+
+        # Start the Pyrogram client
+        shivuu.start()
+        LOGGER.info("✅ Pyrogram client started successfully")
+
+        # Run the bot
+        main()
+
+    except KeyboardInterrupt:
+        LOGGER.info("⚠️ Bot stopped by user (Ctrl+C)")
+    except Exception as e:
+        LOGGER.error(f"❌ Fatal error: {e}")
+        LOGGER.error(traceback.format_exc())
+        raise
+    finally:
+        try:
+            shivuu.stop()
+            LOGGER.info("✅ Pyrogram client stopped")
+        except:
+            pass
+        LOGGER.info("="*50)
+        LOGGER.info("🛑 BOT SHUTDOWN COMPLETE")
+        LOGGER.info("="*50)add_handler(CommandHandler(["grab", "g"], guess, block=False))
         LOGGER.info("✅ Registered: /grab, /g commands")
+
+        # Register pass system handlers
+        try:
+            from shivu.modules.pass import (
+                pass_command,
+                pclaim_command,
+                sweekly_command,
+                tasks_command,
+                upgrade_command,
+                invite_command,
+                passhelp_command,
+                addinvite_command,
+                addgrab_command,
+                approve_elite_command,
+                pass_callback
+            )
+            
+            application.add_handler(CommandHandler("pass", pass_command, block=False))
+            application.add_handler(CommandHandler("pclaim", pclaim_command, block=False))
+            application.add_handler(CommandHandler("sweekly", sweekly_command, block=False))
+            application.add_handler(CommandHandler("tasks", tasks_command, block=False))
+            application.add_handler(CommandHandler("upgrade", upgrade_command, block=False))
+            application.add_handler(CommandHandler("invite", invite_command, block=False))
+            application.add_handler(CommandHandler("passhelp", passhelp_command, block=False))
+            application.add_handler(CommandHandler("addinvite", addinvite_command, block=False))
+            application.add_handler(CommandHandler("addgrab", addgrab_command, block=False))
+            application.add_handler(CommandHandler("approveelite", approve_elite_command, block=False))
+            
+            from telegram.ext import CallbackQueryHandler
+            application.add_handler(CallbackQueryHandler(pass_callback, pattern=r"^pass_", block=False))
+            
+            LOGGER.info("✅ Registered: pass system handlers")
+        except ImportError:
+            LOGGER.warning("⚠️ Pass system module not found, skipping")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register pass system handlers: {e}")
 
         # Register custom module handlers
         try:
@@ -645,44 +741,5 @@ def main() -> None:
         LOGGER.info("="*50)
         LOGGER.info("🚀 Starting bot polling...")
         LOGGER.info("="*50)
-        
-        application.run_polling(
-            drop_pending_updates=True,
-            allowed_updates=Update.ALL_TYPES
-        )
 
-    except Exception as e:
-        LOGGER.error(f"[ERROR] Error in main: {e}")
-        LOGGER.error(traceback.format_exc())
-        raise
-
-
-# ==================== ENTRY POINT ====================
-if __name__ == "__main__":
-    try:
-        LOGGER.info("="*50)
-        LOGGER.info("🤖 SHIVU BOT STARTING")
-        LOGGER.info("="*50)
-
-        # Start the Pyrogram client
-        shivuu.start()
-        LOGGER.info("✅ Pyrogram client started successfully")
-
-        # Run the bot
-        main()
-
-    except KeyboardInterrupt:
-        LOGGER.info("⚠️ Bot stopped by user (Ctrl+C)")
-    except Exception as e:
-        LOGGER.error(f"❌ Fatal error: {e}")
-        LOGGER.error(traceback.format_exc())
-        raise
-    finally:
-        try:
-            shivuu.stop()
-            LOGGER.info("✅ Pyrogram client stopped")
-        except:
-            pass
-        LOGGER.info("="*50)
-        LOGGER.info("🛑 BOT SHUTDOWN COMPLETE")
-        LOGGER.info("="*50)
+        application.
