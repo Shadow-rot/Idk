@@ -37,10 +37,6 @@ first_correct_guesses = {}
 last_user = {}
 warned_users = {}
 
-# Anti-spam configuration
-SPAM_THRESHOLD = 10  # messages in a row
-SPAM_TIMEOUT = 600  # 10 minutes
-
 # ==================== CUSTOM MODULE IMPORTS ====================
 spawn_settings_collection = None
 
@@ -174,48 +170,21 @@ async def get_chat_message_frequency(chat_id):
         return DEFAULT_MESSAGE_FREQUENCY
 
 
-def is_spam_message(chat_id: str, user_id: int) -> bool:
-    """Check if user is spamming messages"""
-    # Initialize tracking for this chat
-    if chat_id not in last_user:
-        last_user[chat_id] = {'user_id': user_id, 'count': 1}
-        return False
-    
-    # Check if same user
-    if last_user[chat_id]['user_id'] == user_id:
-        last_user[chat_id]['count'] += 1
-        
-        # Check if exceeds threshold
-        if last_user[chat_id]['count'] >= SPAM_THRESHOLD:
-            # Check if recently warned
-            if user_id in warned_users:
-                time_since_warning = time.time() - warned_users[user_id]
-                if time_since_warning < SPAM_TIMEOUT:
-                    return True
-            
-            # Record warning time
-            warned_users[user_id] = time.time()
-            return True
-    else:
-        # Different user, reset counter
-        last_user[chat_id] = {'user_id': user_id, 'count': 1}
-    
-    return False
-
-
-# ==================== ENHANCED MESSAGE COUNTER ====================
+# ==================== MESSAGE COUNTER ====================
 async def message_counter(update: Update, context: CallbackContext) -> None:
-    """Count ALL messages (text, media, stickers, etc.) and spawn characters at intervals"""
+    """Count messages and spawn characters at intervals"""
     try:
-        # Only process group messages
+        # Ignore non-group messages
         if update.effective_chat.type not in ['group', 'supergroup']:
             return
 
-        # Ensure we have a message object
-        if not update.message and not update.edited_message:
+        # Ignore bot messages and commands
+        if not update.message or not update.message.text:
             return
 
-        message = update.message or update.edited_message
+        if update.message.text.startswith('/'):
+            return
+
         chat_id = str(update.effective_chat.id)
         user_id = update.effective_user.id
 
@@ -225,59 +194,41 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
         lock = locks[chat_id]
 
         async with lock:
-            # Check for spam
-            if is_spam_message(chat_id, user_id):
-                try:
-                    await message.reply_text(
-                        f"⚠️ 𝘿𝙤𝙣'𝙩 𝙎𝙥𝙖𝙢 {escape(update.effective_user.first_name)}...\n"
-                        "𝙔𝙤𝙪𝙧 𝙈𝙚𝙨𝙨𝙖𝙜𝙚𝙨 𝙒𝙞𝙡𝙡 𝙗𝙚 𝙞𝙜𝙣𝙤𝙧𝙚𝙙 𝙛𝙤𝙧 10 𝙈𝙞𝙣𝙪𝙩𝙚𝙨..."
-                    )
-                except Exception as e:
-                    LOGGER.error(f"Error sending spam warning: {e}")
-                return
-
             # Get message frequency
             message_frequency = await get_chat_message_frequency(chat_id)
+
+            # Anti-spam check
+            if chat_id in last_user and last_user[chat_id]['user_id'] == user_id:
+                last_user[chat_id]['count'] += 1
+                if last_user[chat_id]['count'] >= 10:
+                    # Check if user was recently warned
+                    if user_id in warned_users and time.time() - warned_users[user_id] < 600:
+                        return
+                    else:
+                        try:
+                            await update.message.reply_text(
+                                f"⚠️ 𝘿𝙤𝙣'𝙩 𝙎𝙥𝙖𝙢 {escape(update.effective_user.first_name)}...\n"
+                                "𝙔𝙤𝙪𝙧 𝙈𝙚𝙨𝙨𝙖𝙜𝙚𝙨 𝙒𝙞𝙡𝙡 𝙗𝙚 𝙞𝙜𝙣𝙤𝙧𝙚𝙙 𝙛𝙤𝙧 10 𝙈𝙞𝙣𝙪𝙩𝙚𝙨..."
+                            )
+                        except Exception as e:
+                            LOGGER.error(f"Error sending spam warning: {e}")
+                        warned_users[user_id] = time.time()
+                        return
+            else:
+                last_user[chat_id] = {'user_id': user_id, 'count': 1}
 
             # Initialize message count for this chat
             if chat_id not in message_counts:
                 message_counts[chat_id] = 0
 
-            # Increment message count for ANY type of message
+            # Increment message count
             message_counts[chat_id] += 1
 
-            # Log message type for debugging
-            msg_type = "unknown"
-            if message.text:
-                msg_type = "command" if message.text.startswith('/') else "text"
-            elif message.photo:
-                msg_type = "photo"
-            elif message.video:
-                msg_type = "video"
-            elif message.document:
-                msg_type = "document"
-            elif message.sticker:
-                msg_type = "sticker"
-            elif message.animation:
-                msg_type = "animation"
-            elif message.voice:
-                msg_type = "voice"
-            elif message.video_note:
-                msg_type = "video_note"
-            elif message.audio:
-                msg_type = "audio"
-
-            LOGGER.debug(
-                f"Chat {chat_id}: Message {message_counts[chat_id]}/{message_frequency} "
-                f"(type: {msg_type}, user: {user_id})"
-            )
+            LOGGER.debug(f"Chat {chat_id}: Message {message_counts[chat_id]}/{message_frequency}")
 
             # Check if it's time to spawn
             if message_counts[chat_id] >= message_frequency:
-                LOGGER.info(
-                    f"[SPAWN] Triggering spawn in chat {chat_id} "
-                    f"(reached {message_frequency} messages, last type: {msg_type})"
-                )
+                LOGGER.info(f"[SPAWN] Triggering spawn in chat {chat_id} (reached {message_frequency} messages)")
                 await send_image(update, context)
                 message_counts[chat_id] = 0  # Reset counter
 
@@ -367,10 +318,7 @@ async def send_image(update: Update, context: CallbackContext) -> None:
             parse_mode='Markdown'
         )
 
-        LOGGER.info(
-            f"[SPAWN] Character spawned: {character.get('name', 'Unknown')} "
-            f"(ID: {character.get('id')}) in chat {chat_id}"
-        )
+        LOGGER.info(f"[SPAWN] Character spawned: {character.get('name', 'Unknown')} (ID: {character.get('id')}) in chat {chat_id}")
 
     except Exception as e:
         LOGGER.error(f"[SPAWN ERROR] {e}")
@@ -448,8 +396,10 @@ async def guess(update: Update, context: CallbackContext) -> None:
                     'characters': [last_characters[chat_id]],
                 })
 
+            # ==================== PASS SYSTEM INTEGRATION ====================
             # Update grab task for pass system
             await update_grab_task(user_id)
+            # ================================================================
 
             # Update group user totals
             group_user_total = await group_user_totals_collection.find_one({
@@ -717,18 +667,17 @@ def register_all_handlers():
         except Exception as e:
             LOGGER.error(f"❌ Failed to register sudo handlers: {e}")
 
-        # Add UNIVERSAL message handler - counts ALL message types (MUST BE LAST!)
+        # Add message handler (MUST BE LAST!)
         application.add_handler(MessageHandler(
-            filters.ALL & ~filters.COMMAND & filters.ChatType.GROUPS,
+            filters.TEXT & ~filters.COMMAND,
             message_counter,
             block=False
         ))
-        LOGGER.info("✅ Registered: universal message counter (all message types)")
+        LOGGER.info("✅ Registered: message counter (spawn handler)")
 
         LOGGER.info("="*50)
         LOGGER.info("✅ ALL HANDLERS REGISTERED SUCCESSFULLY")
         LOGGER.info(f"📊 Spawn frequency: {DEFAULT_MESSAGE_FREQUENCY} messages")
-        LOGGER.info("📨 Counting: text, photos, videos, stickers, documents, voice, etc.")
         LOGGER.info("="*50)
 
     except Exception as e:
