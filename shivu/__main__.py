@@ -612,8 +612,8 @@ def register_all_handlers():
             LOGGER.error(f"❌ Failed to register sudo handlers: {e}")
 
         try:
-            from shivu.modules.pass import register_pass_handlers
-            register_pass_handlers()
+            from shivu.modules import pass as pass_module
+            pass_module.register_pass_handlers()
             LOGGER.info("✅ Registered: pass handlers")
         except ImportError:
             LOGGER.warning("⚠️ Pass module not found, skipping")
