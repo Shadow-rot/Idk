@@ -248,7 +248,7 @@ async def propose(update: Update, context: CallbackContext):
     else:
         unique_characters = await get_unique_characters(
             user_id,
-            target_rarities=['🟢 Common', '🟣 Rare', '🟡 Legendary', '💮 Special Edition', '🔮 Premium Edition', '🎗️ Supreme']
+            target_rarities=['💮 Special Edition', '💫 Neon', '✨ Manga', '🎐 Celestial', '🔮 Premium Edition']
         )
         if not unique_characters:
             await update.message.reply_text(
