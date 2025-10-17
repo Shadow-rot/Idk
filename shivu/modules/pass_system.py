@@ -1348,7 +1348,7 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
 
             keyboard = [
                 [
-                    InlineKeyboardButton(to_small_caps("✓ confirm"), callback_data=f"pass_confirmpremium_{user_id}"),
+                    InlineKeyboardButton(to_small_caps("✓ confirm"), callback_data=f"pass_confirmprem_{user_id}"),
                     InlineKeyboardButton(to_small_caps("✗ cancel"), callback_data=f"pass_upgrade_{user_id}")
                 ]
             ]
@@ -1371,7 +1371,7 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                 )
 
         # Handle confirm premium purchase
-        elif action == 'confirmpremium':
+        elif action == 'confirmprem':
             await query.answer()
             user = await user_collection.find_one({'id': user_id})
             cost = PASS_CONFIG['premium']['cost']
