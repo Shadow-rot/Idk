@@ -121,14 +121,32 @@ async def is_character_allowed(character):
             return False
 
         # If spawn settings collection is available, check settings
-        if spawn_settings_collection:
-            settings = await spawn_settings_collection.find_one({'type': 'global'})
+        if spawn_settings_collection is not None:
+            # Check rarity control settings
+            settings = await spawn_settings_collection.find_one({'type': 'rarity_control'})
             if settings:
-                # Check disabled rarities
-                disabled_rarities = settings.get('disabled_rarities', [])
+                char_rarity = character.get('rarity', '🟢 Common')
+                
+                # Extract emoji from rarity
+                if isinstance(char_rarity, str) and ' ' in char_rarity:
+                    rarity_emoji = char_rarity.split(' ')[0]
+                else:
+                    rarity_emoji = char_rarity
+                
+                # Check if this rarity is enabled
+                rarities = settings.get('rarities', {})
+                if rarity_emoji in rarities:
+                    if not rarities[rarity_emoji].get('enabled', True):
+                        LOGGER.debug(f"Character {character.get('id')} has disabled rarity: {rarity_emoji}")
+                        return False
+            
+            # Check old global settings for backward compatibility
+            old_settings = await spawn_settings_collection.find_one({'type': 'global'})
+            if old_settings:
+                # Check disabled rarities (old system)
+                disabled_rarities = old_settings.get('disabled_rarities', [])
                 char_rarity = character.get('rarity', 'Common')
 
-                # Extract emoji from rarity
                 if isinstance(char_rarity, str) and ' ' in char_rarity:
                     rarity_emoji = char_rarity.split(' ')[0]
                 else:
@@ -139,7 +157,7 @@ async def is_character_allowed(character):
                     return False
 
                 # Check disabled animes
-                disabled_animes = settings.get('disabled_animes', [])
+                disabled_animes = old_settings.get('disabled_animes', [])
                 char_anime = character.get('anime', '').lower()
 
                 if char_anime in [anime.lower() for anime in disabled_animes]:
@@ -287,8 +305,49 @@ async def send_image(update: Update, context: CallbackContext) -> None:
             LOGGER.warning(f"[SPAWN] No allowed characters to spawn in chat {chat_id}")
             return
 
-        # Select random character
-        character = random.choice(allowed_characters)
+        # Get rarity spawn settings for weighted selection
+        character = None
+        try:
+            if spawn_settings_collection is not None:
+                settings = await spawn_settings_collection.find_one({'type': 'rarity_control'})
+                if settings and settings.get('rarities'):
+                    rarities = settings['rarities']
+                    
+                    # Group characters by rarity
+                    rarity_groups = {}
+                    for char in allowed_characters:
+                        char_rarity = char.get('rarity', '🟢 Common')
+                        if isinstance(char_rarity, str) and ' ' in char_rarity:
+                            rarity_emoji = char_rarity.split(' ')[0]
+                        else:
+                            rarity_emoji = char_rarity
+                        
+                        if rarity_emoji not in rarity_groups:
+                            rarity_groups[rarity_emoji] = []
+                        rarity_groups[rarity_emoji].append(char)
+                    
+                    # Build weighted selection based on chances
+                    weighted_chars = []
+                    for emoji, chars in rarity_groups.items():
+                        if emoji in rarities and rarities[emoji].get('enabled', True):
+                            chance = rarities[emoji].get('chance', 0)
+                            # Add each character with its rarity weight
+                            # Multiply by 10 to get better distribution
+                            weight = max(1, int(chance * 10))
+                            for char in chars:
+                                weighted_chars.extend([char] * weight)
+                    
+                    if weighted_chars:
+                        character = random.choice(weighted_chars)
+                        LOGGER.info(f"[SPAWN] Selected character using weighted rarity system")
+        except Exception as e:
+            LOGGER.error(f"[SPAWN] Error in weighted selection: {e}")
+            LOGGER.error(traceback.format_exc())
+        
+        # Fallback to random selection if weighted selection failed
+        if not character:
+            character = random.choice(allowed_characters)
+            LOGGER.info(f"[SPAWN] Selected character using random selection (fallback)")
 
         # Mark character as sent
         sent_characters[chat_id].append(character['id'])
@@ -318,7 +377,7 @@ async def send_image(update: Update, context: CallbackContext) -> None:
             parse_mode='Markdown'
         )
 
-        LOGGER.info(f"[SPAWN] Character spawned: {character.get('name', 'Unknown')} (ID: {character.get('id')}) in chat {chat_id}")
+        LOGGER.info(f"[SPAWN] Character spawned: {character.get('name', 'Unknown')} (ID: {character.get('id')}, Rarity: {rarity}) in chat {chat_id}")
 
     except Exception as e:
         LOGGER.error(f"[SPAWN ERROR] {e}")
@@ -492,7 +551,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
 
-            LOGGER.info(f"[GRAB] User {user_id} grabbed {character.get('name')} in chat {chat_id}")
+            LOGGER.info(f"[GRAB] User {user_id} grabbed {character.get('name')} (Rarity: {rarity}) in chat {chat_id}")
 
         else:
             await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙒𝙧𝙞𝙩𝙚 𝘾𝙤𝙧𝙧𝙚𝙘𝙩 𝙉𝙖𝙢𝙚... ❌️')
