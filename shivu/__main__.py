@@ -6,7 +6,7 @@ import asyncio
 import traceback
 from html import escape
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters
+from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters, Application
 from telegram.error import BadRequest, Forbidden
 
 from shivu import (
@@ -17,86 +17,82 @@ from shivu import (
 )
 from shivu.modules import ALL_MODULES
 
-# Database collections
+# ==================== DATABASE COLLECTIONS ====================
 collection = db['anime_characters_lol']
 user_collection = db['user_collection_lmaoooo']
 user_totals_collection = db['user_totals_lmaoooo']
 group_user_totals_collection = db['group_user_totalsssssss']
 top_global_groups_collection = db['top_global_groups']
 
-# Log chat ID
+# ==================== CONFIGURATION ====================
 LOG_CHAT_ID = -1003071132623
+DEFAULT_MESSAGE_FREQUENCY = 50
 
-# Global dictionaries for tracking
+# ==================== GLOBAL STATE ====================
 locks = {}
-message_counters = {}
-spam_counters = {}
-last_characters = {}
-sent_characters = {}
-first_correct_guesses = {}
 message_counts = {}
+sent_characters = {}
+last_characters = {}
+first_correct_guesses = {}
 last_user = {}
 warned_users = {}
 
-# Default spawn frequency
-DEFAULT_MESSAGE_FREQUENCY = 50
+# ==================== CUSTOM MODULE IMPORTS ====================
+spawn_settings_collection = None
 
-# Import all standard modules first
-LOGGER.info("="*50)
-LOGGER.info("STARTING MODULE IMPORTS")
-LOGGER.info("="*50)
-
-for module_name in ALL_MODULES:
+def import_custom_modules():
+    """Import all custom modules with error handling"""
+    global spawn_settings_collection
+    
+    LOGGER.info("="*50)
+    LOGGER.info("IMPORTING CUSTOM MODULES")
+    LOGGER.info("="*50)
+    
+    # Import rarity module
     try:
-        imported_module = importlib.import_module("shivu.modules." + module_name)
-        LOGGER.info(f"✅ Successfully imported: {module_name}")
+        from shivu.modules.rarity import register_rarity_handlers, spawn_settings_collection as ssc
+        spawn_settings_collection = ssc
+        LOGGER.info("[SUCCESS] Imported: rarity module")
+        return True
+    except ImportError as e:
+        LOGGER.warning(f"[WARNING] Rarity module not found: {e}")
+        return False
     except Exception as e:
-        LOGGER.error(f"❌ Failed to import {module_name}: {e}")
+        LOGGER.error(f"[ERROR] Failed to import rarity: {e}")
         LOGGER.error(traceback.format_exc())
-
-# Import custom modules
-LOGGER.info("="*50)
-LOGGER.info("IMPORTING CUSTOM MODULES")
-LOGGER.info("="*50)
-
-try:
-    from shivu.modules.rarity import register_rarity_handlers, spawn_settings_collection
-    LOGGER.info("✅ Imported: rarity module")
-except Exception as e:
-    LOGGER.error(f"❌ Failed to import rarity: {e}")
-    spawn_settings_collection = None
-
-try:
-    from shivu.modules.remove import register_remove_handlers
-    LOGGER.info("✅ Imported: remove module")
-except Exception as e:
-    LOGGER.error(f"❌ Failed to import remove: {e}")
-
-try:
-    from shivu.modules.ckill import register_ckill_handler
-    LOGGER.info("✅ Imported: ckill module")
-except Exception as e:
-    LOGGER.error(f"❌ Failed to import ckill: {e}")
-
-try:
-    from shivu.modules.kill import register_kill_handler
-    LOGGER.info("✅ Imported: kill module")
-except Exception as e:
-    LOGGER.error(f"❌ Failed to import kill: {e}")
-
-try:
-    from shivu.modules.hclaim import register_hclaim_handler
-    LOGGER.info("✅ Imported: hclaim module")
-except Exception as e:
-    LOGGER.error(f"❌ Failed to import hclaim: {e}")
-
-LOGGER.info("="*50)
+        return False
 
 
+def import_standard_modules():
+    """Import all standard modules"""
+    LOGGER.info("="*50)
+    LOGGER.info("STARTING STANDARD MODULE IMPORTS")
+    LOGGER.info("="*50)
+    
+    success_count = 0
+    fail_count = 0
+    
+    for module_name in ALL_MODULES:
+        try:
+            imported_module = importlib.import_module("shivu.modules." + module_name)
+            LOGGER.info(f"[SUCCESS] Imported: {module_name}")
+            success_count += 1
+        except Exception as e:
+            LOGGER.error(f"[ERROR] Failed to import {module_name}: {e}")
+            LOGGER.error(traceback.format_exc())
+            fail_count += 1
+    
+    LOGGER.info(f"[SUMMARY] Module Import: {success_count} successful, {fail_count} failed")
+    return success_count, fail_count
+
+
+# ==================== HELPER FUNCTIONS ====================
 def escape_markdown(text):
     """Escape markdown special characters"""
+    if not text:
+        return ""
     escape_chars = r'\*_`\\~>#+-=|{}.!'
-    return re.sub(r'([%s])' % re.escape(escape_chars), r'\\\1', text)
+    return re.sub(r'([%s])' % re.escape(escape_chars), r'\\\1', str(text))
 
 
 async def is_character_allowed(character):
@@ -104,36 +100,60 @@ async def is_character_allowed(character):
     try:
         # Check if character is removed
         if character.get('removed', False):
+            LOGGER.debug(f"Character {character.get('id')} is marked as removed")
             return False
 
+        # If spawn settings collection is available, check settings
         if spawn_settings_collection:
             settings = await spawn_settings_collection.find_one({'type': 'global'})
-            if not settings:
-                return True
-
-            # Check if rarity is disabled
-            disabled_rarities = settings.get('disabled_rarities', [])
-            char_rarity = character.get('rarity', '🟢 Common')
-
-            # Extract emoji from rarity
-            rarity_emoji = char_rarity.split(' ')[0] if ' ' in char_rarity else char_rarity
-
-            if rarity_emoji in disabled_rarities:
-                return False
-
-            # Check if anime is disabled
-            disabled_animes = settings.get('disabled_animes', [])
-            char_anime = character.get('anime', '').lower()
-
-            if char_anime in [anime.lower() for anime in disabled_animes]:
-                return False
-
+            if settings:
+                # Check disabled rarities
+                disabled_rarities = settings.get('disabled_rarities', [])
+                char_rarity = character.get('rarity', 'Common')
+                
+                # Extract emoji from rarity
+                if isinstance(char_rarity, str) and ' ' in char_rarity:
+                    rarity_emoji = char_rarity.split(' ')[0]
+                else:
+                    rarity_emoji = char_rarity
+                
+                if rarity_emoji in disabled_rarities:
+                    LOGGER.debug(f"Character {character.get('id')} has disabled rarity: {rarity_emoji}")
+                    return False
+                
+                # Check disabled animes
+                disabled_animes = settings.get('disabled_animes', [])
+                char_anime = character.get('anime', '').lower()
+                
+                if char_anime in [anime.lower() for anime in disabled_animes]:
+                    LOGGER.debug(f"Character {character.get('id')} is from disabled anime: {char_anime}")
+                    return False
+        
         return True
     except Exception as e:
         LOGGER.error(f"Error checking character spawn permission: {e}")
         return True
 
 
+async def get_chat_message_frequency(chat_id):
+    """Get message frequency for a specific chat"""
+    try:
+        chat_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
+        if chat_frequency:
+            return chat_frequency.get('message_frequency', DEFAULT_MESSAGE_FREQUENCY)
+        else:
+            # Initialize chat settings in database
+            await user_totals_collection.insert_one({
+                'chat_id': chat_id,
+                'message_frequency': DEFAULT_MESSAGE_FREQUENCY
+            })
+            return DEFAULT_MESSAGE_FREQUENCY
+    except Exception as e:
+        LOGGER.error(f"Error fetching chat frequency: {e}")
+        return DEFAULT_MESSAGE_FREQUENCY
+
+
+# ==================== MESSAGE COUNTER ====================
 async def message_counter(update: Update, context: CallbackContext) -> None:
     """Count messages and spawn characters at intervals"""
     try:
@@ -157,21 +177,8 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
         lock = locks[chat_id]
 
         async with lock:
-            # Get message frequency from database or use default
-            try:
-                chat_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
-                if chat_frequency:
-                    message_frequency = chat_frequency.get('message_frequency', DEFAULT_MESSAGE_FREQUENCY)
-                else:
-                    message_frequency = DEFAULT_MESSAGE_FREQUENCY
-                    # Initialize chat settings in database
-                    await user_totals_collection.insert_one({
-                        'chat_id': chat_id,
-                        'message_frequency': DEFAULT_MESSAGE_FREQUENCY
-                    })
-            except Exception as e:
-                LOGGER.error(f"Error fetching chat frequency: {e}")
-                message_frequency = DEFAULT_MESSAGE_FREQUENCY
+            # Get message frequency
+            message_frequency = await get_chat_message_frequency(chat_id)
 
             # Anti-spam check
             if chat_id in last_user and last_user[chat_id]['user_id'] == user_id:
@@ -183,8 +190,8 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
                     else:
                         try:
                             await update.message.reply_text(
-                                f"⚠️ 𝘿𝙤𝙣'𝙩 𝙎𝙥𝙖𝙢 {escape(update.effective_user.first_name)}...\n"
-                                "𝙔𝙤𝙪𝙧 𝙈𝙚𝙨𝙨𝙖𝙜𝙚𝙨 𝙒𝙞𝙡𝙡 𝙗𝙚 𝙞𝙜𝙣𝙤𝙧𝙚𝙙 𝙛𝙤𝙧 10 𝙈𝙞𝙣𝙪𝙩𝙚𝙨..."
+                                f"[WARNING] Don't Spam {escape(update.effective_user.first_name)}...\n"
+                                "Your Messages Will be ignored for 10 Minutes..."
                             )
                         except Exception as e:
                             LOGGER.error(f"Error sending spam warning: {e}")
@@ -204,15 +211,16 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
 
             # Check if it's time to spawn
             if message_counts[chat_id] >= message_frequency:
-                LOGGER.info(f"🎯 Spawning character in chat {chat_id} (reached {message_frequency} messages)")
+                LOGGER.info(f"[SPAWN] Triggering spawn in chat {chat_id} (reached {message_frequency} messages)")
                 await send_image(update, context)
                 message_counts[chat_id] = 0  # Reset counter
 
     except Exception as e:
-        LOGGER.error(f"Error in message_counter: {e}")
+        LOGGER.error(f"[ERROR] Error in message_counter: {e}")
         LOGGER.error(traceback.format_exc())
 
 
+# ==================== SPAWN CHARACTER ====================
 async def send_image(update: Update, context: CallbackContext) -> None:
     """Send a random character image to the chat"""
     chat_id = update.effective_chat.id
@@ -274,16 +282,16 @@ async def send_image(update: Update, context: CallbackContext) -> None:
             del first_correct_guesses[chat_id]
 
         # Get rarity emoji
-        rarity = character.get('rarity', '🟢 Common')
-        if isinstance(rarity, str):
-            rarity_emoji = rarity.split(' ')[0] if ' ' in rarity else '🟢'
+        rarity = character.get('rarity', 'Common')
+        if isinstance(rarity, str) and ' ' in rarity:
+            rarity_emoji = rarity.split(' ')[0]
         else:
-            rarity_emoji = '🟢'
+            rarity_emoji = ''
 
         # Send character image
         caption = (
-            f"***{rarity_emoji} ʟᴏᴏᴋ ᴀ ᴡᴀɪғᴜ ʜᴀꜱ ꜱᴘᴀᴡɴᴇᴅ !! "
-            f"ᴍᴀᴋᴇ ʜᴇʀ ʏᴏᴜʀ'ꜱ ʙʏ ɢɪᴠɪɴɢ\n/grab 𝚆𝚊𝚒𝚏𝚞 𝚗𝚊𝚖𝚎***"
+            f"***{rarity_emoji} Look a Waifu has spawned! "
+            f"Make her yours by giving\n/grab Waifu name***"
         )
 
         await context.bot.send_photo(
@@ -293,13 +301,14 @@ async def send_image(update: Update, context: CallbackContext) -> None:
             parse_mode='Markdown'
         )
 
-        LOGGER.info(f"[SPAWN] ✅ Character spawned: {character.get('name', 'Unknown')} (ID: {character.get('id')}) in chat {chat_id}")
+        LOGGER.info(f"[SPAWN] Character spawned: {character.get('name', 'Unknown')} (ID: {character.get('id')}) in chat {chat_id}")
 
     except Exception as e:
         LOGGER.error(f"[SPAWN ERROR] {e}")
         LOGGER.error(traceback.format_exc())
 
 
+# ==================== GUESS HANDLER ====================
 async def guess(update: Update, context: CallbackContext) -> None:
     """Handle character guessing"""
     chat_id = update.effective_chat.id
@@ -313,8 +322,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
         # Check if already guessed
         if chat_id in first_correct_guesses:
             await update.message.reply_text(
-                '🚫 𝙒ᴀɪғᴜ ᴀʟʀᴇᴀᴅʏ ɢʀᴀʙʙᴇᴅ ʙʏ 𝙨ᴏᴍᴇᴏɴᴇ ᴇʟ𝙨ᴇ ⚡, '
-                '𝘽ᴇᴛᴛᴇʀ 𝙇ᴜᴄᴋ 𝙉ᴇ𝙭ᴛ 𝙏ɪᴍᴇ'
+                '[TAKEN] Waifu already grabbed by someone else, Better Luck Next Time'
             )
             return
 
@@ -323,11 +331,11 @@ async def guess(update: Update, context: CallbackContext) -> None:
 
         # Validate guess
         if not guess_text:
-            await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙥𝙧𝙤𝙫𝙞𝙙𝙚 𝙖 𝙣𝙖𝙢𝙚!')
+            await update.message.reply_text('Please provide a name!')
             return
 
         if "()" in guess_text or "&" in guess_text:
-            await update.message.reply_text("𝙉𝙖𝙝𝙝 𝙔𝙤𝙪 𝘾𝙖𝙣'𝙩 𝙪𝙨𝙚 𝙏𝙝𝙞𝙨 𝙏𝙮𝙥𝙚𝙨 𝙤𝙛 𝙬𝙤𝙧𝙙𝙨 ❌️")
+            await update.message.reply_text("You can't use these types of words")
             return
 
         # Get character name parts
@@ -431,28 +439,28 @@ async def guess(update: Update, context: CallbackContext) -> None:
             character = last_characters[chat_id]
             keyboard = [[
                 InlineKeyboardButton(
-                    "🪼 ʜᴀʀᴇᴍ",
+                    "Harem",
                     switch_inline_query_current_chat=f"collection.{user_id}"
                 )
             ]]
 
             # Get rarity properly
-            rarity = character.get('rarity', '🟢 Common')
-            if isinstance(rarity, str):
+            rarity = character.get('rarity', 'Common')
+            if isinstance(rarity, str) and ' ' in rarity:
                 rarity_parts = rarity.split(' ', 1)
-                rarity_emoji = rarity_parts[0] if len(rarity_parts) > 0 else '🟢'
+                rarity_emoji = rarity_parts[0]
                 rarity_text = rarity_parts[1] if len(rarity_parts) > 1 else 'Common'
             else:
-                rarity_emoji = '🟢'
-                rarity_text = 'Common'
+                rarity_emoji = ''
+                rarity_text = rarity
 
             success_message = (
                 f'<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> '
-                f'Congratulations 🎊 You grabbed a new Waifu !!✅\n\n'
-                f'🍁 𝙉𝙖𝙢𝙚: <code>{character.get("name", "Unknown")}</code>\n'
-                f'⛩️ 𝘼𝙣𝙞𝙢𝙚: <code>{character.get("anime", "Unknown")}</code>\n'
-                f'{rarity_emoji} 𝙍𝙖𝙧𝙞𝙩𝙮: <code>{rarity_text}</code>\n\n'
-                f'✧⁠ Character successfully added in your harem'
+                f'Congratulations! You grabbed a new Waifu!\n\n'
+                f'Name: <code>{character.get("name", "Unknown")}</code>\n'
+                f'Anime: <code>{character.get("anime", "Unknown")}</code>\n'
+                f'{rarity_emoji} Rarity: <code>{rarity_text}</code>\n\n'
+                f'Character successfully added to your harem'
             )
 
             await update.message.reply_text(
@@ -464,7 +472,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
             LOGGER.info(f"[GRAB] User {user_id} grabbed {character.get('name')} in chat {chat_id}")
 
         else:
-            await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙒𝙧𝙞𝙩𝙚 𝘾𝙤𝙧𝙧𝙚𝙘𝙩 𝙉𝙖𝙢𝙚... ❌️')
+            await update.message.reply_text('Please write the correct name...')
 
     except Exception as e:
         LOGGER.error(f"[GRAB ERROR] {e}")
@@ -472,47 +480,63 @@ async def guess(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text('An error occurred while processing your guess.')
 
 
-def main() -> None:
-    """Run bot"""
-    try:
-        LOGGER.info("="*50)
-        LOGGER.info("REGISTERING HANDLERS")
-        LOGGER.info("="*50)
+# ==================== HANDLER REGISTRATION ====================
+def register_all_handlers():
+    """Register all bot handlers"""
+    LOGGER.info("="*50)
+    LOGGER.info("REGISTERING HANDLERS")
+    LOGGER.info("="*50)
 
-        # Add command handlers
+    try:
+        # Add grab command handlers
         application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
-        LOGGER.info("✅ Registered: /grab, /g commands")
+        LOGGER.info("[SUCCESS] Registered: /grab, /g commands")
 
         # Register custom module handlers
         try:
+            from shivu.modules.remove import register_remove_handlers
             register_remove_handlers()
-            LOGGER.info("✅ Registered: remove handlers")
+            LOGGER.info("[SUCCESS] Registered: remove handlers")
+        except ImportError:
+            LOGGER.warning("[WARNING] Remove module not found, skipping")
         except Exception as e:
-            LOGGER.error(f"❌ Failed to register remove handlers: {e}")
+            LOGGER.error(f"[ERROR] Failed to register remove handlers: {e}")
 
         try:
+            from shivu.modules.rarity import register_rarity_handlers
             register_rarity_handlers()
-            LOGGER.info("✅ Registered: rarity handlers")
+            LOGGER.info("[SUCCESS] Registered: rarity handlers")
+        except ImportError:
+            LOGGER.warning("[WARNING] Rarity module not found, skipping")
         except Exception as e:
-            LOGGER.error(f"❌ Failed to register rarity handlers: {e}")
+            LOGGER.error(f"[ERROR] Failed to register rarity handlers: {e}")
 
         try:
+            from shivu.modules.ckill import register_ckill_handler
             register_ckill_handler()
-            LOGGER.info("✅ Registered: ckill handler")
+            LOGGER.info("[SUCCESS] Registered: ckill handler")
+        except ImportError:
+            LOGGER.warning("[WARNING] Ckill module not found, skipping")
         except Exception as e:
-            LOGGER.error(f"❌ Failed to register ckill handler: {e}")
+            LOGGER.error(f"[ERROR] Failed to register ckill handler: {e}")
 
         try:
+            from shivu.modules.kill import register_kill_handler
             register_kill_handler()
-            LOGGER.info("✅ Registered: kill handler")
+            LOGGER.info("[SUCCESS] Registered: kill handler")
+        except ImportError:
+            LOGGER.warning("[WARNING] Kill module not found, skipping")
         except Exception as e:
-            LOGGER.error(f"❌ Failed to register kill handler: {e}")
+            LOGGER.error(f"[ERROR] Failed to register kill handler: {e}")
 
         try:
+            from shivu.modules.hclaim import register_hclaim_handler
             register_hclaim_handler()
-            LOGGER.info("✅ Registered: hclaim handler")
+            LOGGER.info("[SUCCESS] Registered: hclaim handler")
+        except ImportError:
+            LOGGER.warning("[WARNING] Hclaim module not found, skipping")
         except Exception as e:
-            LOGGER.error(f"❌ Failed to register hclaim handler: {e}")
+            LOGGER.error(f"[ERROR] Failed to register hclaim handler: {e}")
 
         # Add message handler (MUST BE LAST!)
         application.add_handler(MessageHandler(
@@ -520,51 +544,72 @@ def main() -> None:
             message_counter,
             block=False
         ))
-        LOGGER.info("✅ Registered: message counter (spawn handler)")
+        LOGGER.info("[SUCCESS] Registered: message counter (spawn handler)")
 
         LOGGER.info("="*50)
-        LOGGER.info(f"✅ ALL HANDLERS REGISTERED SUCCESSFULLY")
-        LOGGER.info(f"📊 Spawn frequency: {DEFAULT_MESSAGE_FREQUENCY} messages")
+        LOGGER.info("[SUCCESS] ALL HANDLERS REGISTERED")
+        LOGGER.info(f"[CONFIG] Spawn frequency: {DEFAULT_MESSAGE_FREQUENCY} messages")
         LOGGER.info("="*50)
+
+    except Exception as e:
+        LOGGER.error(f"[ERROR] Failed to register handlers: {e}")
+        LOGGER.error(traceback.format_exc())
+        raise
+
+
+# ==================== MAIN FUNCTION ====================
+def main() -> None:
+    """Run bot"""
+    try:
+        # Import all modules
+        import_standard_modules()
+        import_custom_modules()
+
+        # Register all handlers
+        register_all_handlers()
 
         # Start polling
-        LOGGER.info("🚀 Starting bot polling...")
+        LOGGER.info("="*50)
+        LOGGER.info("[START] Starting bot polling...")
+        LOGGER.info("="*50)
+        
         application.run_polling(
             drop_pending_updates=True,
             allowed_updates=Update.ALL_TYPES
         )
 
     except Exception as e:
-        LOGGER.error(f"❌ Error in main: {e}")
+        LOGGER.error(f"[ERROR] Error in main: {e}")
         LOGGER.error(traceback.format_exc())
         raise
 
 
+# ==================== ENTRY POINT ====================
 if __name__ == "__main__":
     try:
         LOGGER.info("="*50)
-        LOGGER.info("🤖 SHIVU BOT STARTING")
+        LOGGER.info("[START] SHIVU BOT STARTING")
         LOGGER.info("="*50)
 
-        # Start the client
+        # Start the Pyrogram client
         shivuu.start()
-        LOGGER.info("✅ Pyrogram client started successfully")
+        LOGGER.info("[SUCCESS] Pyrogram client started")
 
         # Run the bot
         main()
 
     except KeyboardInterrupt:
-        LOGGER.info("⚠️ Bot stopped by user (Ctrl+C)")
+        LOGGER.info("[STOP] Bot stopped by user (Ctrl+C)")
     except Exception as e:
-        LOGGER.error(f"❌ Fatal error: {e}")
+        LOGGER.error(f"[ERROR] Fatal error: {e}")
         LOGGER.error(traceback.format_exc())
         raise
     finally:
         try:
             shivuu.stop()
-            LOGGER.info("✅ Pyrogram client stopped")
+            LOGGER.info("[SUCCESS] Pyrogram client stopped")
         except:
             pass
         LOGGER.info("="*50)
-        LOGGER.info("🛑 BOT SHUTDOWN COMPLETE")
+        LOGGER.info("[SHUTDOWN] BOT SHUTDOWN COMPLETE")
         LOGGER.info("="*50)
