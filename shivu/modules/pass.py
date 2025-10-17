@@ -1178,7 +1178,7 @@ sʜᴀʀᴇ ᴡɪᴛʜ ғʀɪᴇɴᴅs
             except:
                 await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard))
 
-        elif data == "pass_upgrade":
+       elif data == "pass_upgrade":
             pass_data = await get_or_create_pass_data(user_id)
             user = await user_collection.find_one({'id': user_id})
             balance = user.get('balance', 0)
