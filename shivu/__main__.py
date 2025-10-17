@@ -554,6 +554,7 @@ if __name__ == "__main__":
         LOGGER.info("✅ Registered: /grab, /g commands")
 
         # Register pass system handlers
+        
         try:
             from shivu.modules.pass import (
                 pass_command,
