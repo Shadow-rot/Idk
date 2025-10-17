@@ -54,7 +54,7 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
 
         # Get favorite character - FIXED: favorites is now a dict, not an ID
         fav_character = user.get('favorites', None)
-        
+
         # Validate favorite character
         if fav_character and not isinstance(fav_character, dict):
             fav_character = None
@@ -104,11 +104,11 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
         # Build message
         user_name = escape(update.effective_user.first_name)
         harem_message = f"<b>🎴 {user_name}'s Collection ({rarity_filter})</b>\n"
-        
+
         # Add favorite indicator if exists
         if fav_character:
             harem_message += f"<b>💖 Favorite: {escape(fav_character.get('name', 'Unknown'))}</b>\n"
-        
+
         harem_message += f"<b>Page {page + 1}/{total_pages}</b>\n\n"
 
         # Get current page characters
@@ -165,7 +165,7 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
         # Calculate total character count
         total_char_count = len(filtered_chars)
         unique_char_count = len(character_counts)
-        
+
         # Create keyboard with character count
         keyboard = [
             [
@@ -177,7 +177,7 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
             [
                 InlineKeyboardButton(
                     f"📊 Total: {total_char_count} | Unique: {unique_char_count}", 
-                    callback_data="char_count_info"
+                    callback_data="harem_char_count"
                 )
             ]
         ]
@@ -187,11 +187,11 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
             nav_buttons = []
             if page > 0:
                 nav_buttons.append(
-                    InlineKeyboardButton("⬅️ Prev", callback_data=f"harem:{page - 1}:{user_id}")
+                    InlineKeyboardButton("⬅️ Prev", callback_data=f"harem_page:{page - 1}:{user_id}")
                 )
             if page < total_pages - 1:
                 nav_buttons.append(
-                    InlineKeyboardButton("Next ➡️", callback_data=f"harem:{page + 1}:{user_id}")
+                    InlineKeyboardButton("Next ➡️", callback_data=f"harem_page:{page + 1}:{user_id}")
                 )
             if nav_buttons:
                 keyboard.append(nav_buttons)
@@ -201,7 +201,7 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
 
         # FIXED: Determine which image to show - favorite always takes priority
         display_img = None
-        
+
         # Priority 1: Show favorite if it exists and has an image
         if fav_character and fav_character.get('img_url'):
             display_img = fav_character['img_url']
@@ -281,7 +281,7 @@ async def unfav(update: Update, context: CallbackContext) -> None:
             return
 
         fav_character = user.get('favorites', None)
-        
+
         if not fav_character or not isinstance(fav_character, dict):
             await update.message.reply_text('💔 𝙔𝙤𝙪 𝙙𝙤𝙣\'𝙩 𝙝𝙖𝙫𝙚 𝙖 𝙛𝙖𝙫𝙤𝙧𝙞𝙩𝙚 𝙘𝙝𝙖𝙧𝙖𝙘𝙩𝙚𝙧 𝙨𝙚𝙩!')
             return
@@ -289,8 +289,8 @@ async def unfav(update: Update, context: CallbackContext) -> None:
         # Create confirmation buttons with proper format
         buttons = [
             [
-                InlineKeyboardButton("✅ ʏᴇs", callback_data=f"unfav_confirm:{user_id}"),
-                InlineKeyboardButton("❌ ɴᴏ", callback_data=f"unfav_cancel:{user_id}")
+                InlineKeyboardButton("✅ ʏᴇs", callback_data=f"harem_unfav_yes:{user_id}"),
+                InlineKeyboardButton("❌ ɴᴏ", callback_data=f"harem_unfav_no:{user_id}")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(buttons)
@@ -335,14 +335,14 @@ async def handle_unfav_callback(update: Update, context: CallbackContext) -> Non
             await query.answer("⚠️ ᴛʜɪs ɪs ɴᴏᴛ ʏᴏᴜʀ ʀᴇǫᴜᴇsᴛ!", show_alert=True)
             return
 
-        if action == 'unfav_confirm':  # Confirm unfavorite
+        if action == 'harem_unfav_yes':  # Confirm unfavorite
             user = await user_collection.find_one({'id': user_id})
             if not user:
                 await query.answer("❌ ᴜsᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ!", show_alert=True)
                 return
 
             fav_character = user.get('favorites', None)
-            
+
             # Remove favorite
             result = await user_collection.update_one(
                 {'id': user_id},
@@ -363,7 +363,7 @@ async def handle_unfav_callback(update: Update, context: CallbackContext) -> Non
                 parse_mode='HTML'
             )
 
-        elif action == 'unfav_cancel':  # Cancel
+        elif action == 'harem_unfav_no':  # Cancel
             await query.edit_message_caption(
                 caption="❌ ᴀᴄᴛɪᴏɴ ᴄᴀɴᴄᴇʟᴇᴅ. ғᴀᴠᴏʀɪᴛᴇ ᴋᴇᴘᴛ.",
                 parse_mode='HTML'
@@ -383,8 +383,8 @@ async def set_hmode(update: Update, context: CallbackContext) -> None:
     """Set harem display mode"""
     keyboard = [
         [
-            InlineKeyboardButton("🧩 Default", callback_data="mode_default"),
-            InlineKeyboardButton("🔮 By Rarity", callback_data="mode_rarity"),
+            InlineKeyboardButton("🧩 Default", callback_data="harem_mode_default"),
+            InlineKeyboardButton("🔮 By Rarity", callback_data="harem_mode_rarity"),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -401,41 +401,41 @@ async def hmode_rarity(update: Update, context: CallbackContext) -> None:
     """Show rarity selection menu"""
     keyboard = [
         [
-            InlineKeyboardButton("🟢 Common", callback_data="mode_common"),
-            InlineKeyboardButton("🟣 Rare", callback_data="mode_rare"),
-            InlineKeyboardButton("🟡 Legendary", callback_data="mode_legendary"),
+            InlineKeyboardButton("🟢 Common", callback_data="harem_mode_common"),
+            InlineKeyboardButton("🟣 Rare", callback_data="harem_mode_rare"),
+            InlineKeyboardButton("🟡 Legendary", callback_data="harem_mode_legendary"),
         ],
         [
-            InlineKeyboardButton("💮 Special", callback_data="mode_special"),
-            InlineKeyboardButton("💫 Neon", callback_data="mode_neon"),
-            InlineKeyboardButton("✨ Manga", callback_data="mode_manga"),
+            InlineKeyboardButton("💮 Special", callback_data="harem_mode_special"),
+            InlineKeyboardButton("💫 Neon", callback_data="harem_mode_neon"),
+            InlineKeyboardButton("✨ Manga", callback_data="harem_mode_manga"),
         ],
         [
-            InlineKeyboardButton("🎭 Cosplay", callback_data="mode_cosplay"),
-            InlineKeyboardButton("🎐 Celestial", callback_data="mode_celestial"),
-            InlineKeyboardButton("🔮 Premium", callback_data="mode_premium"),
+            InlineKeyboardButton("🎭 Cosplay", callback_data="harem_mode_cosplay"),
+            InlineKeyboardButton("🎐 Celestial", callback_data="harem_mode_celestial"),
+            InlineKeyboardButton("🔮 Premium", callback_data="harem_mode_premium"),
         ],
         [
-            InlineKeyboardButton("💋 Erotic", callback_data="mode_erotic"),
-            InlineKeyboardButton("🌤 Summer", callback_data="mode_summer"),
-            InlineKeyboardButton("☃️ Winter", callback_data="mode_winter"),
+            InlineKeyboardButton("💋 Erotic", callback_data="harem_mode_erotic"),
+            InlineKeyboardButton("🌤 Summer", callback_data="harem_mode_summer"),
+            InlineKeyboardButton("☃️ Winter", callback_data="harem_mode_winter"),
         ],
         [
-            InlineKeyboardButton("☔️ Monsoon", callback_data="mode_monsoon"),
-            InlineKeyboardButton("💝 Valentine", callback_data="mode_valentine"),
-            InlineKeyboardButton("🎃 Halloween", callback_data="mode_halloween"),
+            InlineKeyboardButton("☔️ Monsoon", callback_data="harem_mode_monsoon"),
+            InlineKeyboardButton("💝 Valentine", callback_data="harem_mode_valentine"),
+            InlineKeyboardButton("🎃 Halloween", callback_data="harem_mode_halloween"),
         ],
         [
-            InlineKeyboardButton("🎄 Christmas", callback_data="mode_christmas"),
-            InlineKeyboardButton("🏵 Mythic", callback_data="mode_mythic"),
-            InlineKeyboardButton("🎗 Events", callback_data="mode_events"),
+            InlineKeyboardButton("🎄 Christmas", callback_data="harem_mode_christmas"),
+            InlineKeyboardButton("🏵 Mythic", callback_data="harem_mode_mythic"),
+            InlineKeyboardButton("🎗 Events", callback_data="harem_mode_events"),
         ],
         [
-            InlineKeyboardButton("🎥 Amv", callback_data="mode_amv"),
-            InlineKeyboardButton("👼 Tiny", callback_data="mode_tiny"),
+            InlineKeyboardButton("🎥 Amv", callback_data="harem_mode_amv"),
+            InlineKeyboardButton("👼 Tiny", callback_data="harem_mode_tiny"),
         ],
         [
-            InlineKeyboardButton("⬅️ Back", callback_data="mode_back"),
+            InlineKeyboardButton("⬅️ Back", callback_data="harem_mode_back"),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -456,7 +456,7 @@ async def mode_button(update: Update, context: CallbackContext) -> None:
     data = query.data
 
     try:
-        if data == "mode_default":
+        if data == "harem_mode_default":
             await user_collection.update_one(
                 {'id': user_id}, 
                 {'$set': {'smode': 'default'}}
@@ -467,14 +467,14 @@ async def mode_button(update: Update, context: CallbackContext) -> None:
                 parse_mode='HTML'
             )
 
-        elif data == "mode_rarity":
+        elif data == "harem_mode_rarity":
             await hmode_rarity(update, context)
 
-        elif data == "mode_back":
+        elif data == "harem_mode_back":
             keyboard = [
                 [
-                    InlineKeyboardButton("🧩 Default", callback_data="mode_default"),
-                    InlineKeyboardButton("🔮 By Rarity", callback_data="mode_rarity"),
+                    InlineKeyboardButton("🧩 Default", callback_data="harem_mode_default"),
+                    InlineKeyboardButton("🔮 By Rarity", callback_data="harem_mode_rarity"),
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -485,9 +485,9 @@ async def mode_button(update: Update, context: CallbackContext) -> None:
             )
             await query.answer()
 
-        elif data.startswith("mode_"):
+        elif data.startswith("harem_mode_"):
             # Extract mode name
-            mode_name = data.replace("mode_", "")
+            mode_name = data.replace("harem_mode_", "")
             rarity_display = HAREM_MODE_MAPPING.get(mode_name, "Unknown")
 
             await user_collection.update_one(
@@ -502,6 +502,8 @@ async def mode_button(update: Update, context: CallbackContext) -> None:
 
     except Exception as e:
         print(f"Error in mode button: {e}")
+        import traceback
+        traceback.print_exc()
         await query.answer("Error updating mode", show_alert=True)
 
 
@@ -515,11 +517,13 @@ async def handle_char_count_info(update: Update, context: CallbackContext) -> No
     )
 
 
-# Register handlers
+# Register handlers - ORDER MATTERS! More specific patterns first
 application.add_handler(CommandHandler(["harem"], harem, block=False))
-application.add_handler(CallbackQueryHandler(harem_callback, pattern='^harem:', block=False))
 application.add_handler(CommandHandler("smode", set_hmode, block=False))
-application.add_handler(CallbackQueryHandler(mode_button, pattern='^mode_', block=False))
 application.add_handler(CommandHandler("unfav", unfav, block=False))
-application.add_handler(CallbackQueryHandler(handle_unfav_callback, pattern="^unfav_", block=False))
-application.add_handler(CallbackQueryHandler(handle_char_count_info, pattern="^char_count_info$", block=False))
+
+# Callback handlers with specific prefixes to avoid conflicts
+application.add_handler(CallbackQueryHandler(harem_callback, pattern='^harem_page:', block=False))
+application.add_handler(CallbackQueryHandler(mode_button, pattern='^harem_mode_', block=False))
+application.add_handler(CallbackQueryHandler(handle_unfav_callback, pattern="^harem_unfav_", block=False))
+application.add_handler(CallbackQueryHandler(handle_char_count_info, pattern="^harem_char_count$", block=False))
