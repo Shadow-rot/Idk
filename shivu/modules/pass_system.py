@@ -11,14 +11,14 @@ OWNER_ID = 5147822244
 # Pass configuration
 PASS_CONFIG = {
     'free': {
-        'name': 'ғʀᴇᴇ ᴘᴀss',
+        'name': 'FREE PASS',
         'weekly_reward': 1000,
         'streak_bonus': 5000,
         'mythic_characters': 0,
         'grab_multiplier': 1.0
     },
     'premium': {
-        'name': 'ᴘʀᴇᴍɪᴜᴍ ᴘᴀss',
+        'name': 'PREMIUM PASS',
         'weekly_reward': 5000,
         'streak_bonus': 25000,
         'mythic_characters': 3,
@@ -26,7 +26,7 @@ PASS_CONFIG = {
         'grab_multiplier': 1.5
     },
     'elite': {
-        'name': 'ᴇʟɪᴛᴇ ᴘᴀss',
+        'name': 'ELITE PASS',
         'weekly_reward': 15000,
         'streak_bonus': 100000,
         'mythic_characters': 10,
@@ -39,9 +39,9 @@ PASS_CONFIG = {
 
 # Task requirements
 MYTHIC_TASKS = {
-    'invites': {'required': 5, 'reward': 'ᴍʏᴛʜɪᴄ ᴄʜᴀʀᴀᴄᴛᴇʀ'},
-    'weekly_claims': {'required': 4, 'reward': 'ʙᴏɴᴜs ʀᴇᴡᴀʀᴅ'},
-    'grabs': {'required': 50, 'reward': 'ᴄᴏʟʟᴇᴄᴛᴏʀ'}
+    'invites': {'required': 5, 'reward': 'MYTHIC CHARACTER'},
+    'weekly_claims': {'required': 4, 'reward': 'BONUS REWARD'},
+    'grabs': {'required': 50, 'reward': 'COLLECTOR'}
 }
 
 # Invite rewards
@@ -161,68 +161,60 @@ async def pass_command(update: Update, context: CallbackContext) -> None:
         completed_tasks = sum(1 for task_key, task_info in MYTHIC_TASKS.items() 
                              if tasks.get(task_key, 0) >= task_info['required'])
 
-        tier_status = to_small_caps("free")
+        tier_status = "FREE"
         if tier == 'elite':
             elite_expires = pass_data.get('elite_expires')
             if elite_expires and isinstance(elite_expires, datetime):
                 days_left = (elite_expires - datetime.utcnow()).days
-                tier_status = to_small_caps("elite") + f" ({days_left} " + to_small_caps("days") + ")"
+                tier_status = f"ELITE ({days_left} DAYS)"
         elif tier == 'premium':
             premium_expires = pass_data.get('premium_expires')
             if premium_expires and isinstance(premium_expires, datetime):
                 days_left = (premium_expires - datetime.utcnow()).days
-                tier_status = to_small_caps("premium") + f" ({days_left} " + to_small_caps("days") + ")"
+                tier_status = f"PREMIUM ({days_left} DAYS)"
 
-        mythic_status = to_small_caps("unlocked") if mythic_unlocked else to_small_caps("locked")
+        mythic_status = "UNLOCKED" if mythic_unlocked else "LOCKED"
         grab_multiplier = PASS_CONFIG[tier]['grab_multiplier']
 
-        caption = f"""╔═══════════════════╗
-  {tier_name}
-╚═══════════════════╝
+        caption = f"""<b>{tier_name}</b>
 
-{to_small_caps('user')}: {escape(update.effective_user.first_name)}
-{to_small_caps('id')}: <code>{user_id}</code>
-{to_small_caps('balance')}: <code>{balance:,}</code>
+<b>USER:</b> {escape(update.effective_user.first_name)}
+<b>ID:</b> <code>{user_id}</code>
+<b>BALANCE:</b> <code>{balance:,}</code>
 
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('progress')}
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('weekly claims')}: {weekly_claims}/6
-{to_small_caps('streak')}: {streak_count} {to_small_caps('weeks')}
-{to_small_caps('tasks completed')}: {completed_tasks}/{total_tasks}
-{to_small_caps('mythic unlock')}: {mythic_status}
-{to_small_caps('grab multiplier')}: {grab_multiplier}x
+<b>PROGRESS</b>
+Weekly Claims: {weekly_claims}/6
+Streak: {streak_count} weeks
+Tasks Completed: {completed_tasks}/{total_tasks}
+Mythic Unlock: {mythic_status}
+Grab Multiplier: {grab_multiplier}x
 
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('rewards')}
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('weekly')}: {PASS_CONFIG[tier]['weekly_reward']:,}
-{to_small_caps('streak bonus')}: {PASS_CONFIG[tier]['streak_bonus']:,}
-{to_small_caps('tier status')}: {tier_status}
+<b>REWARDS</b>
+Weekly: {PASS_CONFIG[tier]['weekly_reward']:,}
+Streak Bonus: {PASS_CONFIG[tier]['streak_bonus']:,}
+Tier Status: {tier_status}
 
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('commands')}
-━━━━━━━━━━━━━━━━━━━
-/pclaim - {to_small_caps('weekly reward')}
-/sweekly - {to_small_caps('streak bonus')}
-/tasks - {to_small_caps('view tasks')}
-/upgrade - {to_small_caps('get premium')}
-/invite - {to_small_caps('invite friends')}
+<b>COMMANDS</b>
+/pclaim - Weekly reward
+/sweekly - Streak bonus
+/tasks - View tasks
+/upgrade - Get premium
+/invite - Invite friends
 
-{to_small_caps('complete tasks to unlock mythic character')}
+Complete tasks to unlock mythic character
 """
 
         keyboard = [
             [
-                InlineKeyboardButton(to_small_caps("claim"), callback_data=f"pass_claim_{user_id}"),
-                InlineKeyboardButton(to_small_caps("tasks"), callback_data=f"pass_tasks_{user_id}")
+                InlineKeyboardButton("CLAIM", callback_data=f"pass_claim_{user_id}"),
+                InlineKeyboardButton("TASKS", callback_data=f"pass_tasks_{user_id}")
             ],
             [
-                InlineKeyboardButton(to_small_caps("upgrade"), callback_data=f"pass_upgrade_{user_id}"),
-                InlineKeyboardButton(to_small_caps("invite"), callback_data=f"pass_invite_{user_id}")
+                InlineKeyboardButton("UPGRADE", callback_data=f"pass_upgrade_{user_id}"),
+                InlineKeyboardButton("INVITE", callback_data=f"pass_invite_{user_id}")
             ],
             [
-                InlineKeyboardButton(to_small_caps("help"), callback_data=f"pass_help_{user_id}")
+                InlineKeyboardButton("HELP", callback_data=f"pass_help_{user_id}")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -238,7 +230,7 @@ async def pass_command(update: Update, context: CallbackContext) -> None:
 
     except Exception as e:
         LOGGER.error(f"[PASS ERROR] {e}")
-        await update.message.reply_text(to_small_caps('error loading pass data'))
+        await update.message.reply_text('Error loading pass data')
 
 
 async def pclaim_command(update: Update, context: CallbackContext) -> None:
@@ -257,10 +249,7 @@ async def pclaim_command(update: Update, context: CallbackContext) -> None:
                 hours = remaining.seconds // 3600
                 minutes = (remaining.seconds % 3600) // 60
 
-                msg = (
-                    f"{to_small_caps('next claim in')}\n\n"
-                    f"{remaining.days} {to_small_caps('days')} {hours} {to_small_caps('hours')} {minutes} {to_small_caps('minutes')}"
-                )
+                msg = f"Next claim in\n\n{remaining.days} days {hours} hours {minutes} minutes"
 
                 if hasattr(update, 'callback_query') and update.callback_query:
                     await update.callback_query.answer(msg, show_alert=True)
@@ -328,16 +317,16 @@ async def pclaim_command(update: Update, context: CallbackContext) -> None:
                     upsert=True
                 )
 
-                premium_msg = f"\n\n{to_small_caps('bonus')}: {len(mythic_chars)} {to_small_caps('mythic characters added')}"
+                premium_msg = f"\n\nBONUS: {len(mythic_chars)} mythic characters added"
 
         success_text = (
-            f"{to_small_caps('claimed successfully')}\n\n"
-            f"{to_small_caps('reward')}: <code>{reward:,}</code>\n"
-            f"{to_small_caps('total claims')}: {new_claims}/6{premium_msg}"
+            f"<b>CLAIMED SUCCESSFULLY</b>\n\n"
+            f"Reward: <code>{reward:,}</code>\n"
+            f"Total Claims: {new_claims}/6{premium_msg}"
         )
 
         if hasattr(update, 'callback_query') and update.callback_query:
-            await update.callback_query.answer(to_small_caps("claimed successfully"), show_alert=False)
+            await update.callback_query.answer("Claimed successfully", show_alert=False)
             await update.callback_query.message.reply_text(success_text, parse_mode='HTML')
         else:
             await update.message.reply_text(success_text, parse_mode='HTML')
@@ -346,7 +335,7 @@ async def pclaim_command(update: Update, context: CallbackContext) -> None:
 
     except Exception as e:
         LOGGER.error(f"[PASS CLAIM ERROR] {e}")
-        error_msg = to_small_caps('error processing claim')
+        error_msg = 'Error processing claim'
         if hasattr(update, 'callback_query') and update.callback_query:
             await update.callback_query.answer(error_msg, show_alert=True)
         else:
@@ -363,10 +352,7 @@ async def sweekly_command(update: Update, context: CallbackContext) -> None:
 
         weekly_claims = pass_data.get('weekly_claims', 0)
         if weekly_claims < 6:
-            msg = (
-                f"{to_small_caps('you need 6 weekly claims')}\n"
-                f"{to_small_caps('current')}: {weekly_claims}/6"
-            )
+            msg = f"You need 6 weekly claims\nCurrent: {weekly_claims}/6"
             await update.message.reply_text(msg)
             return
 
@@ -397,12 +383,12 @@ async def sweekly_command(update: Update, context: CallbackContext) -> None:
         if mythic_char:
             char_name = mythic_char.get('name', 'unknown')
             char_anime = mythic_char.get('anime', 'unknown')
-            char_msg = f"\n\n{to_small_caps('bonus character')}:\n{to_small_caps('name')}: {char_name}\n{to_small_caps('anime')}: {char_anime}"
+            char_msg = f"\n\nBONUS CHARACTER:\nName: {char_name}\nAnime: {char_anime}"
 
         await update.message.reply_text(
-            f"{to_small_caps('streak bonus claimed')}\n\n"
-            f"{to_small_caps('bonus gold')}: <code>{bonus:,}</code>\n"
-            f"{to_small_caps('weekly claims reset to')} 0{char_msg}",
+            f"<b>STREAK BONUS CLAIMED</b>\n\n"
+            f"Bonus Gold: <code>{bonus:,}</code>\n"
+            f"Weekly claims reset to 0{char_msg}",
             parse_mode='HTML'
         )
 
@@ -410,7 +396,7 @@ async def sweekly_command(update: Update, context: CallbackContext) -> None:
 
     except Exception as e:
         LOGGER.error(f"[PASS SWEEKLY ERROR] {e}")
-        await update.message.reply_text(to_small_caps('error processing bonus'))
+        await update.message.reply_text('Error processing bonus')
 
 
 async def tasks_command(update: Update, context: CallbackContext) -> None:
@@ -431,16 +417,17 @@ async def tasks_command(update: Update, context: CallbackContext) -> None:
             progress = min(100, int((current / required) * 100))
 
             if current >= required:
-                status = to_small_caps("completed")
+                status = "COMPLETED"
             else:
-                status = to_small_caps("in progress")
+                status = "IN PROGRESS"
                 all_completed = False
 
+            task_name = task_key.replace('_', ' ').upper()
             task_list.append(
-                f"<b>{to_small_caps(task_key.replace('_', ' '))}:</b> {current}/{required}\n"
-                f"   {'█' * (progress // 10)}{'░' * (10 - progress // 10)} {progress}%\n"
-                f"   {to_small_caps('reward')}: {reward}\n"
-                f"   {to_small_caps('status')}: {status}"
+                f"<b>{task_name}:</b> {current}/{required}\n"
+                f"{'█' * (progress // 10)}{'░' * (10 - progress // 10)} {progress}%\n"
+                f"Reward: {reward}\n"
+                f"Status: {status}"
             )
 
         if all_completed and not mythic_unlocked:
@@ -463,22 +450,19 @@ async def tasks_command(update: Update, context: CallbackContext) -> None:
                 mythic_unlocked = True
                 LOGGER.info(f"[PASS] Mythic unlocked for user {user_id}")
 
-        mythic_status = to_small_caps('completed') if mythic_unlocked else to_small_caps('locked')
+        mythic_status = 'COMPLETED' if mythic_unlocked else 'LOCKED'
 
-        caption = f"""╔═══════════════════╗
-  {to_small_caps('mythic tasks')}
-╚═══════════════════╝
+        caption = f"""<b>MYTHIC TASKS</b>
 
 {chr(10).join(task_list)}
 
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('mythic unlock')}: {mythic_status}
+MYTHIC UNLOCK: {mythic_status}
 
-{to_small_caps('complete all tasks to unlock a free mythic character')}
+Complete all tasks to unlock a free mythic character
 """
 
         keyboard = [[
-            InlineKeyboardButton(to_small_caps("back"), callback_data=f"pass_back_{user_id}")
+            InlineKeyboardButton("BACK", callback_data=f"pass_back_{user_id}")
         ]]
 
         if hasattr(update, 'callback_query') and update.callback_query:
@@ -510,7 +494,7 @@ async def tasks_command(update: Update, context: CallbackContext) -> None:
 
     except Exception as e:
         LOGGER.error(f"[PASS TASKS ERROR] {e}")
-        error_msg = to_small_caps('error loading tasks')
+        error_msg = 'Error loading tasks'
         if hasattr(update, 'callback_query') and update.callback_query:
             await update.callback_query.answer(error_msg, show_alert=True)
         else:
@@ -531,40 +515,32 @@ async def invite_command(update: Update, context: CallbackContext) -> None:
         bot_username = context.bot.username
         invite_link = f"https://t.me/{bot_username}?start=r_{user_id}"
 
-        caption = f"""╔═══════════════════╗
-  {to_small_caps('invite program')}
-╚═══════════════════╝
+        caption = f"""<b>INVITE PROGRAM</b>
 
-{to_small_caps('your referrals')}: {total_invites}
-{to_small_caps('earned')}: {total_earnings:,} {to_small_caps('gold')}
+Your Referrals: {total_invites}
+Earned: {total_earnings:,} GOLD
 
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('how to invite')}
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('copy link below')}
-{to_small_caps('share with friends')}
-{to_small_caps('they click and start bot')}
-{to_small_caps('instant rewards')}
+<b>HOW TO INVITE</b>
+Copy link below
+Share with friends
+They click and start bot
+Instant rewards
 
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('rewards')}
-━━━━━━━━━━━━━━━━━━━
-{INVITE_REWARD:,} {to_small_caps('gold per invite')}
-{to_small_caps('counts toward tasks')}
+<b>REWARDS</b>
+{INVITE_REWARD:,} gold per invite
+Counts toward tasks
 
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('your invite link')}
-━━━━━━━━━━━━━━━━━━━
+<b>YOUR INVITE LINK</b>
 <code>{invite_link}</code>
 
-{to_small_caps('tap to copy link')}
+Tap to copy link
 
-{to_small_caps('use')} /addinvite {to_small_caps('command to manually add invites')}
+Use /addinvite command to manually add invites
 """
 
         keyboard = [
-            [InlineKeyboardButton(to_small_caps("share link"), url=invite_link)],
-            [InlineKeyboardButton(to_small_caps("back"), callback_data=f"pass_back_{user_id}")]
+            [InlineKeyboardButton("SHARE LINK", url=invite_link)],
+            [InlineKeyboardButton("BACK", callback_data=f"pass_back_{user_id}")]
         ]
 
         if hasattr(update, 'callback_query') and update.callback_query:
@@ -596,7 +572,7 @@ async def invite_command(update: Update, context: CallbackContext) -> None:
 
     except Exception as e:
         LOGGER.error(f"[PASS INVITE ERROR] {e}")
-        error_msg = to_small_caps('error loading invite')
+        error_msg = 'Error loading invite'
         if hasattr(update, 'callback_query') and update.callback_query:
             await update.callback_query.answer(error_msg, show_alert=True)
         else:
@@ -613,47 +589,41 @@ async def upgrade_command(update: Update, context: CallbackContext) -> None:
         user = await user_collection.find_one({'id': user_id})
         balance = user.get('balance', 0)
 
-        caption = f"""╔═══════════════════╗
-  {to_small_caps('upgrade options')}
-╚═══════════════════╝
+        caption = f"""<b>UPGRADE OPTIONS</b>
 
-{to_small_caps('your balance')}: <code>{balance:,}</code>
-{to_small_caps('current tier')}: {PASS_CONFIG[tier]['name']}
+Your Balance: <code>{balance:,}</code>
+Current Tier: {PASS_CONFIG[tier]['name']}
 
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('premium pass')}
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('cost')}: <code>50,000</code> {to_small_caps('gold')}
-{to_small_caps('duration')}: 30 {to_small_caps('days')}
+<b>PREMIUM PASS</b>
+Cost: <code>50,000</code> GOLD
+Duration: 30 DAYS
 
-<b>{to_small_caps('benefits')}:</b>
-{to_small_caps('weekly reward')}: 5,000
-{to_small_caps('streak bonus')}: 25,000
-{to_small_caps('mythic chars')}: 3 {to_small_caps('per claim')}
-{to_small_caps('multiplier')}: 1.5x
+<b>BENEFITS:</b>
+Weekly Reward: 5,000
+Streak Bonus: 25,000
+Mythic Chars: 3 per claim
+Multiplier: 1.5x
 
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('elite pass')}
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('cost')}: 10 {to_small_caps('inr')}
-{to_small_caps('payment')}: UPI
-{to_small_caps('duration')}: 30 {to_small_caps('days')}
+<b>ELITE PASS</b>
+Cost: 10 INR
+Payment: UPI
+Duration: 30 DAYS
 
-<b>{to_small_caps('benefits')}:</b>
-{to_small_caps('activation bonus')}: 100,000,000 {to_small_caps('gold')}
-{to_small_caps('instant mythics')}: 10 {to_small_caps('characters')}
-{to_small_caps('weekly reward')}: 15,000
-{to_small_caps('streak bonus')}: 100,000
-{to_small_caps('mythic per claim')}: 10
-{to_small_caps('multiplier')}: 2x
+<b>BENEFITS:</b>
+Activation Bonus: 100,000,000 GOLD
+Instant Mythics: 10 characters
+Weekly Reward: 15,000
+Streak Bonus: 100,000
+Mythic per claim: 10
+Multiplier: 2x
 
-{to_small_caps('choose your upgrade')}
+Choose your upgrade
 """
 
         keyboard = [
-            [InlineKeyboardButton(to_small_caps("premium pass"), callback_data=f"pass_buy_premium_{user_id}")],
-            [InlineKeyboardButton(to_small_caps("elite pass"), callback_data=f"pass_buy_elite_{user_id}")],
-            [InlineKeyboardButton(to_small_caps("back"), callback_data=f"pass_back_{user_id}")]
+            [InlineKeyboardButton("PREMIUM PASS", callback_data=f"pass_buy_premium_{user_id}")],
+            [InlineKeyboardButton("ELITE PASS", callback_data=f"pass_buy_elite_{user_id}")],
+            [InlineKeyboardButton("BACK", callback_data=f"pass_back_{user_id}")]
         ]
 
         if hasattr(update, 'callback_query') and update.callback_query:
@@ -685,7 +655,7 @@ async def upgrade_command(update: Update, context: CallbackContext) -> None:
 
     except Exception as e:
         LOGGER.error(f"[PASS UPGRADE ERROR] {e}")
-        error_msg = to_small_caps('error loading upgrade')
+        error_msg = 'Error loading upgrade'
         if hasattr(update, 'callback_query') and update.callback_query:
             await update.callback_query.answer(error_msg, show_alert=True)
         else:
@@ -695,14 +665,15 @@ async def upgrade_command(update: Update, context: CallbackContext) -> None:
 async def addinvite_command(update: Update, context: CallbackContext) -> None:
     """Add invite count for a user - Owner only - /addinvite <user_id> <count>"""
     if update.effective_user.id != OWNER_ID:
-        await update.message.reply_text(to_small_caps('unauthorized'))
+        await update.message.reply_text('Unauthorized')
         return
 
     try:
         if len(context.args) < 2:
             await update.message.reply_text(
-                f"{to_small_caps('usage')}: /addinvite <{to_small_caps('user id')}> <{to_small_caps('count')}>\n\n"
-                f"{to_small_caps('example')}: /addinvite 123456789 5"
+                f"<b>USAGE:</b> /addinvite user_id count\n\n"
+                f"<b>EXAMPLE:</b> /addinvite 123456789 5",
+                parse_mode='HTML'
             )
             return
 
@@ -710,7 +681,7 @@ async def addinvite_command(update: Update, context: CallbackContext) -> None:
         invite_count = int(context.args[1])
 
         if invite_count <= 0:
-            await update.message.reply_text(to_small_caps('count must be positive'))
+            await update.message.reply_text('Count must be positive')
             return
 
         await get_or_create_pass_data(target_user_id)
@@ -729,10 +700,10 @@ async def addinvite_command(update: Update, context: CallbackContext) -> None:
         )
 
         await update.message.reply_text(
-            f"{to_small_caps('invite added')}\n\n"
-            f"{to_small_caps('user id')}: <code>{target_user_id}</code>\n"
-            f"{to_small_caps('invites added')}: {invite_count}\n"
-            f"{to_small_caps('gold awarded')}: <code>{gold_reward:,}</code>",
+            f"<b>INVITE ADDED</b>\n\n"
+            f"User ID: <code>{target_user_id}</code>\n"
+            f"Invites Added: {invite_count}\n"
+            f"Gold Awarded: <code>{gold_reward:,}</code>",
             parse_mode='HTML'
         )
 
@@ -740,9 +711,9 @@ async def addinvite_command(update: Update, context: CallbackContext) -> None:
             await context.bot.send_message(
                 chat_id=target_user_id,
                 text=(
-                    f"{to_small_caps('invite reward')}\n\n"
-                    f"{to_small_caps('you received')} {invite_count} {to_small_caps('invite credits')}\n"
-                    f"{to_small_caps('gold earned')}: <code>{gold_reward:,}</code>"
+                    f"<b>INVITE REWARD</b>\n\n"
+                    f"You received {invite_count} invite credits\n"
+                    f"Gold Earned: <code>{gold_reward:,}</code>"
                 ),
                 parse_mode='HTML'
             )
@@ -752,23 +723,24 @@ async def addinvite_command(update: Update, context: CallbackContext) -> None:
         LOGGER.info(f"[PASS] Added {invite_count} invites to user {target_user_id}")
 
     except ValueError:
-        await update.message.reply_text(to_small_caps('invalid user id or count'))
+        await update.message.reply_text('Invalid user ID or count')
     except Exception as e:
         LOGGER.error(f"[PASS ADDINVITE ERROR] {e}")
-        await update.message.reply_text(to_small_caps('error adding invite'))
+        await update.message.reply_text('Error adding invite')
 
 
 async def addgrab_command(update: Update, context: CallbackContext) -> None:
     """Add grab count for a user - Owner only - /addgrab <user_id> <count>"""
     if update.effective_user.id != OWNER_ID:
-        await update.message.reply_text(to_small_caps('unauthorized'))
+        await update.message.reply_text('Unauthorized')
         return
 
     try:
         if len(context.args) < 2:
             await update.message.reply_text(
-                f"{to_small_caps('usage')}: /addgrab <{to_small_caps('user id')}> <{to_small_caps('count')}>\n\n"
-                f"{to_small_caps('example')}: /addgrab 123456789 10"
+                f"<b>USAGE:</b> /addgrab user_id count\n\n"
+                f"<b>EXAMPLE:</b> /addgrab 123456789 10",
+                parse_mode='HTML'
             )
             return
 
@@ -776,7 +748,7 @@ async def addgrab_command(update: Update, context: CallbackContext) -> None:
         grab_count = int(context.args[1])
 
         if grab_count <= 0:
-            await update.message.reply_text(to_small_caps('count must be positive'))
+            await update.message.reply_text('Count must be positive')
             return
 
         await get_or_create_pass_data(target_user_id)
@@ -787,9 +759,9 @@ async def addgrab_command(update: Update, context: CallbackContext) -> None:
         )
 
         await update.message.reply_text(
-            f"{to_small_caps('grabs added')}\n\n"
-            f"{to_small_caps('user id')}: <code>{target_user_id}</code>\n"
-            f"{to_small_caps('grabs added')}: {grab_count}",
+            f"<b>GRABS ADDED</b>\n\n"
+            f"User ID: <code>{target_user_id}</code>\n"
+            f"Grabs Added: {grab_count}",
             parse_mode='HTML'
         )
 
@@ -797,8 +769,8 @@ async def addgrab_command(update: Update, context: CallbackContext) -> None:
             await context.bot.send_message(
                 chat_id=target_user_id,
                 text=(
-                    f"{to_small_caps('grab credits added')}\n\n"
-                    f"{to_small_caps('you received')} {grab_count} {to_small_caps('grab credits')}"
+                    f"<b>GRAB CREDITS ADDED</b>\n\n"
+                    f"You received {grab_count} grab credits"
                 ),
                 parse_mode='HTML'
             )
@@ -808,23 +780,24 @@ async def addgrab_command(update: Update, context: CallbackContext) -> None:
         LOGGER.info(f"[PASS] Added {grab_count} grabs to user {target_user_id}")
 
     except ValueError:
-        await update.message.reply_text(to_small_caps('invalid user id or count'))
+        await update.message.reply_text('Invalid user ID or count')
     except Exception as e:
         LOGGER.error(f"[PASS ADDGRAB ERROR] {e}")
-        await update.message.reply_text(to_small_caps('error adding grabs'))
+        await update.message.reply_text('Error adding grabs')
 
 
 async def approve_elite_command(update: Update, context: CallbackContext) -> None:
     """Owner command to approve elite pass payment - /approveelite <user_id>"""
     if update.effective_user.id != OWNER_ID:
-        await update.message.reply_text(to_small_caps('unauthorized'))
+        await update.message.reply_text('Unauthorized')
         return
 
     try:
         if len(context.args) < 1:
             await update.message.reply_text(
-                f"{to_small_caps('usage')}: /approveelite <{to_small_caps('user id')}>\n\n"
-                f"{to_small_caps('example')}: /approveelite 123456789"
+                f"<b>USAGE:</b> /approveelite user_id\n\n"
+                f"<b>EXAMPLE:</b> /approveelite 123456789",
+                parse_mode='HTML'
             )
             return
 
@@ -832,14 +805,14 @@ async def approve_elite_command(update: Update, context: CallbackContext) -> Non
 
         target_user = await user_collection.find_one({'id': target_user_id})
         if not target_user:
-            await update.message.reply_text(to_small_caps('user not found'))
+            await update.message.reply_text('User not found')
             return
 
         pass_data = target_user.get('pass_data', {})
         pending = pass_data.get('pending_elite_payment')
 
         if not pending:
-            await update.message.reply_text(to_small_caps('no pending payment for this user'))
+            await update.message.reply_text('No pending payment for this user')
             return
 
         expires = datetime.utcnow() + timedelta(days=30)
@@ -867,11 +840,11 @@ async def approve_elite_command(update: Update, context: CallbackContext) -> Non
         )
 
         await update.message.reply_text(
-            f"{to_small_caps('elite pass activated')}\n\n"
-            f"{to_small_caps('user id')}: <code>{target_user_id}</code>\n"
-            f"{to_small_caps('gold bonus')}: <code>{activation_bonus:,}</code>\n"
-            f"{to_small_caps('mythic characters')}: {len(mythic_chars)}\n"
-            f"{to_small_caps('expires')}: {expires.strftime('%Y-%m-%d')}",
+            f"<b>ELITE PASS ACTIVATED</b>\n\n"
+            f"User ID: <code>{target_user_id}</code>\n"
+            f"Gold Bonus: <code>{activation_bonus:,}</code>\n"
+            f"Mythic Characters: {len(mythic_chars)}\n"
+            f"Expires: {expires.strftime('%Y-%m-%d')}",
             parse_mode='HTML'
         )
 
@@ -879,16 +852,14 @@ async def approve_elite_command(update: Update, context: CallbackContext) -> Non
             await context.bot.send_message(
                 chat_id=target_user_id,
                 text=(
-                    f"╔═══════════════════╗\n"
-                    f"  {to_small_caps('elite pass activated')}\n"
-                    f"╚═══════════════════╝\n\n"
-                    f"{to_small_caps('your elite pass has been activated')}\n\n"
-                    f"<b>{to_small_caps('received')}:</b>\n"
-                    f"{to_small_caps('gold coins')}: <code>{activation_bonus:,}</code>\n"
-                    f"{to_small_caps('mythic characters')}: {len(mythic_chars)}\n"
-                    f"{to_small_caps('expires')}: {expires.strftime('%Y-%m-%d')}\n\n"
-                    f"{to_small_caps('enjoy your benefits')}\n"
-                    f"{to_small_caps('multiplier')}: 2x"
+                    f"<b>ELITE PASS ACTIVATED</b>\n\n"
+                    f"Your elite pass has been activated\n\n"
+                    f"<b>RECEIVED:</b>\n"
+                    f"Gold Coins: <code>{activation_bonus:,}</code>\n"
+                    f"Mythic Characters: {len(mythic_chars)}\n"
+                    f"Expires: {expires.strftime('%Y-%m-%d')}\n\n"
+                    f"Enjoy your benefits\n"
+                    f"Multiplier: 2x"
                 ),
                 parse_mode='HTML'
             )
@@ -898,41 +869,39 @@ async def approve_elite_command(update: Update, context: CallbackContext) -> Non
         LOGGER.info(f"[PASS] Elite pass approved for user {target_user_id}")
 
     except ValueError:
-        await update.message.reply_text(to_small_caps('invalid user id'))
+        await update.message.reply_text('Invalid user ID')
     except Exception as e:
         LOGGER.error(f"[PASS APPROVE ERROR] {e}")
-        await update.message.reply_text(to_small_caps('error processing approval'))
+        await update.message.reply_text('Error processing approval')
 
 
 async def passhelp_command(update: Update, context: CallbackContext) -> None:
     """Show all pass commands - /passhelp"""
-    help_text = f"""╔═══════════════════╗
-  {to_small_caps('pass system commands')}
-╚═══════════════════╝
+    help_text = f"""<b>PASS SYSTEM COMMANDS</b>
 
-<b>{to_small_caps('user commands')}:</b>
-/pass - {to_small_caps('view pass status')}
-/pclaim - {to_small_caps('claim weekly reward')}
-/sweekly - {to_small_caps('claim 6 week streak bonus')}
-/tasks - {to_small_caps('view task progress')}
-/upgrade - {to_small_caps('upgrade to premium or elite')}
-/invite - {to_small_caps('get invite link')}
-/passhelp - {to_small_caps('show this help')}
+<b>USER COMMANDS:</b>
+/pass - View pass status
+/pclaim - Claim weekly reward
+/sweekly - Claim 6 week streak bonus
+/tasks - View task progress
+/upgrade - Upgrade to premium or elite
+/invite - Get invite link
+/passhelp - Show this help
 
-<b>{to_small_caps('owner commands')}:</b>
-/addinvite <{to_small_caps('user id')}> <{to_small_caps('count')}> - {to_small_caps('add invites')}
-/addgrab <{to_small_caps('user id')}> <{to_small_caps('count')}> - {to_small_caps('add grabs')}
-/approveelite <{to_small_caps('user id')}> - {to_small_caps('approve elite payment')}
+<b>OWNER COMMANDS:</b>
+/addinvite user_id count - Add invites
+/addgrab user_id count - Add grabs
+/approveelite user_id - Approve elite payment
 
-<b>{to_small_caps('pass tiers')}:</b>
-{to_small_caps('free')}: 1,000 {to_small_caps('weekly')} | 5,000 {to_small_caps('streak')}
-{to_small_caps('premium')}: 5,000 {to_small_caps('weekly')} | 25,000 {to_small_caps('streak')} | 3 {to_small_caps('mythic per claim')}
-{to_small_caps('elite')}: 15,000 {to_small_caps('weekly')} | 100,000 {to_small_caps('streak')} | 10 {to_small_caps('mythic per claim')}
+<b>PASS TIERS:</b>
+FREE: 1,000 weekly | 5,000 streak
+PREMIUM: 5,000 weekly | 25,000 streak | 3 mythic per claim
+ELITE: 15,000 weekly | 100,000 streak | 10 mythic per claim
 
-<b>{to_small_caps('tasks for mythic unlock')}:</b>
-5 {to_small_caps('invites')}
-4 {to_small_caps('weekly claims')}
-50 {to_small_caps('grabs')}
+<b>TASKS FOR MYTHIC UNLOCK:</b>
+5 invites
+4 weekly claims
+50 grabs
 """
 
     await update.message.reply_text(help_text, parse_mode='HTML')
@@ -961,7 +930,7 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
             user_id = query.from_user.id
 
         if query.from_user.id != user_id:
-            await query.answer(to_small_caps("not your request"), show_alert=True)
+            await query.answer("Not your request", show_alert=True)
             return
 
         if action == 'claim':
@@ -981,31 +950,32 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
             await invite_command(update, context)
 
         elif action == 'help':
-            help_text = (
-                f"╔═══════════════════╗\n"
-                f"  {to_small_caps('pass help')}\n"
-                f"╚═══════════════════╝\n\n"
-                f"<b>{to_small_caps('commands')}:</b>\n"
-                f"/pass - {to_small_caps('view pass status')}\n"
-                f"/pclaim - {to_small_caps('claim weekly reward')}\n"
-                f"/sweekly - {to_small_caps('claim streak bonus')}\n"
-                f"/tasks - {to_small_caps('view task progress')}\n"
-                f"/upgrade - {to_small_caps('upgrade options')}\n"
-                f"/invite - {to_small_caps('invite friends')}\n"
-                f"/passhelp - {to_small_caps('full command list')}\n\n"
-                f"<b>{to_small_caps('how to unlock mythic')}:</b>\n"
-                f"{to_small_caps('invite 5 people')}\n"
-                f"{to_small_caps('claim 4 weekly rewards')}\n"
-                f"{to_small_caps('grab 50 characters')}\n\n"
-                f"<b>{to_small_caps('pass tiers')}:</b>\n"
-                f"{to_small_caps('free')}: {to_small_caps('basic rewards')}\n"
-                f"{to_small_caps('premium')}: {to_small_caps('50k gold for 30 days')}\n"
-                f"{to_small_caps('elite')}: {to_small_caps('10 inr for 30 days')}\n\n"
-                f"{to_small_caps('complete all tasks for free mythic')}"
-            )
+            help_text = f"""<b>PASS HELP</b>
+
+<b>COMMANDS:</b>
+/pass - View pass status
+/pclaim - Claim weekly reward
+/sweekly - Claim streak bonus
+/tasks - View task progress
+/upgrade - Upgrade options
+/invite - Invite friends
+/passhelp - Full command list
+
+<b>HOW TO UNLOCK MYTHIC:</b>
+Invite 5 people
+Claim 4 weekly rewards
+Grab 50 characters
+
+<b>PASS TIERS:</b>
+FREE: Basic rewards
+PREMIUM: 50k gold for 30 days
+ELITE: 10 INR for 30 days
+
+Complete all tasks for free mythic
+"""
 
             keyboard = [[
-                InlineKeyboardButton(to_small_caps("back"), callback_data=f"pass_back_{user_id}")
+                InlineKeyboardButton("BACK", callback_data=f"pass_back_{user_id}")
             ]]
 
             try:
@@ -1041,68 +1011,60 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
             completed_tasks = sum(1 for task_key, task_info in MYTHIC_TASKS.items() 
                                  if tasks.get(task_key, 0) >= task_info['required'])
 
-            tier_status = to_small_caps("free")
+            tier_status = "FREE"
             if tier == 'elite':
                 elite_expires = pass_data.get('elite_expires')
                 if elite_expires and isinstance(elite_expires, datetime):
                     days_left = (elite_expires - datetime.utcnow()).days
-                    tier_status = to_small_caps("elite") + f" ({days_left} " + to_small_caps("days") + ")"
+                    tier_status = f"ELITE ({days_left} DAYS)"
             elif tier == 'premium':
                 premium_expires = pass_data.get('premium_expires')
                 if premium_expires and isinstance(premium_expires, datetime):
                     days_left = (premium_expires - datetime.utcnow()).days
-                    tier_status = to_small_caps("premium") + f" ({days_left} " + to_small_caps("days") + ")"
+                    tier_status = f"PREMIUM ({days_left} DAYS)"
 
-            mythic_status = to_small_caps("unlocked") if mythic_unlocked else to_small_caps("locked")
+            mythic_status = "UNLOCKED" if mythic_unlocked else "LOCKED"
             grab_multiplier = PASS_CONFIG[tier]['grab_multiplier']
 
-            caption = f"""╔═══════════════════╗
-  {tier_name}
-╚═══════════════════╝
+            caption = f"""<b>{tier_name}</b>
 
-{to_small_caps('user')}: {escape(query.from_user.first_name)}
-{to_small_caps('id')}: <code>{user_id}</code>
-{to_small_caps('balance')}: <code>{balance:,}</code>
+<b>USER:</b> {escape(query.from_user.first_name)}
+<b>ID:</b> <code>{user_id}</code>
+<b>BALANCE:</b> <code>{balance:,}</code>
 
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('progress')}
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('weekly claims')}: {weekly_claims}/6
-{to_small_caps('streak')}: {streak_count} {to_small_caps('weeks')}
-{to_small_caps('tasks completed')}: {completed_tasks}/{total_tasks}
-{to_small_caps('mythic unlock')}: {mythic_status}
-{to_small_caps('grab multiplier')}: {grab_multiplier}x
+<b>PROGRESS</b>
+Weekly Claims: {weekly_claims}/6
+Streak: {streak_count} weeks
+Tasks Completed: {completed_tasks}/{total_tasks}
+Mythic Unlock: {mythic_status}
+Grab Multiplier: {grab_multiplier}x
 
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('rewards')}
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('weekly')}: {PASS_CONFIG[tier]['weekly_reward']:,}
-{to_small_caps('streak bonus')}: {PASS_CONFIG[tier]['streak_bonus']:,}
-{to_small_caps('tier status')}: {tier_status}
+<b>REWARDS</b>
+Weekly: {PASS_CONFIG[tier]['weekly_reward']:,}
+Streak Bonus: {PASS_CONFIG[tier]['streak_bonus']:,}
+Tier Status: {tier_status}
 
-━━━━━━━━━━━━━━━━━━━
-{to_small_caps('commands')}
-━━━━━━━━━━━━━━━━━━━
-/pclaim - {to_small_caps('weekly reward')}
-/sweekly - {to_small_caps('streak bonus')}
-/tasks - {to_small_caps('view tasks')}
-/upgrade - {to_small_caps('get premium')}
-/invite - {to_small_caps('invite friends')}
+<b>COMMANDS</b>
+/pclaim - Weekly reward
+/sweekly - Streak bonus
+/tasks - View tasks
+/upgrade - Get premium
+/invite - Invite friends
 
-{to_small_caps('complete tasks to unlock mythic character')}
+Complete tasks to unlock mythic character
 """
 
             keyboard = [
                 [
-                    InlineKeyboardButton(to_small_caps("claim"), callback_data=f"pass_claim_{user_id}"),
-                    InlineKeyboardButton(to_small_caps("tasks"), callback_data=f"pass_tasks_{user_id}")
+                    InlineKeyboardButton("CLAIM", callback_data=f"pass_claim_{user_id}"),
+                    InlineKeyboardButton("TASKS", callback_data=f"pass_tasks_{user_id}")
                 ],
                 [
-                    InlineKeyboardButton(to_small_caps("upgrade"), callback_data=f"pass_upgrade_{user_id}"),
-                    InlineKeyboardButton(to_small_caps("invite"), callback_data=f"pass_invite_{user_id}")
+                    InlineKeyboardButton("UPGRADE", callback_data=f"pass_upgrade_{user_id}"),
+                    InlineKeyboardButton("INVITE", callback_data=f"pass_invite_{user_id}")
                 ],
                 [
-                    InlineKeyboardButton(to_small_caps("help"), callback_data=f"pass_help_{user_id}")
+                    InlineKeyboardButton("HELP", callback_data=f"pass_help_{user_id}")
                 ]
             ]
 
@@ -1132,27 +1094,27 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                 balance = user.get('balance', 0)
 
                 if balance < cost:
-                    await query.answer(to_small_caps("insufficient balance"), show_alert=True)
+                    await query.answer("Insufficient balance", show_alert=True)
                     return
 
-                caption = (
-                    f"╔═══════════════════╗\n"
-                    f"  {to_small_caps('confirm premium purchase')}\n"
-                    f"╚═══════════════════╝\n\n"
-                    f"{to_small_caps('cost')}: <code>{cost:,}</code> {to_small_caps('gold')}\n"
-                    f"{to_small_caps('your balance')}: <code>{balance:,}</code>\n\n"
-                    f"<b>{to_small_caps('benefits')}:</b>\n"
-                    f"{to_small_caps('weekly reward')}: 5,000\n"
-                    f"{to_small_caps('streak bonus')}: 25,000\n"
-                    f"{to_small_caps('mythic chars')}: 3 {to_small_caps('per claim')}\n"
-                    f"{to_small_caps('multiplier')}: 1.5x\n\n"
-                    f"{to_small_caps('confirm purchase')}"
-                )
+                caption = f"""<b>CONFIRM PREMIUM PURCHASE</b>
+
+Cost: <code>{cost:,}</code> GOLD
+Your Balance: <code>{balance:,}</code>
+
+<b>BENEFITS:</b>
+Weekly Reward: 5,000
+Streak Bonus: 25,000
+Mythic Chars: 3 per claim
+Multiplier: 1.5x
+
+Confirm purchase?
+"""
 
                 keyboard = [
                     [
-                        InlineKeyboardButton(to_small_caps("confirm"), callback_data=f"pass_confirm_premium_{user_id}"),
-                        InlineKeyboardButton(to_small_caps("cancel"), callback_data=f"pass_cancel_{user_id}")
+                        InlineKeyboardButton("CONFIRM", callback_data=f"pass_confirm_premium_{user_id}"),
+                        InlineKeyboardButton("CANCEL", callback_data=f"pass_cancel_{user_id}")
                     ]
                 ]
 
@@ -1177,30 +1139,30 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                 upi_id = PASS_CONFIG['elite']['upi_id']
                 cost_inr = PASS_CONFIG['elite']['cost_inr']
 
-                caption = (
-                    f"╔═══════════════════╗\n"
-                    f"  {to_small_caps('elite pass payment')}\n"
-                    f"╚═══════════════════╝\n\n"
-                    f"<b>{to_small_caps('payment details')}:</b>\n"
-                    f"{to_small_caps('amount')}: {cost_inr} {to_small_caps('inr')}\n"
-                    f"{to_small_caps('upi id')}: <code>{upi_id}</code>\n\n"
-                    f"<b>{to_small_caps('instructions')}:</b>\n"
-                    f"{to_small_caps('send')} {cost_inr} {to_small_caps('inr to the upi id above')}\n"
-                    f"{to_small_caps('take a screenshot of payment')}\n"
-                    f"{to_small_caps('click submit payment below')}\n"
-                    f"{to_small_caps('owner will verify and activate')}\n\n"
-                    f"<b>{to_small_caps('benefits')}:</b>\n"
-                    f"{to_small_caps('activation bonus')}: 100,000,000 {to_small_caps('gold')}\n"
-                    f"{to_small_caps('instant mythics')}: 10 {to_small_caps('characters')}\n"
-                    f"{to_small_caps('weekly reward')}: 15,000\n"
-                    f"{to_small_caps('streak bonus')}: 100,000\n"
-                    f"{to_small_caps('mythic per claim')}: 10\n"
-                    f"{to_small_caps('multiplier')}: 2x"
-                )
+                caption = f"""<b>ELITE PASS PAYMENT</b>
+
+<b>PAYMENT DETAILS:</b>
+Amount: {cost_inr} INR
+UPI ID: <code>{upi_id}</code>
+
+<b>INSTRUCTIONS:</b>
+Send {cost_inr} INR to the UPI ID above
+Take a screenshot of payment
+Click submit payment below
+Owner will verify and activate
+
+<b>BENEFITS:</b>
+Activation Bonus: 100,000,000 GOLD
+Instant Mythics: 10 characters
+Weekly Reward: 15,000
+Streak Bonus: 100,000
+Mythic per claim: 10
+Multiplier: 2x
+"""
 
                 keyboard = [
-                    [InlineKeyboardButton(to_small_caps("submit payment"), callback_data=f"pass_submit_elite_{user_id}")],
-                    [InlineKeyboardButton(to_small_caps("cancel"), callback_data=f"pass_cancel_{user_id}")]
+                    [InlineKeyboardButton("SUBMIT PAYMENT", callback_data=f"pass_submit_elite_{user_id}")],
+                    [InlineKeyboardButton("CANCEL", callback_data=f"pass_cancel_{user_id}")]
                 ]
 
                 try:
@@ -1227,7 +1189,7 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                 balance = user.get('balance', 0)
 
                 if balance < cost:
-                    await query.answer(to_small_caps("insufficient balance"), show_alert=True)
+                    await query.answer("Insufficient balance", show_alert=True)
                     return
 
                 expires = datetime.utcnow() + timedelta(days=30)
@@ -1243,22 +1205,22 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                     }
                 )
 
-                caption = (
-                    f"╔═══════════════════╗\n"
-                    f"  {to_small_caps('premium activated')}\n"
-                    f"╚═══════════════════╝\n\n"
-                    f"{to_small_caps('premium pass activated successfully')}\n"
-                    f"{to_small_caps('expires')}: {expires.strftime('%Y-%m-%d')}\n\n"
-                    f"<b>{to_small_caps('your benefits')}:</b>\n"
-                    f"{to_small_caps('weekly reward')}: 5,000\n"
-                    f"{to_small_caps('streak bonus')}: 25,000\n"
-                    f"{to_small_caps('mythic chars')}: 3 {to_small_caps('per claim')}\n"
-                    f"{to_small_caps('multiplier')}: 1.5x\n\n"
-                    f"{to_small_caps('enjoy your benefits')}"
-                )
+                caption = f"""<b>PREMIUM ACTIVATED</b>
+
+Premium pass activated successfully
+Expires: {expires.strftime('%Y-%m-%d')}
+
+<b>YOUR BENEFITS:</b>
+Weekly Reward: 5,000
+Streak Bonus: 25,000
+Mythic Chars: 3 per claim
+Multiplier: 1.5x
+
+Enjoy your benefits
+"""
 
                 keyboard = [[
-                    InlineKeyboardButton(to_small_caps("back to pass"), callback_data=f"pass_back_{user_id}")
+                    InlineKeyboardButton("BACK TO PASS", callback_data=f"pass_back_{user_id}")
                 ]]
 
                 try:
@@ -1278,7 +1240,7 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                         parse_mode='HTML'
                     )
 
-                await query.answer(to_small_caps("premium activated"), show_alert=False)
+                await query.answer("Premium activated", show_alert=False)
                 LOGGER.info(f"[PASS] User {user_id} upgraded to premium")
 
         elif action == 'submit' and len(parts) >= 3:
@@ -1292,14 +1254,12 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                     await context.bot.send_message(
                         chat_id=OWNER_ID,
                         text=(
-                            f"╔═══════════════════╗\n"
-                            f"  {to_small_caps('elite pass payment')}\n"
-                            f"╚═══════════════════╝\n\n"
-                            f"{to_small_caps('user id')}: <code>{user_id}</code>\n"
-                            f"{to_small_caps('username')}: @{query.from_user.username or 'none'}\n"
-                            f"{to_small_caps('name')}: {query.from_user.first_name}\n"
-                            f"{to_small_caps('amount')}: 10 {to_small_caps('inr')}\n\n"
-                            f"{to_small_caps('verify payment and use')}:\n"
+                            f"<b>ELITE PASS PAYMENT</b>\n\n"
+                            f"User ID: <code>{user_id}</code>\n"
+                            f"Username: @{query.from_user.username or 'none'}\n"
+                            f"Name: {query.from_user.first_name}\n"
+                            f"Amount: 10 INR\n\n"
+                            f"Verify payment and use:\n"
                             f"<code>/approveelite {user_id}</code>"
                         ),
                         parse_mode='HTML'
@@ -1307,20 +1267,21 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                 except Exception as e:
                     LOGGER.error(f"[PASS] Could not notify owner: {e}")
 
-                caption = (
-                    f"╔═══════════════════╗\n"
-                    f"  {to_small_caps('payment submitted')}\n"
-                    f"╚═══════════════════╝\n\n"
-                    f"{to_small_caps('your payment request has been submitted')}\n\n"
-                    f"{to_small_caps('owner will verify and activate your elite pass within 24 hours')}\n\n"
-                    f"{to_small_caps('you will receive a notification once activated')}\n\n"
-                    f"{to_small_caps('you will receive')}:\n"
-                    f"100,000,000 {to_small_caps('gold')}\n"
-                    f"10 {to_small_caps('mythic characters')}"
-                )
+                caption = f"""<b>PAYMENT SUBMITTED</b>
+
+Your payment request has been submitted
+
+Owner will verify and activate your elite pass within 24 hours
+
+You will receive a notification once activated
+
+You will receive:
+100,000,000 GOLD
+10 mythic characters
+"""
 
                 keyboard = [[
-                    InlineKeyboardButton(to_small_caps("back to pass"), callback_data=f"pass_back_{user_id}")
+                    InlineKeyboardButton("BACK TO PASS", callback_data=f"pass_back_{user_id}")
                 ]]
 
                 try:
@@ -1340,17 +1301,17 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                         parse_mode='HTML'
                     )
 
-                await query.answer(to_small_caps("payment submitted for verification"), show_alert=False)
+                await query.answer("Payment submitted for verification", show_alert=False)
                 LOGGER.info(f"[PASS] User {user_id} submitted elite payment")
 
         elif action == 'cancel':
-            await query.answer(to_small_caps("cancelled"), show_alert=False)
+            await query.answer("Cancelled", show_alert=False)
             update.callback_query = query
             await upgrade_command(update, context)
 
     except Exception as e:
         LOGGER.error(f"[PASS CALLBACK ERROR] {e}")
-        await query.answer(to_small_caps('error processing request'), show_alert=True)
+        await query.answer('Error processing request', show_alert=True)
 
 
 # ========================================
