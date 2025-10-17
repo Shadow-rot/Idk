@@ -1327,10 +1327,6 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
             cost = PASS_CONFIG['premium']['cost']
             balance = user.get('balance', 0)
 
-            if balance < cost:
-                await query.answer(to_small_caps("insufficient balance"), show_alert=True)
-                return
-
             caption = (
                 f"╔═══════════════════╗\n"
                 f"  {to_small_caps('confirm premium purchase')}\n"
