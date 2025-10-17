@@ -34,6 +34,7 @@ Use rarity number accordingly:
 17. 🏵 Mythic
 18. 🎗 Special Events
 19. 🎥 AMV
+20. 👼 Tiny
 """
 
 REPLY_UPLOAD_TEXT = """Reply to a photo/video with:
@@ -62,6 +63,7 @@ RARITY_MAP = {
     17: "🏵 Mythic",
     18: "🎗 Special Events",
     19: "🎥 AMV"
+    20: "👼 Tiny"
 }
 
 
