@@ -3,7 +3,6 @@ from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
 from html import escape 
 import random
 import math
-from itertools import groupby
 from shivu import db, application
 
 # Database collections
@@ -53,14 +52,12 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
             await message.reply_text("You don't have any characters yet! Use /grab to catch some.")
             return
 
-        # Get favorite character
-        fav_character_id = user.get('favorites', None)
-        fav_character = None
-        if fav_character_id:
-            fav_character = next(
-                (c for c in characters if isinstance(c, dict) and c.get('id') == fav_character_id),
-                None
-            )
+        # Get favorite character - FIXED: favorites is now a dict, not an ID
+        fav_character = user.get('favorites', None)
+        
+        # Validate favorite character
+        if fav_character and not isinstance(fav_character, dict):
+            fav_character = None
 
         # Get harem mode
         hmode = user.get('smode', 'default')
@@ -107,6 +104,11 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
         # Build message
         user_name = escape(update.effective_user.first_name)
         harem_message = f"<b>🎴 {user_name}'s Collection ({rarity_filter})</b>\n"
+        
+        # Add favorite indicator if exists
+        if fav_character:
+            harem_message += f"<b>💖 Favorite: {escape(fav_character.get('name', 'Unknown'))}</b>\n"
+        
         harem_message += f"<b>Page {page + 1}/{total_pages}</b>\n\n"
 
         # Get current page characters
@@ -150,7 +152,12 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
                     else:
                         rarity_emoji = '🟢'
 
-                    harem_message += f'  {rarity_emoji} <code>{char_id}</code> • <b>{escape(name)}</b> ×{count}\n'
+                    # Add heart emoji if this is the favorite
+                    fav_marker = ""
+                    if fav_character and char_id == fav_character.get('id'):
+                        fav_marker = " 💖"
+
+                    harem_message += f'  {rarity_emoji} <code>{char_id}</code> • <b>{escape(name)}</b> ×{count}{fav_marker}\n'
                     included.add(char_id)
 
             harem_message += '\n'
@@ -180,10 +187,13 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
         reply_markup = InlineKeyboardMarkup(keyboard)
         message = update.message or update.callback_query.message
 
-        # Determine which image to show
+        # FIXED: Determine which image to show - favorite always takes priority
         display_img = None
-        if fav_character and 'img_url' in fav_character:
+        
+        # Priority 1: Show favorite if it exists and has an image
+        if fav_character and fav_character.get('img_url'):
             display_img = fav_character['img_url']
+        # Priority 2: Show random character from filtered list
         elif filtered_chars:
             random_char = random.choice(filtered_chars)
             display_img = random_char.get('img_url')
@@ -219,6 +229,8 @@ async def harem(update: Update, context: CallbackContext, page=0, edit=False) ->
 
     except Exception as e:
         print(f"Error in harem command: {e}")
+        import traceback
+        traceback.print_exc()
         message = update.message or update.callback_query.message
         await message.reply_text("An error occurred while loading your collection.")
 
@@ -244,6 +256,119 @@ async def harem_callback(update: Update, context: CallbackContext) -> None:
     except Exception as e:
         print(f"Error in harem callback: {e}")
         await query.answer("Error loading page", show_alert=True)
+
+
+async def unfav(update: Update, context: CallbackContext) -> None:
+    """Remove favorite character"""
+    user_id = update.effective_user.id
+
+    try:
+        user = await user_collection.find_one({'id': user_id})
+        if not user:
+            await update.message.reply_text('𝙔𝙤𝙪 𝙝𝙖𝙫𝙚 𝙣𝙤𝙩 𝙂𝙤𝙩 𝘼𝙣𝙮 𝙒𝘼𝙄𝙁𝙐 𝙮𝙚𝙩...')
+            return
+
+        fav_character = user.get('favorites', None)
+        
+        if not fav_character or not isinstance(fav_character, dict):
+            await update.message.reply_text('💔 𝙔𝙤𝙪 𝙙𝙤𝙣\'𝙩 𝙝𝙖𝙫𝙚 𝙖 𝙛𝙖𝙫𝙤𝙧𝙞𝙩𝙚 𝙘𝙝𝙖𝙧𝙖𝙘𝙩𝙚𝙧 𝙨𝙚𝙩!')
+            return
+
+        # Create confirmation buttons
+        buttons = [
+            [
+                InlineKeyboardButton("✅ ʏᴇs", callback_data=f"ufc_{user_id}"),
+                InlineKeyboardButton("❌ ɴᴏ", callback_data=f"ufx_{user_id}")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(buttons)
+
+        await update.message.reply_photo(
+            photo=fav_character.get("img_url", ""),
+            caption=(
+                f"<b>💔 ᴅᴏ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ʀᴇᴍᴏᴠᴇ ᴛʜɪs ғᴀᴠᴏʀɪᴛᴇ?</b>\n\n"
+                f"✨ <b>ɴᴀᴍᴇ:</b> <code>{fav_character.get('name', 'Unknown')}</code>\n"
+                f"📺 <b>ᴀɴɪᴍᴇ:</b> <code>{fav_character.get('anime', 'Unknown')}</code>\n"
+                f"🆔 <b>ɪᴅ:</b> <code>{fav_character.get('id', 'Unknown')}</code>"
+            ),
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+
+    except Exception as e:
+        print(f"Error in unfav command: {e}")
+        import traceback
+        traceback.print_exc()
+        await update.message.reply_text('ᴀɴ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ ᴡʜɪʟᴇ ᴘʀᴏᴄᴇssɪɴɢ ʏᴏᴜʀ ʀᴇǫᴜᴇsᴛ.')
+
+
+async def handle_unfav_callback(update: Update, context: CallbackContext) -> None:
+    """Handle unfavorite button callbacks"""
+    query = update.callback_query
+
+    try:
+        data = query.data
+        await query.answer()
+
+        # Check if it's an unfav callback
+        if not (data.startswith('ufc_') or data.startswith('ufx_')):
+            return
+
+        parts = data.split('_', 1)
+        if len(parts) < 2:
+            await query.answer("❌ ɪɴᴠᴀʟɪᴅ ᴄᴀʟʟʙᴀᴄᴋ ᴅᴀᴛᴀ!", show_alert=True)
+            return
+
+        action_code = parts[0]  # 'ufc' (confirm) or 'ufx' (cancel)
+        user_id = int(parts[1])
+
+        # Verify user
+        if query.from_user.id != user_id:
+            await query.answer("⚠️ ᴛʜɪs ɪs ɴᴏᴛ ʏᴏᴜʀ ʀᴇǫᴜᴇsᴛ!", show_alert=True)
+            return
+
+        if action_code == 'ufc':  # Confirm unfavorite
+            user = await user_collection.find_one({'id': user_id})
+            if not user:
+                await query.answer("❌ ᴜsᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ!", show_alert=True)
+                return
+
+            fav_character = user.get('favorites', None)
+            
+            # Remove favorite
+            result = await user_collection.update_one(
+                {'id': user_id},
+                {'$unset': {'favorites': ""}}
+            )
+
+            if result.matched_count == 0:
+                await query.answer("❌ ғᴀɪʟᴇᴅ ᴛᴏ ᴜᴘᴅᴀᴛᴇ!", show_alert=True)
+                return
+
+            await query.edit_message_caption(
+                caption=(
+                    f"<b>💔 ғᴀᴠᴏʀɪᴛᴇ ʀᴇᴍᴏᴠᴇᴅ!</b>\n\n"
+                    f"✨ <b>ɴᴀᴍᴇ:</b> <code>{fav_character.get('name', 'Unknown')}</code>\n"
+                    f"📺 <b>ᴀɴɪᴍᴇ:</b> <code>{fav_character.get('anime', 'Unknown')}</code>\n\n"
+                    f"<i>💖 ʏᴏᴜ ᴄᴀɴ sᴇᴛ ᴀ ɴᴇᴡ ғᴀᴠᴏʀɪᴛᴇ ᴜsɪɴɢ /fav</i>"
+                ),
+                parse_mode='HTML'
+            )
+
+        elif action_code == 'ufx':  # Cancel
+            await query.edit_message_caption(
+                caption="❌ ᴀᴄᴛɪᴏɴ ᴄᴀɴᴄᴇʟᴇᴅ. ғᴀᴠᴏʀɪᴛᴇ ᴋᴇᴘᴛ.",
+                parse_mode='HTML'
+            )
+
+    except Exception as e:
+        print(f"Error in unfav callback: {e}")
+        import traceback
+        traceback.print_exc()
+        try:
+            await query.answer(f"❌ ᴇʀʀᴏʀ: {str(e)[:100]}", show_alert=True)
+        except:
+            pass
 
 
 async def set_hmode(update: Update, context: CallbackContext) -> None:
@@ -375,5 +500,7 @@ async def mode_button(update: Update, context: CallbackContext) -> None:
 # Register handlers
 application.add_handler(CommandHandler(["harem"], harem, block=False))
 application.add_handler(CallbackQueryHandler(harem_callback, pattern='^harem:', block=False))
-application.add_handler( CommandHandler("smode", set_hmode, block=False))
+application.add_handler(CommandHandler("smode", set_hmode, block=False))
 application.add_handler(CallbackQueryHandler(mode_button, pattern='^mode_', block=False))
+application.add_handler(CommandHandler("unfav", unfav, block=False))
+application.add_handler(CallbackQueryHandler(handle_unfav_callback, pattern="^uf[cx]_", block=False))
