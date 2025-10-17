@@ -126,20 +126,20 @@ async def is_character_allowed(character):
             settings = await spawn_settings_collection.find_one({'type': 'rarity_control'})
             if settings:
                 char_rarity = character.get('rarity', '🟢 Common')
-                
+
                 # Extract emoji from rarity
                 if isinstance(char_rarity, str) and ' ' in char_rarity:
                     rarity_emoji = char_rarity.split(' ')[0]
                 else:
                     rarity_emoji = char_rarity
-                
+
                 # Check if this rarity is enabled
                 rarities = settings.get('rarities', {})
                 if rarity_emoji in rarities:
                     if not rarities[rarity_emoji].get('enabled', True):
                         LOGGER.debug(f"Character {character.get('id')} has disabled rarity: {rarity_emoji}")
                         return False
-            
+
             # Check old global settings for backward compatibility
             old_settings = await spawn_settings_collection.find_one({'type': 'global'})
             if old_settings:
@@ -312,7 +312,7 @@ async def send_image(update: Update, context: CallbackContext) -> None:
                 settings = await spawn_settings_collection.find_one({'type': 'rarity_control'})
                 if settings and settings.get('rarities'):
                     rarities = settings['rarities']
-                    
+
                     # Group characters by rarity
                     rarity_groups = {}
                     for char in allowed_characters:
@@ -321,11 +321,11 @@ async def send_image(update: Update, context: CallbackContext) -> None:
                             rarity_emoji = char_rarity.split(' ')[0]
                         else:
                             rarity_emoji = char_rarity
-                        
+
                         if rarity_emoji not in rarity_groups:
                             rarity_groups[rarity_emoji] = []
                         rarity_groups[rarity_emoji].append(char)
-                    
+
                     # Build weighted selection based on chances
                     weighted_chars = []
                     for emoji, chars in rarity_groups.items():
@@ -336,14 +336,14 @@ async def send_image(update: Update, context: CallbackContext) -> None:
                             weight = max(1, int(chance * 10))
                             for char in chars:
                                 weighted_chars.extend([char] * weight)
-                    
+
                     if weighted_chars:
                         character = random.choice(weighted_chars)
                         LOGGER.info(f"[SPAWN] Selected character using weighted rarity system")
         except Exception as e:
             LOGGER.error(f"[SPAWN] Error in weighted selection: {e}")
             LOGGER.error(traceback.format_exc())
-        
+
         # Fallback to random selection if weighted selection failed
         if not character:
             character = random.choice(allowed_characters)
@@ -455,10 +455,8 @@ async def guess(update: Update, context: CallbackContext) -> None:
                     'characters': [last_characters[chat_id]],
                 })
 
-            # ==================== PASS SYSTEM INTEGRATION ====================
             # Update grab task for pass system
             await update_grab_task(user_id)
-            # ================================================================
 
             # Update group user totals
             group_user_total = await group_user_totals_collection.find_one({
@@ -574,6 +572,45 @@ def register_all_handlers():
         application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
         LOGGER.info("✅ Registered: /grab, /g commands")
 
+        # Register rarity module handlers FIRST (before other modules)
+        try:
+            from shivu.modules.rarity import register_rarity_handlers
+            register_rarity_handlers()
+            LOGGER.info("✅ Registered: rarity handlers")
+        except (ImportError, AttributeError) as e:
+            LOGGER.warning(f"⚠️ Rarity module not found: {e}")
+        except Exception as e:
+            LOGGER.error(f"❌ Failed to register rarity handlers: {e}")
+            LOGGER.error(traceback.format_exc())
+
+        # Register other custom module handlers
+        handlers_to_register = [
+            ('pass_system', [
+                ('pass_command', 'pass'),
+                ('pclaim_command', 'pclaim'),
+                ('sweekly_command', 'sweekly'),
+                ('tasks_command', 'tasks'),
+                ('upgrade_command', 'upgrade'),
+                ('invite_command', 'invite'),
+                ('passhelp_command', 'passhelp'),
+                ('addinvite_command', 'addinvite'),
+                ('addgrab_command', 'addgrab'),
+                ('approve_elite_command', 'approveelite'),
+            ]),
+            ('remove', 'register_remove_handlers'),
+            ('ckill', 'register_ckill_handler'),
+            ('kill', 'register_kill_handler'),
+            ('hclaim', 'register_hclaim_handler'),
+            ('favorite', 'register_favorite_handlers'),
+            ('gift', 'register_gift_handlers'),
+            ('trade', 'register_trade_handlers'),
+            ('upload', 'register_upload_handlers'),
+            ('leaderboard', 'register_leaderboard_handlers'),
+            ('collection', 'register_collection_handlers'),
+            ('change', 'register_change_handlers'),
+            ('sudo', 'register_sudo_handlers'),
+        ]
+
         # Register pass system handlers
         try:
             from shivu.modules.pass_system import (
@@ -607,124 +644,35 @@ def register_all_handlers():
             LOGGER.warning("⚠️ Pass system module not found, skipping")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register pass system handlers: {e}")
+            LOGGER.error(traceback.format_exc())
 
-        # Register custom module handlers
-        try:
-            from shivu.modules.remove import register_remove_handlers
-            register_remove_handlers()
-            LOGGER.info("✅ Registered: remove handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Remove module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register remove handlers: {e}")
+        # Register other module handlers
+        module_configs = [
+            ('remove', 'register_remove_handlers'),
+            ('ckill', 'register_ckill_handler'),
+            ('kill', 'register_kill_handler'),
+            ('hclaim', 'register_hclaim_handler'),
+            ('favorite', 'register_favorite_handlers'),
+            ('gift', 'register_gift_handlers'),
+            ('trade', 'register_trade_handlers'),
+            ('upload', 'register_upload_handlers'),
+            ('leaderboard', 'register_leaderboard_handlers'),
+            ('collection', 'register_collection_handlers'),
+            ('change', 'register_change_handlers'),
+            ('sudo', 'register_sudo_handlers'),
+        ]
 
-        try:
-            from shivu.modules.rarity import register_rarity_handlers
-            register_rarity_handlers()
-            LOGGER.info("✅ Registered: rarity handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Rarity module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register rarity handlers: {e}")
-
-        try:
-            from shivu.modules.ckill import register_ckill_handler
-            register_ckill_handler()
-            LOGGER.info("✅ Registered: ckill handler")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Ckill module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register ckill handler: {e}")
-
-        try:
-            from shivu.modules.kill import register_kill_handler
-            register_kill_handler()
-            LOGGER.info("✅ Registered: kill handler")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Kill module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register kill handler: {e}")
-
-        try:
-            from shivu.modules.hclaim import register_hclaim_handler
-            register_hclaim_handler()
-            LOGGER.info("✅ Registered: hclaim handler")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Hclaim module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register hclaim handler: {e}")
-
-        try:
-            from shivu.modules.favorite import register_favorite_handlers
-            register_favorite_handlers()
-            LOGGER.info("✅ Registered: favorite handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Favorite module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register favorite handlers: {e}")
-
-        try:
-            from shivu.modules.gift import register_gift_handlers
-            register_gift_handlers()
-            LOGGER.info("✅ Registered: gift handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Gift module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register gift handlers: {e}")
-
-        try:
-            from shivu.modules.trade import register_trade_handlers
-            register_trade_handlers()
-            LOGGER.info("✅ Registered: trade handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Trade module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register trade handlers: {e}")
-
-        try:
-            from shivu.modules.upload import register_upload_handlers
-            register_upload_handlers()
-            LOGGER.info("✅ Registered: upload handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Upload module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register upload handlers: {e}")
-
-        try:
-            from shivu.modules.leaderboard import register_leaderboard_handlers
-            register_leaderboard_handlers()
-            LOGGER.info("✅ Registered: leaderboard handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Leaderboard module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register leaderboard handlers: {e}")
-
-        try:
-            from shivu.modules.collection import register_collection_handlers
-            register_collection_handlers()
-            LOGGER.info("✅ Registered: collection handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Collection module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register collection handlers: {e}")
-
-        try:
-            from shivu.modules.change import register_change_handlers
-            register_change_handlers()
-            LOGGER.info("✅ Registered: change handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Change module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register change handlers: {e}")
-
-        try:
-            from shivu.modules.sudo import register_sudo_handlers
-            register_sudo_handlers()
-            LOGGER.info("✅ Registered: sudo handlers")
-        except (ImportError, AttributeError):
-            LOGGER.warning("⚠️ Sudo module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register sudo handlers: {e}")
+        for module_name, register_func_name in module_configs:
+            try:
+                module = importlib.import_module(f"shivu.modules.{module_name}")
+                register_func = getattr(module, register_func_name)
+                register_func()
+                LOGGER.info(f"✅ Registered: {module_name} handlers")
+            except (ImportError, AttributeError):
+                LOGGER.warning(f"⚠️ {module_name.capitalize()} module not found, skipping")
+            except Exception as e:
+                LOGGER.error(f"❌ Failed to register {module_name} handlers: {e}")
+                LOGGER.error(traceback.format_exc())
 
         # Add message handler (MUST BE LAST!)
         application.add_handler(MessageHandler(
