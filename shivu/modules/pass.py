@@ -1041,4 +1041,4 @@ application.add_handler(CallbackQueryHandler(pass_callback, pattern=r"^pass_", b
 LOGGER.info("✅ Pass system handlers registered")
 
 # Export functions
-__all__ = ['handle_grab_task', 'handle_referral']
+__all__ = ['register_pass_handlers', 'handle_grab_task', 'handle_referral']
