@@ -1029,7 +1029,7 @@ sʜᴀʀᴇ ᴡɪᴛʜ ғʀɪᴇɴᴅs
 
 
 def register_pass_handlers():
-    """Register all pass handlers"""
+    """Register all pass handlers - MUST be called before other callback handlers"""
     application.add_handler(CommandHandler("pass", pass_command, block=False))
     application.add_handler(CommandHandler("pclaim", pclaim_command, block=False))
     application.add_handler(CommandHandler("sweekly", sweekly_command, block=False))
@@ -1037,8 +1037,11 @@ def register_pass_handlers():
     application.add_handler(CommandHandler("upgrade", upgrade_command, block=False))
     application.add_handler(CommandHandler("invite", invite_command, block=False))
     application.add_handler(CommandHandler("approveelite", approve_elite_command, block=False))
-    application.add_handler(CallbackQueryHandler(pass_callback, pattern=r"^pass_", block=False))
-    LOGGER.info("✅ Pass system handlers registered")
+    
+    # Register with higher priority (group=-1) to handle before other callbacks
+    application.add_handler(CallbackQueryHandler(pass_callback, pattern=r"^pass_", block=False), group=-1)
+    
+    LOGGER.info("✅ Pass system handlers registered with priority")
 
 
 # Export functions
