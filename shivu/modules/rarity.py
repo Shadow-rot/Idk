@@ -117,8 +117,8 @@ def create_panel_keyboard(rarities, page=0):
     keyboard = []
 
     # Header
-    keyboard.append([InlineKeyboardButton("🎯 Spawn Rarity Control Panel", callback_data="panel_noop")])
-    keyboard.append([InlineKeyboardButton("━━━━━━━━━━━━━━━━━━", callback_data="panel_noop")])
+    keyboard.append([InlineKeyboardButton("🎯 Spawn Rarity Control Panel", callback_data="noop")])
+    keyboard.append([InlineKeyboardButton("━━━━━━━━━━━━━━━━━━", callback_data="noop")])
 
     # Calculate pagination
     items_per_page = 5
@@ -137,39 +137,39 @@ def create_panel_keyboard(rarities, page=0):
         keyboard.append([
             InlineKeyboardButton(
                 f"{emoji} {name} {status}",
-                callback_data=f"toggle|{emoji}|{page}"
+                callback_data=f"toggle_{emoji}_{page}"
             )
         ])
 
         # Chance adjustment buttons (only if enabled)
         if data['enabled']:
             keyboard.append([
-                InlineKeyboardButton("--", callback_data=f"dec10|{emoji}|{page}"),
-                InlineKeyboardButton("-", callback_data=f"dec1|{emoji}|{page}"),
-                InlineKeyboardButton(f"{chance}%", callback_data="panel_noop"),
-                InlineKeyboardButton("+", callback_data=f"inc1|{emoji}|{page}"),
-                InlineKeyboardButton("++", callback_data=f"inc10|{emoji}|{page}"),
+                InlineKeyboardButton("--", callback_data=f"dec10_{emoji}_{page}"),
+                InlineKeyboardButton("-", callback_data=f"dec1_{emoji}_{page}"),
+                InlineKeyboardButton(f"{chance}%", callback_data="noop"),
+                InlineKeyboardButton("+", callback_data=f"inc1_{emoji}_{page}"),
+                InlineKeyboardButton("++", callback_data=f"inc10_{emoji}_{page}"),
             ])
 
     # Pagination buttons
-    keyboard.append([InlineKeyboardButton("━━━━━━━━━━━━━━━━━━", callback_data="panel_noop")])
+    keyboard.append([InlineKeyboardButton("━━━━━━━━━━━━━━━━━━", callback_data="noop")])
     if total_pages > 1:
         nav_buttons = []
         if page > 0:
-            nav_buttons.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"page|{page-1}"))
-        nav_buttons.append(InlineKeyboardButton(f"📄 {page+1}/{total_pages}", callback_data="panel_noop"))
+            nav_buttons.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"page_{page-1}"))
+        nav_buttons.append(InlineKeyboardButton(f"📄 {page+1}/{total_pages}", callback_data="noop"))
         if page < total_pages - 1:
-            nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"page|{page+1}"))
+            nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"page_{page+1}"))
         keyboard.append(nav_buttons)
 
     # Control buttons
     keyboard.append([
-        InlineKeyboardButton("🔄 Normalize", callback_data=f"normalize|{page}"),
-        InlineKeyboardButton("♻️ Reset", callback_data=f"reset|{page}")
+        InlineKeyboardButton("🔄 Normalize", callback_data=f"normalize_{page}"),
+        InlineKeyboardButton("♻️ Reset", callback_data=f"reset_{page}")
     ])
     keyboard.append([
-        InlineKeyboardButton("✅ Enable All", callback_data=f"enable_all|{page}"),
-        InlineKeyboardButton("❌ Disable All", callback_data=f"disable_all|{page}")
+        InlineKeyboardButton("✅ Enable All", callback_data=f"enable_all_{page}"),
+        InlineKeyboardButton("❌ Disable All", callback_data=f"disable_all_{page}")
     ])
     keyboard.append([InlineKeyboardButton("❎ Close Panel", callback_data="close")])
 
@@ -267,7 +267,7 @@ async def panel_callback(update: Update, context: CallbackContext):
             return
 
         # Handle noop (display only)
-        if data == "panel_noop":
+        if data == "noop":
             await query.answer()
             return
 
@@ -281,15 +281,11 @@ async def panel_callback(update: Update, context: CallbackContext):
         settings = await get_spawn_settings()
         rarities = settings['rarities']
 
-        # Parse callback data using pipe separator
-        parts = data.split('|')
+        # Parse callback data using underscore separator
+        parts = data.split('_')
         action = parts[0]
-        
-        # Extract page (always last part for most actions)
-        page = 0
-        if len(parts) > 1 and parts[-1].isdigit():
-            page = int(parts[-1])
 
+        page = 0
         changed = False
         answer_text = ""
 
@@ -300,6 +296,7 @@ async def panel_callback(update: Update, context: CallbackContext):
 
         elif action == "toggle":
             emoji = parts[1]
+            page = int(parts[2])
             if emoji in rarities:
                 rarities[emoji]['enabled'] = not rarities[emoji]['enabled']
                 changed = True
@@ -307,50 +304,60 @@ async def panel_callback(update: Update, context: CallbackContext):
 
         elif action == "inc1":
             emoji = parts[1]
-            if emoji in rarities:
+            page = int(parts[2])
+            if emoji in rarities and rarities[emoji]['enabled']:
                 rarities[emoji]['chance'] = min(100, round(rarities[emoji]['chance'] + 1, 2))
                 changed = True
                 answer_text = f"Increased to {rarities[emoji]['chance']}%"
 
         elif action == "inc10":
             emoji = parts[1]
-            if emoji in rarities:
+            page = int(parts[2])
+            if emoji in rarities and rarities[emoji]['enabled']:
                 rarities[emoji]['chance'] = min(100, round(rarities[emoji]['chance'] + 10, 2))
                 changed = True
                 answer_text = f"Increased to {rarities[emoji]['chance']}%"
 
         elif action == "dec1":
             emoji = parts[1]
-            if emoji in rarities:
-                rarities[emoji]['chance'] = max(0, round(rarities[emoji]['chance'] - 1, 2))
+            page = int(parts[2])
+            if emoji in rarities and rarities[emoji]['enabled']:
+                rarities[emoji]['chance'] = max(0.1, round(rarities[emoji]['chance'] - 1, 2))
                 changed = True
                 answer_text = f"Decreased to {rarities[emoji]['chance']}%"
 
         elif action == "dec10":
             emoji = parts[1]
-            if emoji in rarities:
-                rarities[emoji]['chance'] = max(0, round(rarities[emoji]['chance'] - 10, 2))
+            page = int(parts[2])
+            if emoji in rarities and rarities[emoji]['enabled']:
+                rarities[emoji]['chance'] = max(0.1, round(rarities[emoji]['chance'] - 10, 2))
                 changed = True
                 answer_text = f"Decreased to {rarities[emoji]['chance']}%"
 
         elif action == "normalize":
+            page = int(parts[1])
             rarities = normalize_chances(rarities)
             changed = True
             answer_text = "Chances normalized to 100%"
 
         elif action == "reset":
+            page = int(parts[1]) if len(parts) > 1 else 0
             rarities = DEFAULT_RARITIES.copy()
             changed = True
             answer_text = "Reset to default settings"
             page = 0
 
-        elif action == "enable_all":
+        elif action == "enable":
+            # enable_all
+            page = int(parts[2])
             for emoji in rarities:
                 rarities[emoji]['enabled'] = True
             changed = True
             answer_text = "All rarities enabled"
 
-        elif action == "disable_all":
+        elif action == "disable":
+            # disable_all
+            page = int(parts[2])
             for emoji in rarities:
                 rarities[emoji]['enabled'] = False
             changed = True
@@ -358,13 +365,13 @@ async def panel_callback(update: Update, context: CallbackContext):
 
         # Update database if changes were made
         if changed:
-            await update_spawn_settings(rarities)
+            success = await update_spawn_settings(rarities)
+            if not success:
+                await query.answer("❌ Failed to save changes", show_alert=True)
+                return
 
         # Answer callback query
-        if answer_text:
-            await query.answer(answer_text)
-        else:
-            await query.answer()
+        await query.answer(answer_text if answer_text else "")
 
         # Update panel display
         text = format_panel_text(rarities, page)
@@ -396,7 +403,7 @@ def register_rarity_handlers():
         application.add_handler(CommandHandler("spawnpanel", spawnpanel_command, block=False))
         application.add_handler(CallbackQueryHandler(
             panel_callback, 
-            pattern=r"^(toggle|inc1|inc10|dec1|dec10|normalize|reset|enable_all|disable_all|page|close|panel_noop)", 
+            pattern=r"^(toggle|inc1|inc10|dec1|dec10|normalize|reset|enable|disable|page|close|noop)", 
             block=False
         ))
         LOGGER.info("✅ Registered spawn rarity control handlers")
