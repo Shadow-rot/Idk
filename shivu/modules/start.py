@@ -436,7 +436,7 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
 {to_small_caps('tap on their names to contact them')}
 """
         sudo_keyboard = [
-            [InlineKeyboardButton("lodu", url='https://t.me/ll_Yoichi_Isagi_ll')],
+            [InlineKeyboardButton("参┊ＹＯＩＣＨＩ→ ＩＳＡＧＩএ", url='https://t.me/ll_Yoichi_Isagi_ll')],
             [InlineKeyboardButton("꧁ღ⊱✨Kaizen ✨⊱ღ꧂", url='https://t.me/digital_paradoxx')],
             [InlineKeyboardButton("ｋｉｌｌｕａ", url='https://t.me/notkilluafr')],
             [InlineKeyboardButton("─°✧Sʜ༏ᵏ༏ɱⲟɾ༏♡︎³↳°─⋆", url='https://t.me/avinashs_sun')],
@@ -460,7 +460,7 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
 {to_small_caps('tap on the button below to contact the owner')}
 """
         owner_keyboard = [
-            [InlineKeyboardButton("lodu", url='https://t.me/ll_Thorfinn_ll')],
+            [InlineKeyboardButton("々 Ꭲʜᴏʀꜰɪɴɴ ⸙", url='https://t.me/ll_Thorfinn_ll')],
             [InlineKeyboardButton(to_small_caps("back to credits"), callback_data='credits')]
         ]
         reply_markup = InlineKeyboardMarkup(owner_keyboard)
