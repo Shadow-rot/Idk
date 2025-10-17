@@ -3,7 +3,7 @@ from telegram.ext import CommandHandler, CallbackQueryHandler
 from shivu import application, user_collection
 
 # Replace OWNER_ID with the actual owner's user ID
-OWNER_ID = 5147822244
+OWNER_ID = 8420981179
 
 async def transfer(update, context):
     try:
