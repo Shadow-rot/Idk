@@ -1,12 +1,11 @@
 """
-Spawn Rarity Control System
-Allows admins to control which rarities spawn and their spawn rates
+Spawn Rarity Control System - Command Based
+Allows admins to control which rarities spawn and their spawn rates using commands
 """
 
 import traceback
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
-from telegram.error import BadRequest
+from telegram import Update
+from telegram.ext import CommandHandler, CallbackContext
 
 from shivu import application, shivuu, db, LOGGER
 
@@ -61,8 +60,35 @@ DEFAULT_RARITIES = {
     '👼': {'name': 'Tiny', 'enabled': True, 'chance': 0.1},
 }
 
-# Sudo users who can access the panel
+# Sudo users who can access the commands
 SUDO_USERS = [5147822244, 8420981179]  # Add your admin user IDs here
+
+# Emoji to name mapping for easier command usage
+EMOJI_TO_NAME = {
+    '🟢': 'common',
+    '🟣': 'rare',
+    '🟡': 'legendary',
+    '💮': 'special',
+    '💫': 'neon',
+    '✨': 'manga',
+    '🎭': 'cosplay',
+    '🎐': 'celestial',
+    '🔮': 'premium',
+    '💋': 'erotic',
+    '🌤': 'summer',
+    '☃️': 'winter',
+    '☔️': 'monsoon',
+    '💝': 'valentine',
+    '🎃': 'halloween',
+    '🎄': 'christmas',
+    '🏵': 'mythic',
+    '🎗': 'events',
+    '🎥': 'amv',
+    '👼': 'tiny'
+}
+
+# Reverse mapping
+NAME_TO_EMOJI = {v: k for k, v in EMOJI_TO_NAME.items()}
 
 
 async def get_spawn_settings():
@@ -112,112 +138,29 @@ def normalize_chances(rarities):
     return rarities
 
 
-def create_panel_keyboard(rarities, page=0):
-    """Create inline keyboard for spawn panel (paginated)"""
-    keyboard = []
-
-    # Header
-    keyboard.append([InlineKeyboardButton("🎯 Spawn Rarity Control Panel", callback_data="noop")])
-    keyboard.append([InlineKeyboardButton("━━━━━━━━━━━━━━━━━━", callback_data="noop")])
-
-    # Calculate pagination
-    items_per_page = 5
-    rarity_items = list(rarities.items())
-    total_pages = (len(rarity_items) + items_per_page - 1) // items_per_page
-    start_idx = page * items_per_page
-    end_idx = min(start_idx + items_per_page, len(rarity_items))
-
-    # Display current page items
-    for emoji, data in rarity_items[start_idx:end_idx]:
-        status = "✅" if data['enabled'] else "❌"
-        name = data['name']
-        chance = data['chance']
-
-        # Status toggle button
-        keyboard.append([
-            InlineKeyboardButton(
-                f"{emoji} {name} {status}",
-                callback_data=f"toggle_{emoji}_{page}"
-            )
-        ])
-
-        # Chance adjustment buttons (only if enabled)
-        if data['enabled']:
-            keyboard.append([
-                InlineKeyboardButton("--", callback_data=f"dec10_{emoji}_{page}"),
-                InlineKeyboardButton("-", callback_data=f"dec1_{emoji}_{page}"),
-                InlineKeyboardButton(f"{chance}%", callback_data="noop"),
-                InlineKeyboardButton("+", callback_data=f"inc1_{emoji}_{page}"),
-                InlineKeyboardButton("++", callback_data=f"inc10_{emoji}_{page}"),
-            ])
-
-    # Pagination buttons
-    keyboard.append([InlineKeyboardButton("━━━━━━━━━━━━━━━━━━", callback_data="noop")])
-    if total_pages > 1:
-        nav_buttons = []
-        if page > 0:
-            nav_buttons.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"page_{page-1}"))
-        nav_buttons.append(InlineKeyboardButton(f"📄 {page+1}/{total_pages}", callback_data="noop"))
-        if page < total_pages - 1:
-            nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"page_{page+1}"))
-        keyboard.append(nav_buttons)
-
-    # Control buttons
-    keyboard.append([
-        InlineKeyboardButton("🔄 Normalize", callback_data=f"normalize_{page}"),
-        InlineKeyboardButton("♻️ Reset", callback_data=f"reset_{page}")
-    ])
-    keyboard.append([
-        InlineKeyboardButton("✅ Enable All", callback_data=f"enable_all_{page}"),
-        InlineKeyboardButton("❌ Disable All", callback_data=f"disable_all_{page}")
-    ])
-    keyboard.append([InlineKeyboardButton("❎ Close Panel", callback_data="close")])
-
-    return InlineKeyboardMarkup(keyboard)
+def find_rarity_emoji(rarity_input):
+    """Find rarity emoji from input (name or emoji)"""
+    rarity_input = rarity_input.lower().strip()
+    
+    # Check if input is emoji
+    if rarity_input in DEFAULT_RARITIES:
+        return rarity_input
+    
+    # Check if input is name
+    if rarity_input in NAME_TO_EMOJI:
+        return NAME_TO_EMOJI[rarity_input]
+    
+    # Partial name matching
+    for name, emoji in NAME_TO_EMOJI.items():
+        if rarity_input in name:
+            return emoji
+    
+    return None
 
 
-def format_panel_text(rarities, page=0):
-    """Format the panel message text"""
-    enabled_count = sum(1 for r in rarities.values() if r['enabled'])
-    total_count = len(rarities)
-    total_chance = sum(r['chance'] for r in rarities.values() if r['enabled'])
-
-    # Calculate items for current page
-    items_per_page = 5
-    rarity_items = list(rarities.items())
-    total_pages = (len(rarity_items) + items_per_page - 1) // items_per_page
-    start_idx = page * items_per_page
-    end_idx = min(start_idx + items_per_page, len(rarity_items))
-
-    text = (
-        "🎯 **SPAWN RARITY CONTROL PANEL**\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"📊 **Status**: {enabled_count}/{total_count} rarities enabled\n"
-        f"💯 **Total Chance**: {total_chance:.2f}%\n"
-        f"📄 **Page**: {page+1}/{total_pages}\n\n"
-        "**Current Page Configuration:**\n"
-    )
-
-    for emoji, data in rarity_items[start_idx:end_idx]:
-        status = "✅ Enabled" if data['enabled'] else "❌ Disabled"
-        text += f"{emoji} **{data['name']}**: {data['chance']:.2f}% - {status}\n"
-
-    text += (
-        "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "**Instructions:**\n"
-        "• Click rarity name to toggle enable/disable\n"
-        "• Use -/+ buttons to adjust spawn chance\n"
-        "• --/++ adjusts by 10%, -/+ adjusts by 1%\n"
-        "• Navigate pages to see all rarities\n"
-        "• Normalize ensures total equals 100%\n"
-        "• Changes apply immediately to spawns"
-    )
-
-    return text
-
-
-async def spawnpanel_command(update: Update, context: CallbackContext):
-    """Show spawn rarity control panel"""
+# ==================== VIEW COMMAND ====================
+async def rview_command(update: Update, context: CallbackContext):
+    """View all rarity spawn settings - Usage: /rview"""
     try:
         user_id = update.effective_user.id
 
@@ -234,179 +177,424 @@ async def spawnpanel_command(update: Update, context: CallbackContext):
         settings = await get_spawn_settings()
         rarities = settings['rarities']
 
-        # Create and send panel
-        text = format_panel_text(rarities, page=0)
-        keyboard = create_panel_keyboard(rarities, page=0)
+        # Calculate statistics
+        enabled_count = sum(1 for r in rarities.values() if r['enabled'])
+        total_count = len(rarities)
+        total_chance = sum(r['chance'] for r in rarities.values() if r['enabled'])
 
-        await update.message.reply_text(
-            text,
-            reply_markup=keyboard,
-            parse_mode='Markdown'
+        # Build message
+        text = (
+            "🎯 **SPAWN RARITY SETTINGS**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📊 **Status**: {enabled_count}/{total_count} rarities enabled\n"
+            f"💯 **Total Chance**: {total_chance:.2f}%\n\n"
+            "**Current Configuration:**\n\n"
         )
 
-        LOGGER.info(f"Spawn panel opened by user {user_id}")
+        # Sort rarities by chance (descending)
+        sorted_rarities = sorted(
+            rarities.items(),
+            key=lambda x: x[1]['chance'],
+            reverse=True
+        )
+
+        for emoji, data in sorted_rarities:
+            status = "✅" if data['enabled'] else "❌"
+            text += (
+                f"{emoji} **{data['name']}**\n"
+                f"  └ Status: {status} | Chance: `{data['chance']:.2f}%`\n"
+            )
+
+        text += (
+            "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "**Available Commands:**\n"
+            "`/renable <rarity>` - Enable a rarity\n"
+            "`/rdisable <rarity>` - Disable a rarity\n"
+            "`/rchance <rarity> <value>` - Set spawn chance\n"
+            "`/rnormalize` - Normalize chances to 100%\n"
+            "`/rreset` - Reset to defaults\n"
+            "`/renableall` - Enable all rarities\n"
+            "`/rdisableall` - Disable all rarities\n\n"
+            "**Example:**\n"
+            "`/renable legendary`\n"
+            "`/rchance mythic 5.0`\n"
+            "`/rdisable common`"
+        )
+
+        await update.message.reply_text(text, parse_mode='Markdown')
+        LOGGER.info(f"Rarity settings viewed by user {user_id}")
 
     except Exception as e:
-        LOGGER.error(f"Error in spawnpanel command: {e}")
+        LOGGER.error(f"Error in rview command: {e}")
         LOGGER.error(traceback.format_exc())
-        await update.message.reply_text(
-            "❌ An error occurred while opening the spawn panel."
-        )
+        await update.message.reply_text("❌ An error occurred while fetching settings.")
 
 
-async def panel_callback(update: Update, context: CallbackContext):
-    """Handle spawn panel button callbacks"""
+# ==================== ENABLE COMMAND ====================
+async def renable_command(update: Update, context: CallbackContext):
+    """Enable a rarity - Usage: /renable <rarity>"""
     try:
-        query = update.callback_query
-        user_id = query.from_user.id
-        data = query.data
+        user_id = update.effective_user.id
 
-        # Check sudo access
         if user_id not in SUDO_USERS:
-            await query.answer("⚠️ Access denied!", show_alert=True)
+            await update.message.reply_text("⚠️ Access denied!")
             return
 
-        # Handle noop (display only)
-        if data == "noop":
-            await query.answer()
+        if not context.args:
+            await update.message.reply_text(
+                "❌ **Usage:** `/renable <rarity>`\n\n"
+                "**Example:** `/renable legendary`",
+                parse_mode='Markdown'
+            )
             return
 
-        # Handle close
-        if data == "close":
-            await query.message.delete()
-            await query.answer("Panel closed")
+        rarity_input = ' '.join(context.args)
+        emoji = find_rarity_emoji(rarity_input)
+
+        if not emoji:
+            await update.message.reply_text(
+                f"❌ Rarity '{rarity_input}' not found!\n"
+                "Use `/rview` to see available rarities.",
+                parse_mode='Markdown'
+            )
             return
 
-        # Get current settings
         settings = await get_spawn_settings()
         rarities = settings['rarities']
 
-        # Parse callback data using underscore separator
-        parts = data.split('_')
-        action = parts[0]
-
-        page = 0
-        changed = False
-        answer_text = ""
-
-        # Handle different actions
-        if action == "page":
-            page = int(parts[1])
-            answer_text = f"Page {page+1}"
-
-        elif action == "toggle":
-            emoji = parts[1]
-            page = int(parts[2])
-            if emoji in rarities:
-                rarities[emoji]['enabled'] = not rarities[emoji]['enabled']
-                changed = True
-                answer_text = f"{'Enabled' if rarities[emoji]['enabled'] else 'Disabled'} {rarities[emoji]['name']}"
-
-        elif action == "inc1":
-            emoji = parts[1]
-            page = int(parts[2])
-            if emoji in rarities and rarities[emoji]['enabled']:
-                rarities[emoji]['chance'] = min(100, round(rarities[emoji]['chance'] + 1, 2))
-                changed = True
-                answer_text = f"Increased to {rarities[emoji]['chance']}%"
-
-        elif action == "inc10":
-            emoji = parts[1]
-            page = int(parts[2])
-            if emoji in rarities and rarities[emoji]['enabled']:
-                rarities[emoji]['chance'] = min(100, round(rarities[emoji]['chance'] + 10, 2))
-                changed = True
-                answer_text = f"Increased to {rarities[emoji]['chance']}%"
-
-        elif action == "dec1":
-            emoji = parts[1]
-            page = int(parts[2])
-            if emoji in rarities and rarities[emoji]['enabled']:
-                rarities[emoji]['chance'] = max(0.1, round(rarities[emoji]['chance'] - 1, 2))
-                changed = True
-                answer_text = f"Decreased to {rarities[emoji]['chance']}%"
-
-        elif action == "dec10":
-            emoji = parts[1]
-            page = int(parts[2])
-            if emoji in rarities and rarities[emoji]['enabled']:
-                rarities[emoji]['chance'] = max(0.1, round(rarities[emoji]['chance'] - 10, 2))
-                changed = True
-                answer_text = f"Decreased to {rarities[emoji]['chance']}%"
-
-        elif action == "normalize":
-            page = int(parts[1])
-            rarities = normalize_chances(rarities)
-            changed = True
-            answer_text = "Chances normalized to 100%"
-
-        elif action == "reset":
-            page = int(parts[1]) if len(parts) > 1 else 0
-            rarities = DEFAULT_RARITIES.copy()
-            changed = True
-            answer_text = "Reset to default settings"
-            page = 0
-
-        elif action == "enable":
-            # enable_all
-            page = int(parts[2])
-            for emoji in rarities:
-                rarities[emoji]['enabled'] = True
-            changed = True
-            answer_text = "All rarities enabled"
-
-        elif action == "disable":
-            # disable_all
-            page = int(parts[2])
-            for emoji in rarities:
-                rarities[emoji]['enabled'] = False
-            changed = True
-            answer_text = "All rarities disabled"
-
-        # Update database if changes were made
-        if changed:
-            success = await update_spawn_settings(rarities)
-            if not success:
-                await query.answer("❌ Failed to save changes", show_alert=True)
-                return
-
-        # Answer callback query
-        await query.answer(answer_text if answer_text else "")
-
-        # Update panel display
-        text = format_panel_text(rarities, page)
-        keyboard = create_panel_keyboard(rarities, page)
-
-        try:
-            await query.edit_message_text(
-                text,
-                reply_markup=keyboard,
+        if rarities[emoji]['enabled']:
+            await update.message.reply_text(
+                f"ℹ️ {emoji} **{rarities[emoji]['name']}** is already enabled!",
                 parse_mode='Markdown'
             )
-        except BadRequest as e:
-            # Message unchanged or other non-critical error
-            if "Message is not modified" not in str(e):
-                LOGGER.warning(f"BadRequest in panel update: {e}")
+            return
+
+        rarities[emoji]['enabled'] = True
+        await update_spawn_settings(rarities)
+
+        await update.message.reply_text(
+            f"✅ Successfully enabled {emoji} **{rarities[emoji]['name']}**!",
+            parse_mode='Markdown'
+        )
+        LOGGER.info(f"User {user_id} enabled rarity: {rarities[emoji]['name']}")
 
     except Exception as e:
-        LOGGER.error(f"Error in panel callback: {e}")
+        LOGGER.error(f"Error in renable command: {e}")
         LOGGER.error(traceback.format_exc())
+        await update.message.reply_text("❌ An error occurred.")
+
+
+# ==================== DISABLE COMMAND ====================
+async def rdisable_command(update: Update, context: CallbackContext):
+    """Disable a rarity - Usage: /rdisable <rarity>"""
+    try:
+        user_id = update.effective_user.id
+
+        if user_id not in SUDO_USERS:
+            await update.message.reply_text("⚠️ Access denied!")
+            return
+
+        if not context.args:
+            await update.message.reply_text(
+                "❌ **Usage:** `/rdisable <rarity>`\n\n"
+                "**Example:** `/rdisable common`",
+                parse_mode='Markdown'
+            )
+            return
+
+        rarity_input = ' '.join(context.args)
+        emoji = find_rarity_emoji(rarity_input)
+
+        if not emoji:
+            await update.message.reply_text(
+                f"❌ Rarity '{rarity_input}' not found!\n"
+                "Use `/rview` to see available rarities.",
+                parse_mode='Markdown'
+            )
+            return
+
+        settings = await get_spawn_settings()
+        rarities = settings['rarities']
+
+        if not rarities[emoji]['enabled']:
+            await update.message.reply_text(
+                f"ℹ️ {emoji} **{rarities[emoji]['name']}** is already disabled!",
+                parse_mode='Markdown'
+            )
+            return
+
+        rarities[emoji]['enabled'] = False
+        await update_spawn_settings(rarities)
+
+        await update.message.reply_text(
+            f"✅ Successfully disabled {emoji} **{rarities[emoji]['name']}**!",
+            parse_mode='Markdown'
+        )
+        LOGGER.info(f"User {user_id} disabled rarity: {rarities[emoji]['name']}")
+
+    except Exception as e:
+        LOGGER.error(f"Error in rdisable command: {e}")
+        LOGGER.error(traceback.format_exc())
+        await update.message.reply_text("❌ An error occurred.")
+
+
+# ==================== SET CHANCE COMMAND ====================
+async def rchance_command(update: Update, context: CallbackContext):
+    """Set spawn chance for a rarity - Usage: /rchance <rarity> <percentage>"""
+    try:
+        user_id = update.effective_user.id
+
+        if user_id not in SUDO_USERS:
+            await update.message.reply_text("⚠️ Access denied!")
+            return
+
+        if len(context.args) < 2:
+            await update.message.reply_text(
+                "❌ **Usage:** `/rchance <rarity> <percentage>`\n\n"
+                "**Example:** `/rchance legendary 15.5`",
+                parse_mode='Markdown'
+            )
+            return
+
+        # Get percentage (last argument)
         try:
-            await query.answer("❌ An error occurred", show_alert=True)
-        except:
-            pass
+            chance = float(context.args[-1])
+        except ValueError:
+            await update.message.reply_text("❌ Invalid percentage value!")
+            return
+
+        if chance < 0 or chance > 100:
+            await update.message.reply_text("❌ Percentage must be between 0 and 100!")
+            return
+
+        # Get rarity name (all args except last)
+        rarity_input = ' '.join(context.args[:-1])
+        emoji = find_rarity_emoji(rarity_input)
+
+        if not emoji:
+            await update.message.reply_text(
+                f"❌ Rarity '{rarity_input}' not found!\n"
+                "Use `/rview` to see available rarities.",
+                parse_mode='Markdown'
+            )
+            return
+
+        settings = await get_spawn_settings()
+        rarities = settings['rarities']
+
+        old_chance = rarities[emoji]['chance']
+        rarities[emoji]['chance'] = round(chance, 2)
+        await update_spawn_settings(rarities)
+
+        await update.message.reply_text(
+            f"✅ Updated {emoji} **{rarities[emoji]['name']}** spawn chance!\n"
+            f"Previous: `{old_chance:.2f}%` → New: `{chance:.2f}%`\n\n"
+            "💡 Tip: Use `/rnormalize` to balance all chances to 100%",
+            parse_mode='Markdown'
+        )
+        LOGGER.info(f"User {user_id} set {rarities[emoji]['name']} chance to {chance}%")
+
+    except Exception as e:
+        LOGGER.error(f"Error in rchance command: {e}")
+        LOGGER.error(traceback.format_exc())
+        await update.message.reply_text("❌ An error occurred.")
 
 
+# ==================== NORMALIZE COMMAND ====================
+async def rnormalize_command(update: Update, context: CallbackContext):
+    """Normalize all spawn chances to total 100% - Usage: /rnormalize"""
+    try:
+        user_id = update.effective_user.id
+
+        if user_id not in SUDO_USERS:
+            await update.message.reply_text("⚠️ Access denied!")
+            return
+
+        settings = await get_spawn_settings()
+        rarities = settings['rarities']
+
+        # Get enabled rarities before normalization
+        enabled_rarities = {k: v for k, v in rarities.items() if v['enabled']}
+        
+        if not enabled_rarities:
+            await update.message.reply_text("❌ No rarities are enabled!")
+            return
+
+        old_total = sum(r['chance'] for r in enabled_rarities.values())
+
+        # Normalize
+        rarities = normalize_chances(rarities)
+        await update_spawn_settings(rarities)
+
+        new_total = sum(r['chance'] for r in rarities.values() if r['enabled'])
+
+        await update.message.reply_text(
+            f"✅ Successfully normalized spawn chances!\n\n"
+            f"Previous Total: `{old_total:.2f}%`\n"
+            f"New Total: `{new_total:.2f}%`\n\n"
+            "All enabled rarities have been proportionally adjusted.",
+            parse_mode='Markdown'
+        )
+        LOGGER.info(f"User {user_id} normalized spawn chances")
+
+    except Exception as e:
+        LOGGER.error(f"Error in rnormalize command: {e}")
+        LOGGER.error(traceback.format_exc())
+        await update.message.reply_text("❌ An error occurred.")
+
+
+# ==================== RESET COMMAND ====================
+async def rreset_command(update: Update, context: CallbackContext):
+    """Reset all settings to defaults - Usage: /rreset"""
+    try:
+        user_id = update.effective_user.id
+
+        if user_id not in SUDO_USERS:
+            await update.message.reply_text("⚠️ Access denied!")
+            return
+
+        rarities = DEFAULT_RARITIES.copy()
+        await update_spawn_settings(rarities)
+
+        await update.message.reply_text(
+            "✅ Successfully reset all rarity settings to defaults!\n\n"
+            "All rarities are now enabled with balanced spawn chances.\n"
+            "Use `/rview` to see the current configuration.",
+            parse_mode='Markdown'
+        )
+        LOGGER.info(f"User {user_id} reset spawn settings to defaults")
+
+    except Exception as e:
+        LOGGER.error(f"Error in rreset command: {e}")
+        LOGGER.error(traceback.format_exc())
+        await update.message.reply_text("❌ An error occurred.")
+
+
+# ==================== ENABLE ALL COMMAND ====================
+async def renableall_command(update: Update, context: CallbackContext):
+    """Enable all rarities - Usage: /renableall"""
+    try:
+        user_id = update.effective_user.id
+
+        if user_id not in SUDO_USERS:
+            await update.message.reply_text("⚠️ Access denied!")
+            return
+
+        settings = await get_spawn_settings()
+        rarities = settings['rarities']
+
+        for emoji in rarities:
+            rarities[emoji]['enabled'] = True
+
+        await update_spawn_settings(rarities)
+
+        await update.message.reply_text(
+            "✅ Successfully enabled all rarities!\n\n"
+            f"All {len(rarities)} rarities are now active.",
+            parse_mode='Markdown'
+        )
+        LOGGER.info(f"User {user_id} enabled all rarities")
+
+    except Exception as e:
+        LOGGER.error(f"Error in renableall command: {e}")
+        LOGGER.error(traceback.format_exc())
+        await update.message.reply_text("❌ An error occurred.")
+
+
+# ==================== DISABLE ALL COMMAND ====================
+async def rdisableall_command(update: Update, context: CallbackContext):
+    """Disable all rarities - Usage: /rdisableall"""
+    try:
+        user_id = update.effective_user.id
+
+        if user_id not in SUDO_USERS:
+            await update.message.reply_text("⚠️ Access denied!")
+            return
+
+        settings = await get_spawn_settings()
+        rarities = settings['rarities']
+
+        for emoji in rarities:
+            rarities[emoji]['enabled'] = False
+
+        await update_spawn_settings(rarities)
+
+        await update.message.reply_text(
+            "⚠️ Successfully disabled all rarities!\n\n"
+            "**Warning:** No characters will spawn until you enable at least one rarity.\n"
+            "Use `/renable <rarity>` or `/renableall` to re-enable rarities.",
+            parse_mode='Markdown'
+        )
+        LOGGER.info(f"User {user_id} disabled all rarities")
+
+    except Exception as e:
+        LOGGER.error(f"Error in rdisableall command: {e}")
+        LOGGER.error(traceback.format_exc())
+        await update.message.reply_text("❌ An error occurred.")
+
+
+# ==================== HELP COMMAND ====================
+async def rhelp_command(update: Update, context: CallbackContext):
+    """Show help for rarity commands - Usage: /rhelp"""
+    try:
+        user_id = update.effective_user.id
+
+        if user_id not in SUDO_USERS:
+            await update.message.reply_text("⚠️ Access denied!")
+            return
+
+        text = (
+            "🎯 **RARITY CONTROL COMMANDS**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "**View Settings:**\n"
+            "`/rview` - View all rarity settings\n\n"
+            "**Enable/Disable:**\n"
+            "`/renable <rarity>` - Enable a specific rarity\n"
+            "`/rdisable <rarity>` - Disable a specific rarity\n"
+            "`/renableall` - Enable all rarities\n"
+            "`/rdisableall` - Disable all rarities\n\n"
+            "**Adjust Spawn Rates:**\n"
+            "`/rchance <rarity> <percentage>` - Set spawn chance\n"
+            "`/rnormalize` - Balance all chances to 100%\n\n"
+            "**Reset:**\n"
+            "`/rreset` - Reset to default settings\n\n"
+            "**Examples:**\n"
+            "```\n"
+            "/renable legendary\n"
+            "/rdisable common\n"
+            "/rchance mythic 2.5\n"
+            "/rnormalize\n"
+            "```\n\n"
+            "**Available Rarities:**\n"
+            "common, rare, legendary, special, neon, manga, "
+            "cosplay, celestial, premium, erotic, summer, winter, "
+            "monsoon, valentine, halloween, christmas, mythic, "
+            "events, amv, tiny"
+        )
+
+        await update.message.reply_text(text, parse_mode='Markdown')
+
+    except Exception as e:
+        LOGGER.error(f"Error in rhelp command: {e}")
+        LOGGER.error(traceback.format_exc())
+        await update.message.reply_text("❌ An error occurred.")
+
+
+# ==================== HANDLER REGISTRATION ====================
 def register_rarity_handlers():
     """Register handlers for rarity control system"""
     try:
-        application.add_handler(CommandHandler("spawnpanel", spawnpanel_command, block=False))
-        application.add_handler(CallbackQueryHandler(
-            panel_callback, 
-            pattern=r"^(toggle|inc1|inc10|dec1|dec10|normalize|reset|enable|disable|page|close|noop)", 
-            block=False
-        ))
-        LOGGER.info("✅ Registered spawn rarity control handlers")
+        application.add_handler(CommandHandler("rview", rview_command, block=False))
+        application.add_handler(CommandHandler("renable", renable_command, block=False))
+        application.add_handler(CommandHandler("rdisable", rdisable_command, block=False))
+        application.add_handler(CommandHandler("rchance", rchance_command, block=False))
+        application.add_handler(CommandHandler("rnormalize", rnormalize_command, block=False))
+        application.add_handler(CommandHandler("rreset", rreset_command, block=False))
+        application.add_handler(CommandHandler("renableall", renableall_command, block=False))
+        application.add_handler(CommandHandler("rdisableall", rdisableall_command, block=False))
+        application.add_handler(CommandHandler("rhelp", rhelp_command, block=False))
+        
+        LOGGER.info("✅ Registered spawn rarity control handlers (command-based)")
     except Exception as e:
         LOGGER.error(f"❌ Failed to register rarity handlers: {e}")
 
