@@ -143,55 +143,8 @@ async def handle_referral(referrer_id: int, new_user_id: int):
         return False
 
 
-async def invite_command(update: Update, context: CallbackContext) -> None:
-    """Show invite information"""
-    user_id = update.effective_user.id
-
-    try:
-        pass_data = await get_or_create_pass_data(user_id)
-
-        referral_count = pass_data.get('referral_count', 0)
-        referral_earnings = pass_data.get('referral_earnings', 0)
-        invite_link = f"https://t.me/{BOT_USERNAME}?start=r_{user_id}"
-
-        caption = f"""ɪɴᴠɪᴛᴇ ᴘʀᴏɢʀᴀᴍ
-
-ʏᴏᴜʀ ʀᴇғᴇʀʀᴀʟs {referral_count}
-ᴇᴀʀɴᴇᴅ {referral_earnings:,} ɢᴏʟᴅ
-
-ʜᴏᴡ ᴛᴏ ɪɴᴠɪᴛᴇ
-ᴄᴏᴘʏ ʟɪɴᴋ ʙᴇʟᴏᴡ
-sʜᴀʀᴇ ᴡɪᴛʜ ғʀɪᴇɴᴅs
-ᴛʜᴇʏ ᴄʟɪᴄᴋ ᴀɴᴅ sᴛᴀʀᴛ ʙᴏᴛ
-ɪɴsᴛᴀɴᴛ ʀᴇᴡᴀʀᴅs
-
-ʏᴏᴜʀ ɪɴᴠɪᴛᴇ ʟɪɴᴋ
-<code>{invite_link}</code>
-
-ʀᴇᴡᴀʀᴅs
-1000 ɢᴏʟᴅ ᴘᴇʀ ʀᴇғᴇʀʀᴀʟ
-ᴄᴏᴜɴᴛs ᴛᴏᴡᴀʀᴅs ᴘᴀss ᴛᴀsᴋs
-ᴜɴʟᴏᴄᴋ ᴍʏᴛʜɪᴄ ᴀᴛ 5 ɪɴᴠɪᴛᴇs
-"""
-
-        keyboard = [[
-            InlineKeyboardButton("sʜᴀʀᴇ ʟɪɴᴋ", url=f"https://t.me/share/url?url={invite_link}")
-        ]]
-
-        await update.message.reply_photo(
-            photo="https://files.catbox.moe/z8fhwx.jpg",
-            caption=caption,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='HTML'
-        )
-
-    except Exception as e:
-        LOGGER.error(f"[PASS INVITE ERROR] {e}")
-        await update.message.reply_text(to_small_caps('error loading invite data'))
-
-
 async def pass_command(update: Update, context: CallbackContext) -> None:
-    """Show pass status"""
+    """Show pass status and help"""
     user_id = update.effective_user.id
 
     try:
@@ -245,16 +198,23 @@ async def pass_command(update: Update, context: CallbackContext) -> None:
 {to_small_caps('weekly')} {PASS_CONFIG[tier]['weekly_reward']:,}
 {to_small_caps('streak bonus')} {PASS_CONFIG[tier]['streak_bonus']:,}
 {to_small_caps('status')} {tier_status}
+
+{to_small_caps('commands')}
+/pclaim - {to_small_caps('claim weekly reward')}
+/sweekly - {to_small_caps('claim streak bonus')}
+/tasks - {to_small_caps('view task progress')}
+/upgrade - {to_small_caps('upgrade pass tier')}
+/invite - {to_small_caps('get referral link')}
 """
 
         keyboard = [
             [
-                InlineKeyboardButton(to_small_caps("claim"), callback_data=f"pass_claim_{user_id}"),
-                InlineKeyboardButton(to_small_caps("tasks"), callback_data=f"pass_tasks_{user_id}")
+                InlineKeyboardButton(to_small_caps("claim"), callback_data=f"pass_claim"),
+                InlineKeyboardButton(to_small_caps("tasks"), callback_data=f"pass_tasks")
             ],
             [
-                InlineKeyboardButton(to_small_caps("upgrade"), callback_data=f"pass_upgrade_{user_id}"),
-                InlineKeyboardButton(to_small_caps("invite"), callback_data=f"pass_invite_{user_id}")
+                InlineKeyboardButton(to_small_caps("upgrade"), callback_data=f"pass_upgrade"),
+                InlineKeyboardButton(to_small_caps("invite"), callback_data=f"pass_invite")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -287,11 +247,7 @@ async def pclaim_command(update: Update, context: CallbackContext) -> None:
                 minutes = (remaining.seconds % 3600) // 60
 
                 msg = f"{to_small_caps('next claim in')}\n{remaining.days}ᴅ {hours}ʜ {minutes}ᴍ"
-
-                if hasattr(update, 'callback_query') and update.callback_query:
-                    await update.callback_query.answer(msg, show_alert=True)
-                else:
-                    await update.message.reply_text(msg)
+                await update.message.reply_text(msg)
                 return
 
         tier = pass_data.get('tier', 'free')
@@ -357,20 +313,11 @@ async def pclaim_command(update: Update, context: CallbackContext) -> None:
                 premium_msg = f"\n{to_small_caps('bonus')} {len(mythic_chars)} {to_small_caps('mythic added')}"
 
         success_text = f"{to_small_caps('claimed')}\n{to_small_caps('reward')} {reward:,}\n{to_small_caps('claims')} {new_claims}/6{premium_msg}"
-
-        if hasattr(update, 'callback_query') and update.callback_query:
-            await update.callback_query.answer(to_small_caps("claimed"), show_alert=False)
-            await update.callback_query.message.reply_text(success_text)
-        else:
-            await update.message.reply_text(success_text)
+        await update.message.reply_text(success_text)
 
     except Exception as e:
         LOGGER.error(f"[PASS CLAIM ERROR] {e}")
-        error_msg = to_small_caps('error processing claim')
-        if hasattr(update, 'callback_query') and update.callback_query:
-            await update.callback_query.answer(error_msg, show_alert=True)
-        else:
-            await update.message.reply_text(error_msg)
+        await update.message.reply_text(to_small_caps('error processing claim'))
 
 
 async def sweekly_command(update: Update, context: CallbackContext) -> None:
@@ -475,39 +422,19 @@ async def tasks_command(update: Update, context: CallbackContext) -> None:
 """
 
         keyboard = [[
-            InlineKeyboardButton(to_small_caps("refresh"), callback_data=f"pass_tasks_{user_id}"),
-            InlineKeyboardButton(to_small_caps("back"), callback_data=f"pass_back_{user_id}")
+            InlineKeyboardButton(to_small_caps("refresh"), callback_data=f"pass_tasks"),
+            InlineKeyboardButton(to_small_caps("back"), callback_data=f"pass_back")
         ]]
 
-        if hasattr(update, 'callback_query') and update.callback_query:
-            try:
-                media = InputMediaPhoto(
-                    media="https://files.catbox.moe/z8fhwx.jpg",
-                    caption=caption
-                )
-                await update.callback_query.edit_message_media(
-                    media=media,
-                    reply_markup=InlineKeyboardMarkup(keyboard)
-                )
-            except:
-                await update.callback_query.edit_message_caption(
-                    caption=caption,
-                    reply_markup=InlineKeyboardMarkup(keyboard)
-                )
-        else:
-            await update.message.reply_photo(
-                photo="https://files.catbox.moe/z8fhwx.jpg",
-                caption=caption,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+        await update.message.reply_photo(
+            photo="https://files.catbox.moe/z8fhwx.jpg",
+            caption=caption,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
     except Exception as e:
         LOGGER.error(f"[PASS TASKS ERROR] {e}")
-        error_msg = to_small_caps('error loading tasks')
-        if hasattr(update, 'callback_query') and update.callback_query:
-            await update.callback_query.answer(error_msg, show_alert=True)
-        else:
-            await update.message.reply_text(error_msg)
+        await update.message.reply_text(to_small_caps('error loading tasks'))
 
 
 async def upgrade_command(update: Update, context: CallbackContext) -> None:
@@ -548,35 +475,67 @@ async def upgrade_command(update: Update, context: CallbackContext) -> None:
 """
 
         keyboard = [
-            [InlineKeyboardButton(to_small_caps("buy premium"), callback_data=f"pass_buy_premium_{user_id}")],
-            [InlineKeyboardButton(to_small_caps("buy elite"), callback_data=f"pass_buy_elite_{user_id}")],
-            [InlineKeyboardButton(to_small_caps("back"), callback_data=f"pass_back_{user_id}")]
+            [InlineKeyboardButton(to_small_caps("buy premium"), callback_data=f"pass_buy_premium")],
+            [InlineKeyboardButton(to_small_caps("buy elite"), callback_data=f"pass_buy_elite")],
+            [InlineKeyboardButton(to_small_caps("back"), callback_data=f"pass_back")]
         ]
 
-        if hasattr(update, 'callback_query') and update.callback_query:
-            try:
-                media = InputMediaPhoto(
-                    media="https://files.catbox.moe/z8fhwx.jpg",
-                    caption=caption
-                )
-                await update.callback_query.edit_message_media(
-                    media=media,
-                    reply_markup=InlineKeyboardMarkup(keyboard)
-                )
-            except:
-                await update.callback_query.edit_message_caption(
-                    caption=caption,
-                    reply_markup=InlineKeyboardMarkup(keyboard)
-                )
-        else:
-            await update.message.reply_photo(
-                photo="https://files.catbox.moe/z8fhwx.jpg",
-                caption=caption,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+        await update.message.reply_photo(
+            photo="https://files.catbox.moe/z8fhwx.jpg",
+            caption=caption,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
     except Exception as e:
         LOGGER.error(f"[PASS UPGRADE ERROR] {e}")
+        await update.message.reply_text(to_small_caps('error loading upgrade'))
+
+
+async def invite_command(update: Update, context: CallbackContext) -> None:
+    """Show invite information"""
+    user_id = update.effective_user.id
+
+    try:
+        pass_data = await get_or_create_pass_data(user_id)
+
+        referral_count = pass_data.get('referral_count', 0)
+        referral_earnings = pass_data.get('referral_earnings', 0)
+        invite_link = f"https://t.me/{BOT_USERNAME}?start=r_{user_id}"
+
+        caption = f"""ɪɴᴠɪᴛᴇ ᴘʀᴏɢʀᴀᴍ
+
+ʏᴏᴜʀ ʀᴇғᴇʀʀᴀʟs {referral_count}
+ᴇᴀʀɴᴇᴅ {referral_earnings:,} ɢᴏʟᴅ
+
+ʜᴏᴡ ᴛᴏ ɪɴᴠɪᴛᴇ
+ᴄᴏᴘʏ ʟɪɴᴋ ʙᴇʟᴏᴡ
+sʜᴀʀᴇ ᴡɪᴛʜ ғʀɪᴇɴᴅs
+ᴛʜᴇʏ ᴄʟɪᴄᴋ ᴀɴᴅ sᴛᴀʀᴛ ʙᴏᴛ
+ɪɴsᴛᴀɴᴛ ʀᴇᴡᴀʀᴅs
+
+ʏᴏᴜʀ ɪɴᴠɪᴛᴇ ʟɪɴᴋ
+<code>{invite_link}</code>
+
+ʀᴇᴡᴀʀᴅs
+1000 ɢᴏʟᴅ ᴘᴇʀ ʀᴇғᴇʀʀᴀʟ
+ᴄᴏᴜɴᴛs ᴛᴏᴡᴀʀᴅs ᴘᴀss ᴛᴀsᴋs
+ᴜɴʟᴏᴄᴋ ᴍʏᴛʜɪᴄ ᴀᴛ 5 ɪɴᴠɪᴛᴇs
+"""
+
+        keyboard = [[
+            InlineKeyboardButton("sʜᴀʀᴇ ʟɪɴᴋ", url=f"https://t.me/share/url?url={invite_link}")
+        ]]
+
+        await update.message.reply_photo(
+            photo="https://files.catbox.moe/z8fhwx.jpg",
+            caption=caption,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='HTML'
+        )
+
+    except Exception as e:
+        LOGGER.error(f"[PASS INVITE ERROR] {e}")
+        await update.message.reply_text(to_small_caps('error loading invite data'))
 
 
 async def approve_elite_command(update: Update, context: CallbackContext) -> None:
@@ -592,7 +551,7 @@ async def approve_elite_command(update: Update, context: CallbackContext) -> Non
 
         target_user_id = int(context.args[0])
         target_user = await user_collection.find_one({'id': target_user_id})
-        
+
         if not target_user:
             await update.message.reply_text(to_small_caps('user not found'))
             return
@@ -647,42 +606,163 @@ async def approve_elite_command(update: Update, context: CallbackContext) -> Non
 async def pass_callback(update: Update, context: CallbackContext) -> None:
     """Handle pass callbacks"""
     query = update.callback_query
+    await query.answer()
 
     try:
         data = query.data
-        if not data.startswith('pass_'):
-            return
+        user_id = query.from_user.id
 
-        parts = data.split('_')
-        action = parts[1]
+        if data == "pass_claim":
+            pass_data = await get_or_create_pass_data(user_id)
+            last_claim = pass_data.get('last_weekly_claim')
+            
+            if last_claim and isinstance(last_claim, datetime):
+                time_since = datetime.utcnow() - last_claim
+                if time_since < timedelta(days=7):
+                    remaining = timedelta(days=7) - time_since
+                    hours = remaining.seconds // 3600
+                    minutes = (remaining.seconds % 3600) // 60
+                    await query.answer(f"{to_small_caps('next claim in')} {remaining.days}ᴅ {hours}ʜ {minutes}ᴍ", show_alert=True)
+                    return
+            
+            tier = pass_data.get('tier', 'free')
+            reward = PASS_CONFIG[tier]['weekly_reward']
+            mythic_chars_count = PASS_CONFIG[tier]['mythic_characters']
+            
+            new_claims = pass_data.get('weekly_claims', 0) + 1
+            await user_collection.update_one(
+                {'id': user_id},
+                {
+                    '$set': {
+                        'pass_data.last_weekly_claim': datetime.utcnow(),
+                        'pass_data.weekly_claims': new_claims,
+                        'pass_data.tasks.weekly_claims': new_claims
+                    },
+                    '$inc': {'balance': reward}
+                }
+            )
+            
+            premium_msg = ""
+            if mythic_chars_count > 0:
+                mythic_chars = await collection.find({'rarity': '🏵 Mythic'}).limit(mythic_chars_count).to_list(length=mythic_chars_count)
+                if mythic_chars:
+                    await user_collection.update_one(
+                        {'id': user_id},
+                        {'$push': {'characters': {'$each': mythic_chars}}}
+                    )
+                    await user_totals_collection.update_one(
+                        {'id': user_id},
+                        {'$inc': {'count': len(mythic_chars)}},
+                        upsert=True
+                    )
+                    premium_msg = f"\n{to_small_caps('bonus')} {len(mythic_chars)} {to_small_caps('mythic added')}"
+            
+            await query.answer(to_small_caps("claimed successfully"), show_alert=False)
+            await query.message.reply_text(f"{to_small_caps('claimed')}\n{to_small_caps('reward')} {reward:,}\n{to_small_caps('claims')} {new_claims}/6{premium_msg}")
 
-        if len(parts) >= 3:
+        elif data == "pass_tasks":
+            pass_data = await get_or_create_pass_data(user_id)
+            tasks = pass_data.get('tasks', {})
+            mythic_unlocked = pass_data.get('mythic_unlocked', False)
+
+            task_list = []
+            all_completed = True
+            for task_key, task_info in MYTHIC_TASKS.items():
+                current = tasks.get(task_key, 0)
+                required = task_info['required']
+                display = task_info['display']
+
+                if current >= required:
+                    status = "✅"
+                else:
+                    status = "⏳"
+                    all_completed = False
+
+                task_list.append(f"{status} {display} {current}/{required}")
+
+            if all_completed and not mythic_unlocked:
+                mythic_char = await collection.find_one({'rarity': '🏵 Mythic'})
+                if mythic_char:
+                    await user_collection.update_one(
+                        {'id': user_id},
+                        {
+                            '$push': {'characters': mythic_char},
+                            '$set': {'pass_data.mythic_unlocked': True}
+                        }
+                    )
+                    await user_totals_collection.update_one(
+                        {'id': user_id},
+                        {'$inc': {'count': 1}},
+                        upsert=True
+                    )
+                    mythic_unlocked = True
+
+            mythic_status = '✅' if mythic_unlocked else '🔒'
+
+            caption = f"""{to_small_caps('mythic tasks')}
+
+{chr(10).join(task_list)}
+
+{to_small_caps('mythic unlock')} {mythic_status}
+"""
+
+            keyboard = [[
+                InlineKeyboardButton(to_small_caps("refresh"), callback_data="pass_tasks"),
+                InlineKeyboardButton(to_small_caps("back"), callback_data="pass_back")
+            ]]
+
             try:
-                user_id = int(parts[-1])
+                media = InputMediaPhoto(media="https://files.catbox.moe/z8fhwx.jpg", caption=caption)
+                await query.edit_message_media(media=media, reply_markup=InlineKeyboardMarkup(keyboard))
             except:
-                user_id = query.from_user.id
-        else:
-            user_id = query.from_user.id
+                await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard))
 
-        if query.from_user.id != user_id:
-            await query.answer(to_small_caps("not your request"), show_alert=True)
-            return
+        elif data == "pass_upgrade":
+            pass_data = await get_or_create_pass_data(user_id)
+            user = await user_collection.find_one({'id': user_id})
+            balance = user.get('balance', 0)
+            tier = pass_data.get('tier', 'free')
 
-        await query.answer()
+            caption = f"""{to_small_caps('upgrade pass')}
 
-        if action == 'claim':
-            update.callback_query = query
-            await pclaim_command(update, context)
+{to_small_caps('balance')} {balance:,}
+{to_small_caps('current')} {PASS_CONFIG[tier]['name']}
 
-        elif action == 'tasks':
-            update.callback_query = query
-            await tasks_command(update, context)
+💎 {to_small_caps('premium pass')}
+{to_small_caps('cost')} 50000 {to_small_caps('gold')}
+{to_small_caps('duration')} 30 {to_small_caps('days')}
 
-        elif action == 'upgrade':
-            update.callback_query = query
-            await upgrade_command(update, context)
+{to_small_caps('benefits')}
+{to_small_caps('weekly')} 5000
+{to_small_caps('streak')} 25000
+{to_small_caps('mythic')} 3 {to_small_caps('per claim')}
 
-        elif action == 'invite':
+⭐ {to_small_caps('elite pass')}
+{to_small_caps('cost')} 10 {to_small_caps('inr')}
+{to_small_caps('upi')} {PASS_CONFIG['elite']['upi_id']}
+{to_small_caps('duration')} 30 {to_small_caps('days')}
+
+{to_small_caps('benefits')}
+{to_small_caps('instant')} 100000000 {to_small_caps('gold')}
+{to_small_caps('instant')} 10 {to_small_caps('mythic')}
+{to_small_caps('weekly')} 15000
+{to_small_caps('streak')} 100000
+{to_small_caps('mythic')} 10 {to_small_caps('per claim')}
+"""
+
+            keyboard = [
+                [InlineKeyboardButton(to_small_caps("buy premium"), callback_data="pass_buy_premium")],
+                [InlineKeyboardButton(to_small_caps("buy elite"), callback_data="pass_buy_elite")],
+                [InlineKeyboardButton(to_small_caps("back"), callback_data="pass_back")]
+            ]
+
+            try:
+                media = InputMediaPhoto(media="https://files.catbox.moe/z8fhwx.jpg", caption=caption)
+                await query.edit_message_media(media=media, reply_markup=InlineKeyboardMarkup(keyboard))
+            except:
+                await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard))
+
+        elif data == "pass_invite":
             pass_data = await get_or_create_pass_data(user_id)
             referral_count = pass_data.get('referral_count', 0)
             referral_earnings = pass_data.get('referral_earnings', 0)
@@ -708,27 +788,169 @@ sʜᴀʀᴇ ᴡɪᴛʜ ғʀɪᴇɴᴅs
 
             keyboard = [
                 [InlineKeyboardButton("sʜᴀʀᴇ ʟɪɴᴋ", url=f"https://t.me/share/url?url={invite_link}")],
-                [InlineKeyboardButton(to_small_caps("back"), callback_data=f"pass_back_{user_id}")]
+                [InlineKeyboardButton(to_small_caps("back"), callback_data="pass_back")]
             ]
 
             try:
-                media = InputMediaPhoto(
-                    media="https://files.catbox.moe/z8fhwx.jpg",
-                    caption=caption,
-                    parse_mode='HTML'
-                )
-                await query.edit_message_media(
-                    media=media,
-                    reply_markup=InlineKeyboardMarkup(keyboard)
-                )
+                media = InputMediaPhoto(media="https://files.catbox.moe/z8fhwx.jpg", caption=caption, parse_mode='HTML')
+                await query.edit_message_media(media=media, reply_markup=InlineKeyboardMarkup(keyboard))
             except:
-                await query.edit_message_caption(
-                    caption=caption,
-                    reply_markup=InlineKeyboardMarkup(keyboard),
-                    parse_mode='HTML'
-                )
+                await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
-        elif action == 'back':
+        elif data == "pass_buy_premium":
+            user = await user_collection.find_one({'id': user_id})
+            cost = PASS_CONFIG['premium']['cost']
+            balance = user.get('balance', 0)
+
+            if balance < cost:
+                await query.answer(f"{to_small_caps('need')} {cost - balance:,} {to_small_caps('more gold')}", show_alert=True)
+                return
+
+            caption = f"""{to_small_caps('confirm premium')}
+
+{to_small_caps('cost')} {cost:,}
+{to_small_caps('balance')} {balance:,}
+
+{to_small_caps('benefits')}
+{to_small_caps('weekly')} 5000
+{to_small_caps('streak')} 25000
+{to_small_caps('mythic')} 3 {to_small_caps('per claim')}
+"""
+
+            keyboard = [
+                [
+                    InlineKeyboardButton(to_small_caps("confirm"), callback_data="pass_confirm_premium"),
+                    InlineKeyboardButton(to_small_caps("cancel"), callback_data="pass_upgrade")
+                ]
+            ]
+
+            try:
+                media = InputMediaPhoto(media="https://files.catbox.moe/z8fhwx.jpg", caption=caption)
+                await query.edit_message_media(media=media, reply_markup=InlineKeyboardMarkup(keyboard))
+            except:
+                await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard))
+
+        elif data == "pass_buy_elite":
+            upi_id = PASS_CONFIG['elite']['upi_id']
+            cost_inr = PASS_CONFIG['elite']['cost_inr']
+
+            caption = f"""{to_small_caps('elite payment')}
+
+{to_small_caps('amount')} {cost_inr} {to_small_caps('inr')}
+{to_small_caps('upi')} <code>{upi_id}</code>
+
+{to_small_caps('steps')}
+1 {to_small_caps('pay to upi above')}
+2 {to_small_caps('screenshot payment')}
+3 {to_small_caps('click submit')}
+4 {to_small_caps('wait for approval')}
+
+{to_small_caps('instant rewards')}
+{to_small_caps('gold')} 100000000
+{to_small_caps('mythic')} 10 {to_small_caps('characters')}
+"""
+
+            keyboard = [
+                [InlineKeyboardButton(to_small_caps("submit payment"), callback_data="pass_submit_elite")],
+                [InlineKeyboardButton(to_small_caps("cancel"), callback_data="pass_upgrade")]
+            ]
+
+            try:
+                media = InputMediaPhoto(media="https://files.catbox.moe/z8fhwx.jpg", caption=caption, parse_mode='HTML')
+                await query.edit_message_media(media=media, reply_markup=InlineKeyboardMarkup(keyboard))
+            except:
+                await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+
+        elif data == "pass_confirm_premium":
+            user = await user_collection.find_one({'id': user_id})
+            cost = PASS_CONFIG['premium']['cost']
+            balance = user.get('balance', 0)
+
+            if balance < cost:
+                await query.answer(to_small_caps("insufficient balance"), show_alert=True)
+                return
+
+            expires = datetime.utcnow() + timedelta(days=30)
+
+            await user_collection.update_one(
+                {'id': user_id},
+                {
+                    '$inc': {'balance': -cost},
+                    '$set': {
+                        'pass_data.tier': 'premium',
+                        'pass_data.premium_expires': expires
+                    }
+                }
+            )
+
+            caption = f"""✅ {to_small_caps('premium active')}
+
+{to_small_caps('activated successfully')}
+{to_small_caps('expires')} {expires.strftime('%Y-%m-%d')}
+
+{to_small_caps('benefits')}
+{to_small_caps('weekly')} 5000
+{to_small_caps('streak')} 25000
+{to_small_caps('mythic')} 3 {to_small_caps('per claim')}
+"""
+
+            keyboard = [[InlineKeyboardButton(to_small_caps("back"), callback_data="pass_back")]]
+
+            try:
+                media = InputMediaPhoto(media="https://files.catbox.moe/z8fhwx.jpg", caption=caption)
+                await query.edit_message_media(media=media, reply_markup=InlineKeyboardMarkup(keyboard))
+            except:
+                await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard))
+
+            await query.answer(to_small_caps("premium activated"), show_alert=False)
+            LOGGER.info(f"[PASS] User {user_id} upgraded to premium")
+
+        elif data == "pass_submit_elite":
+            await user_collection.update_one(
+                {'id': user_id},
+                {'$set': {'pass_data.pending_elite_payment': datetime.utcnow()}}
+            )
+
+            try:
+                await context.bot.send_message(
+                    chat_id=OWNER_ID,
+                    text=f"""⭐ {to_small_caps('new elite payment')}
+
+{to_small_caps('user')} {user_id}
+{to_small_caps('username')} @{query.from_user.username or 'none'}
+{to_small_caps('name')} {query.from_user.first_name}
+{to_small_caps('amount')} 10 {to_small_caps('inr')}
+
+{to_small_caps('to approve')}
+/approveelite {user_id}"""
+                )
+            except Exception as e:
+                LOGGER.error(f"[PASS] Could not notify owner: {e}")
+
+            caption = f"""📤 {to_small_caps('payment submitted')}
+
+✅ {to_small_caps('request received')}
+
+{to_small_caps('owner will verify')}
+{to_small_caps('activation within 24h')}
+
+{to_small_caps('rewards')}
+{to_small_caps('gold')} 100000000
+{to_small_caps('mythic')} 10
+"""
+
+            keyboard = [[InlineKeyboardButton(to_small_caps("back"), callback_data="pass_back")]]
+
+            try:
+                media = InputMediaPhoto(media="https://files.catbox.moe/z8fhwx.jpg", caption=caption)
+                await query.edit_message_media(media=media, reply_markup=InlineKeyboardMarkup(keyboard))
+            except:
+                await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard))
+
+            await query.answer(to_small_caps("payment submitted"), show_alert=False)
+            LOGGER.info(f"[PASS] User {user_id} submitted elite payment")
+
+        elif data == "pass_back":
             pass_data = await get_or_create_pass_data(user_id)
             user = await user_collection.find_one({'id': user_id})
 
@@ -775,259 +997,48 @@ sʜᴀʀᴇ ᴡɪᴛʜ ғʀɪᴇɴᴅs
 {to_small_caps('weekly')} {PASS_CONFIG[tier]['weekly_reward']:,}
 {to_small_caps('streak bonus')} {PASS_CONFIG[tier]['streak_bonus']:,}
 {to_small_caps('status')} {tier_status}
+
+{to_small_caps('commands')}
+/pclaim - {to_small_caps('claim weekly reward')}
+/sweekly - {to_small_caps('claim streak bonus')}
+/tasks - {to_small_caps('view task progress')}
+/upgrade - {to_small_caps('upgrade pass tier')}
+/invite - {to_small_caps('get referral link')}
 """
 
             keyboard = [
                 [
-                    InlineKeyboardButton(to_small_caps("claim"), callback_data=f"pass_claim_{user_id}"),
-                    InlineKeyboardButton(to_small_caps("tasks"), callback_data=f"pass_tasks_{user_id}")
+                    InlineKeyboardButton(to_small_caps("claim"), callback_data="pass_claim"),
+                    InlineKeyboardButton(to_small_caps("tasks"), callback_data="pass_tasks")
                 ],
                 [
-                    InlineKeyboardButton(to_small_caps("upgrade"), callback_data=f"pass_upgrade_{user_id}"),
-                    InlineKeyboardButton(to_small_caps("invite"), callback_data=f"pass_invite_{user_id}")
+                    InlineKeyboardButton(to_small_caps("upgrade"), callback_data="pass_upgrade"),
+                    InlineKeyboardButton(to_small_caps("invite"), callback_data="pass_invite")
                 ]
             ]
 
             try:
-                media = InputMediaPhoto(
-                    media="https://files.catbox.moe/z8fhwx.jpg",
-                    caption=caption,
-                    parse_mode='HTML'
-                )
-                await query.edit_message_media(
-                    media=media,
-                    reply_markup=InlineKeyboardMarkup(keyboard)
-                )
+                media = InputMediaPhoto(media="https://files.catbox.moe/z8fhwx.jpg", caption=caption, parse_mode='HTML')
+                await query.edit_message_media(media=media, reply_markup=InlineKeyboardMarkup(keyboard))
             except:
-                await query.edit_message_caption(
-                    caption=caption,
-                    reply_markup=InlineKeyboardMarkup(keyboard),
-                    parse_mode='HTML'
-                )
-
-        elif action == 'buy' and len(parts) >= 3:
-            tier_type = parts[2]
-
-            if tier_type == 'premium':
-                user = await user_collection.find_one({'id': user_id})
-                cost = PASS_CONFIG['premium']['cost']
-                balance = user.get('balance', 0)
-
-                if balance < cost:
-                    await query.answer(
-                        f"{to_small_caps('need')} {cost - balance:,} {to_small_caps('more gold')}",
-                        show_alert=True
-                    )
-                    return
-
-                caption = f"""{to_small_caps('confirm premium')}
-
-{to_small_caps('cost')} {cost:,}
-{to_small_caps('balance')} {balance:,}
-
-{to_small_caps('benefits')}
-{to_small_caps('weekly')} 5000
-{to_small_caps('streak')} 25000
-{to_small_caps('mythic')} 3 {to_small_caps('per claim')}
-"""
-
-                keyboard = [
-                    [
-                        InlineKeyboardButton(to_small_caps("confirm"), callback_data=f"pass_confirm_premium_{user_id}"),
-                        InlineKeyboardButton(to_small_caps("cancel"), callback_data=f"pass_upgrade_{user_id}")
-                    ]
-                ]
-
-                try:
-                    media = InputMediaPhoto(
-                        media="https://files.catbox.moe/z8fhwx.jpg",
-                        caption=caption
-                    )
-                    await query.edit_message_media(
-                        media=media,
-                        reply_markup=InlineKeyboardMarkup(keyboard)
-                    )
-                except:
-                    await query.edit_message_caption(
-                        caption=caption,
-                        reply_markup=InlineKeyboardMarkup(keyboard)
-                    )
-
-            elif tier_type == 'elite':
-                upi_id = PASS_CONFIG['elite']['upi_id']
-                cost_inr = PASS_CONFIG['elite']['cost_inr']
-
-                caption = f"""{to_small_caps('elite payment')}
-
-{to_small_caps('amount')} {cost_inr} {to_small_caps('inr')}
-{to_small_caps('upi')} <code>{upi_id}</code>
-
-{to_small_caps('steps')}
-1 {to_small_caps('pay to upi above')}
-2 {to_small_caps('screenshot payment')}
-3 {to_small_caps('click submit')}
-4 {to_small_caps('wait for approval')}
-
-{to_small_caps('instant rewards')}
-{to_small_caps('gold')} 100000000
-{to_small_caps('mythic')} 10 {to_small_caps('characters')}
-"""
-
-                keyboard = [
-                    [InlineKeyboardButton(to_small_caps("submit payment"), callback_data=f"pass_submit_elite_{user_id}")],
-                    [InlineKeyboardButton(to_small_caps("cancel"), callback_data=f"pass_upgrade_{user_id}")]
-                ]
-
-                try:
-                    media = InputMediaPhoto(
-                        media="https://files.catbox.moe/z8fhwx.jpg",
-                        caption=caption,
-                        parse_mode='HTML'
-                    )
-                    await query.edit_message_media(
-                        media=media,
-                        reply_markup=InlineKeyboardMarkup(keyboard)
-                    )
-                except:
-                    await query.edit_message_caption(
-                        caption=caption,
-                        reply_markup=InlineKeyboardMarkup(keyboard),
-                        parse_mode='HTML'
-                    )
-
-        elif action == 'confirm' and len(parts) >= 3:
-            if parts[2] == 'premium':
-                user = await user_collection.find_one({'id': user_id})
-                cost = PASS_CONFIG['premium']['cost']
-                balance = user.get('balance', 0)
-
-                if balance < cost:
-                    await query.answer(to_small_caps("insufficient balance"), show_alert=True)
-                    return
-
-                expires = datetime.utcnow() + timedelta(days=30)
-
-                await user_collection.update_one(
-                    {'id': user_id},
-                    {
-                        '$inc': {'balance': -cost},
-                        '$set': {
-                            'pass_data.tier': 'premium',
-                            'pass_data.premium_expires': expires
-                        }
-                    }
-                )
-
-                caption = f"""✅ {to_small_caps('premium active')}
-
-{to_small_caps('activated successfully')}
-{to_small_caps('expires')} {expires.strftime('%Y-%m-%d')}
-
-{to_small_caps('benefits')}
-{to_small_caps('weekly')} 5000
-{to_small_caps('streak')} 25000
-{to_small_caps('mythic')} 3 {to_small_caps('per claim')}
-"""
-
-                keyboard = [[
-                    InlineKeyboardButton(to_small_caps("back"), callback_data=f"pass_back_{user_id}")
-                ]]
-
-                try:
-                    media = InputMediaPhoto(
-                        media="https://files.catbox.moe/z8fhwx.jpg",
-                        caption=caption
-                    )
-                    await query.edit_message_media(
-                        media=media,
-                        reply_markup=InlineKeyboardMarkup(keyboard)
-                    )
-                except:
-                    await query.edit_message_caption(
-                        caption=caption,
-                        reply_markup=InlineKeyboardMarkup(keyboard)
-                    )
-
-                await query.answer(to_small_caps("premium activated"), show_alert=False)
-                LOGGER.info(f"[PASS] User {user_id} upgraded to premium")
-
-        elif action == 'submit' and len(parts) >= 3:
-            if parts[2] == 'elite':
-                await user_collection.update_one(
-                    {'id': user_id},
-                    {'$set': {'pass_data.pending_elite_payment': datetime.utcnow()}}
-                )
-
-                try:
-                    await context.bot.send_message(
-                        chat_id=OWNER_ID,
-                        text=f"""⭐ {to_small_caps('new elite payment')}
-
-{to_small_caps('user')} {user_id}
-{to_small_caps('username')} @{query.from_user.username or 'none'}
-{to_small_caps('name')} {query.from_user.first_name}
-{to_small_caps('amount')} 10 {to_small_caps('inr')}
-
-{to_small_caps('to approve')}
-/approveelite {user_id}"""
-                    )
-                except Exception as e:
-                    LOGGER.error(f"[PASS] Could not notify owner: {e}")
-
-                caption = f"""📤 {to_small_caps('payment submitted')}
-
-✅ {to_small_caps('request received')}
-
-{to_small_caps('owner will verify')}
-{to_small_caps('activation within 24h')}
-
-{to_small_caps('rewards')}
-{to_small_caps('gold')} 100000000
-{to_small_caps('mythic')} 10
-"""
-
-                keyboard = [[
-                    InlineKeyboardButton(to_small_caps("back"), callback_data=f"pass_back_{user_id}")
-                ]]
-
-                try:
-                    media = InputMediaPhoto(
-                        media="https://files.catbox.moe/z8fhwx.jpg",
-                        caption=caption
-                    )
-                    await query.edit_message_media(
-                        media=media,
-                        reply_markup=InlineKeyboardMarkup(keyboard)
-                    )
-                except:
-                    await query.edit_message_caption(
-                        caption=caption,
-                        reply_markup=InlineKeyboardMarkup(keyboard)
-                    )
-
-                await query.answer(to_small_caps("payment submitted"), show_alert=False)
-                LOGGER.info(f"[PASS] User {user_id} submitted elite payment")
+                await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
     except Exception as e:
         LOGGER.error(f"[PASS CALLBACK ERROR] {e}")
-        try:
-            await query.answer(to_small_caps('error'), show_alert=True)
-        except:
-            pass
+        await query.answer(to_small_caps('error'), show_alert=True)
 
 
-def register_pass_handlers():
-    """Register all pass handlers"""
-    application.add_handler(CommandHandler("pass", pass_command, block=False))
-    application.add_handler(CommandHandler("pclaim", pclaim_command, block=False))
-    application.add_handler(CommandHandler("sweekly", sweekly_command, block=False))
-    application.add_handler(CommandHandler("tasks", tasks_command, block=False))
-    application.add_handler(CommandHandler("upgrade", upgrade_command, block=False))
-    application.add_handler(CommandHandler("invite", invite_command, block=False))
-    application.add_handler(CommandHandler("approveelite", approve_elite_command, block=False))
-    application.add_handler(CallbackQueryHandler(pass_callback, pattern=r"^pass_", block=False))
-    LOGGER.info("✅ Registered: pass handlers")
+# Register handlers
+application.add_handler(CommandHandler("pass", pass_command, block=False))
+application.add_handler(CommandHandler("pclaim", pclaim_command, block=False))
+application.add_handler(CommandHandler("sweekly", sweekly_command, block=False))
+application.add_handler(CommandHandler("tasks", tasks_command, block=False))
+application.add_handler(CommandHandler("upgrade", upgrade_command, block=False))
+application.add_handler(CommandHandler("invite", invite_command, block=False))
+application.add_handler(CommandHandler("approveelite", approve_elite_command, block=False))
+application.add_handler(CallbackQueryHandler(pass_callback, pattern=r"^pass_", block=False))
 
+LOGGER.info("✅ Pass system handlers registered")
 
 # Export functions
-__all__ = ['register_pass_handlers', 'handle_grab_task', 'handle_referral']
+__all__ = ['handle_grab_task', 'handle_referral']
