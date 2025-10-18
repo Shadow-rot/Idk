@@ -513,7 +513,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
 
 # ==================== HANDLER REGISTRATION ====================
 def register_all_handlers():
-    """Register all bot handlers"""
+    """Register all bot handlers automatically"""
     LOGGER.info("="*50)
     LOGGER.info("REGISTERING HANDLERS")
     LOGGER.info("="*50)
@@ -523,71 +523,23 @@ def register_all_handlers():
         application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
         LOGGER.info("✅ Registered: /grab, /g commands")
 
-        # Register rarity module handlers FIRST
-        try:
-            from shivu.modules.rarity import register_rarity_handlers
-            register_rarity_handlers()
-            LOGGER.info("✅ Registered: rarity handlers")
-        except (ImportError, AttributeError) as e:
-            LOGGER.warning(f"⚠️ Rarity module not found or no registration function: {e}")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register rarity handlers: {e}")
-            LOGGER.error(traceback.format_exc())
-
-        # Register pass system handlers
-        try:
-            from shivu.modules.pass_system import (
-                pass_command, pclaim_command, sweekly_command, tasks_command,
-                upgrade_command, invite_command, passhelp_command, addinvite_command,
-                addgrab_command, approve_elite_command, pass_callback
-            )
-
-            application.add_handler(CommandHandler("pass", pass_command, block=False))
-            application.add_handler(CommandHandler("pclaim", pclaim_command, block=False))
-            application.add_handler(CommandHandler("sweekly", sweekly_command, block=False))
-            application.add_handler(CommandHandler("tasks", tasks_command, block=False))
-            application.add_handler(CommandHandler("upgrade", upgrade_command, block=False))
-            application.add_handler(CommandHandler("invite", invite_command, block=False))
-            application.add_handler(CommandHandler("passhelp", passhelp_command, block=False))
-            application.add_handler(CommandHandler("addinvite", addinvite_command, block=False))
-            application.add_handler(CommandHandler("addgrab", addgrab_command, block=False))
-            application.add_handler(CommandHandler("approveelite", approve_elite_command, block=False))
-            application.add_handler(CallbackQueryHandler(pass_callback, pattern=r"^pass_", block=False))
-
-            LOGGER.info("✅ Registered: pass system handlers")
-        except ImportError:
-            LOGGER.warning("⚠️ Pass system module not found, skipping")
-        except Exception as e:
-            LOGGER.error(f"❌ Failed to register pass system handlers: {e}")
-            LOGGER.error(traceback.format_exc())
-
-        # Register other module handlers
-        module_configs = [
-            ('remove', 'register_remove_handlers'),
-            ('ckill', 'register_ckill_handler'),
-            ('kill', 'register_kill_handler'),
-            ('hclaim', 'register_hclaim_handler'),
-            ('favorite', 'register_favorite_handlers'),
-            ('gift', 'register_gift_handlers'),
-            ('trade', 'register_trade_handlers'),
-            ('upload', 'register_upload_handlers'),
-            ('leaderboard', 'register_leaderboard_handlers'),
-            ('collection', 'register_collection_handlers'),
-            ('change', 'register_change_handlers'),
-            ('sudo', 'register_sudo_handlers'),
-        ]
-
-        for module_name, register_func_name in module_configs:
+        # Auto-register all modules from shivu.modules
+        for module_name in ALL_MODULES:
             try:
                 module = importlib.import_module(f"shivu.modules.{module_name}")
-                if hasattr(module, register_func_name):
-                    register_func = getattr(module, register_func_name)
-                    register_func()
-                    LOGGER.info(f"✅ Registered: {module_name} handlers")
+                
+                # Try common registration function names
+                for func_name in ['register_handlers', f'register_{module_name}_handlers', f'register_{module_name}_handler']:
+                    if hasattr(module, func_name):
+                        register_func = getattr(module, func_name)
+                        register_func()
+                        LOGGER.info(f"✅ Registered: {module_name} handlers via {func_name}()")
+                        break
                 else:
-                    LOGGER.warning(f"⚠️ {module_name} module found but no {register_func_name} function")
+                    LOGGER.debug(f"ℹ️ {module_name} has no registration function (imported only)")
+                    
             except ImportError:
-                LOGGER.warning(f"⚠️ {module_name.capitalize()} module not found, skipping")
+                LOGGER.warning(f"⚠️ {module_name} module not found, skipping")
             except Exception as e:
                 LOGGER.error(f"❌ Failed to register {module_name} handlers: {e}")
                 LOGGER.error(traceback.format_exc())
