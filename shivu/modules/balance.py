@@ -93,7 +93,7 @@ async def pay(update, context):
     if amount <= 0:
         await update.message.reply_text("ᴀᴍᴏᴜɴᴛ ᴍᴜꜱᴛ ʙᴇ ᴘᴏꜱɪᴛɪᴠᴇ.")
         return
-    elif amount > 1_000_000:
+    elif amount > 1_000_0000:
         await update.message.reply_text("ʏᴏᴜ ᴄᴀɴ ᴏɴʟʏ ᴘᴀʏ ᴜᴘ ᴛᴏ `1,000,000` ɢᴏʟᴅ ᴄᴏɪɴꜱ.", parse_mode="Markdown")
         return
 
