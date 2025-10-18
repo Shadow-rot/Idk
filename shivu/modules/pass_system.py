@@ -29,8 +29,8 @@ PASS_CONFIG = {
         'name': 'ᴇʟɪᴛᴇ ᴘᴀss',
         'weekly_reward': 15000,
         'streak_bonus': 100000,
-        'mythic_characters': 10,
-        'cost_inr': 10,
+        'mythic_characters': 5,
+        'cost_inr': 50,
         'upi_id': 'looktouhid@oksbi',
         'activation_bonus': 100000000,
         'grab_multiplier': 2.0
@@ -563,10 +563,10 @@ async def upgrade_command(update: Update, context: CallbackContext) -> None:
 
 <b>{to_small_caps('benefits')}:</b>
 {to_small_caps('activation bonus')}: 100,000,000 {to_small_caps('gold')}
-{to_small_caps('instant mythics')}: 10 {to_small_caps('characters')}
+{to_small_caps('instant mythics')}: 5 {to_small_caps('characters')}
 {to_small_caps('weekly reward')}: 15,000
 {to_small_caps('streak bonus')}: 100,000
-{to_small_caps('mythic per claim')}: 10
+{to_small_caps('mythic per claim')}: 1
 {to_small_caps('multiplier')}: 2x
 
 {to_small_caps('choose your upgrade')}
@@ -745,7 +745,7 @@ async def approve_elite_command(update: Update, context: CallbackContext) -> Non
         expires = datetime.utcnow() + timedelta(days=30)
         activation_bonus = PASS_CONFIG['elite']['activation_bonus']
 
-        mythic_chars = await collection.find({'rarity': '🏵 Mythic'}).limit(10).to_list(length=10)
+        mythic_chars = await collection.find({'rarity': '🏵 Mythic'}).limit(5).to_list(length=5)
 
         await user_collection.update_one(
             {'id': target_user_id},
@@ -1076,10 +1076,10 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
 
 <b>{to_small_caps('benefits')}:</b>
 {to_small_caps('activation bonus')}: 100,000,000 {to_small_caps('gold')}
-{to_small_caps('instant mythics')}: 10 {to_small_caps('characters')}
+{to_small_caps('instant mythics')}: 5 {to_small_caps('characters')}
 {to_small_caps('weekly reward')}: 15,000
 {to_small_caps('streak bonus')}: 100,000
-{to_small_caps('mythic per claim')}: 10
+{to_small_caps('mythic per claim')}: 1
 {to_small_caps('multiplier')}: 2x
 
 {to_small_caps('choose your upgrade')}
@@ -1447,7 +1447,7 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                 f"4️⃣ {to_small_caps('owner will verify within 24 hours')}\n\n"
                 f"<b>{to_small_caps('elite benefits')}:</b>\n"
                 f"💰 {to_small_caps('activation bonus')}: 100,000,000 {to_small_caps('gold')}\n"
-                f"🏵 {to_small_caps('instant mythics')}: 10 {to_small_caps('characters')}\n"
+                f"🏵 {to_small_caps('instant mythics')}: 5 {to_small_caps('characters')}\n"
                 f"📅 {to_small_caps('weekly reward')}: 15,000 {to_small_caps('gold')}\n"
                 f"🔥 {to_small_caps('streak bonus')}: 100,000 {to_small_caps('gold')}\n"
                 f"⚡ {to_small_caps('mythic per claim')}: 10\n"
@@ -1515,7 +1515,7 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                 f"📬 {to_small_caps('you will receive a notification once activated')}\n\n"
                 f"<b>{to_small_caps('you will receive')}:</b>\n"
                 f"💰 100,000,000 {to_small_caps('gold')}\n"
-                f"🏵 10 {to_small_caps('mythic characters')}\n"
+                f"🏵 5 {to_small_caps('mythic characters')}\n"
                 f"⚡ 2.0x {to_small_caps('grab multiplier')}\n\n"
                 f"{to_small_caps('thank you for your purchase!')}"
             )
