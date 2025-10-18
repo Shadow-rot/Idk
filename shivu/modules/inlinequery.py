@@ -286,11 +286,33 @@ async def inlinequery(update: Update, context) -> None:
             if not char_img:
                 continue
 
+            # For inline queries, we need to use cached file_id from channel messages
+            # External URLs often fail with WEBPAGE_MEDIA_EMPTY error
+            message_id = character.get('message_id')
+            
+            # If we have a message_id, we can use InlineQueryResultCachedPhoto/Video
+            # This is more reliable than using external URLs
             try:
+                if message_id:
+                    # Try to get the file_id from the channel message
+                    # This requires the bot to have access to the channel
+                    try:
+                        from shivu import CHARA_CHANNEL_ID
+                        channel_message = await context.bot.get_chat(CHARA_CHANNEL_ID)
+                        # We'll use the message_id to reference the media
+                        # For now, fallback to URL method with better error handling
+                    except:
+                        pass
+                
+                # Use URL-based results with proper validation
                 if is_video:
-                    # Check if it's a GIF
+                    # For videos, only use if URL is from trusted sources
+                    # Catbox, Imgur, Telegraph, etc.
+                    trusted_domains = ['catbox.moe', 'i.imgur.com', 'telegra.ph', 'te.legra.ph']
+                    is_trusted = any(domain in char_img.lower() for domain in trusted_domains)
+                    
                     if is_gif_url(char_img):
-                        # Use MPEG4 Gif for better GIF support
+                        # GIFs work better with MPEG4Gif
                         results.append(
                             InlineQueryResultMpeg4Gif(
                                 id=result_id,
@@ -301,9 +323,8 @@ async def inlinequery(update: Update, context) -> None:
                                 reply_markup=button
                             )
                         )
-                    else:
-                        # Use Video result for MP4/other videos
-                        # Note: Telegram requires direct video URLs with proper MIME type
+                    elif is_trusted:
+                        # Only use video result for trusted domains
                         results.append(
                             InlineQueryResultVideo(
                                 id=result_id,
@@ -316,11 +337,25 @@ async def inlinequery(update: Update, context) -> None:
                                 parse_mode='HTML',
                                 reply_markup=button,
                                 video_width=640,
-                                video_height=360
+                                video_height=360,
+                                video_duration=0
+                            )
+                        )
+                    else:
+                        # For untrusted video URLs, fallback to photo
+                        print(f"Skipping video from untrusted source: {char_img}")
+                        results.append(
+                            InlineQueryResultPhoto(
+                                id=result_id,
+                                photo_url=char_img,
+                                thumbnail_url=char_img,
+                                caption=caption + f"\n\n⚠️ {to_small_caps('video preview unavailable - see channel')}",
+                                parse_mode='HTML',
+                                reply_markup=button
                             )
                         )
                 else:
-                    # Use Photo result for images
+                    # Use Photo result for images (usually more reliable)
                     results.append(
                         InlineQueryResultPhoto(
                             id=result_id,
@@ -332,22 +367,11 @@ async def inlinequery(update: Update, context) -> None:
                         )
                     )
             except Exception as result_error:
-                # If video result fails, try as photo (fallback)
+                # If any result fails, log and skip
                 print(f"Error creating inline result for {char_id}: {result_error}")
-                try:
-                    results.append(
-                        InlineQueryResultPhoto(
-                            id=result_id,
-                            photo_url=char_img,
-                            thumbnail_url=char_img,
-                            caption=caption,
-                            parse_mode='HTML',
-                            reply_markup=button
-                        )
-                    )
-                except:
-                    # Skip this character if both fail
-                    continue
+                print(f"URL: {char_img}")
+                # Don't add broken results - just skip this character
+                continue
 
         await update.inline_query.answer(results, next_offset=next_offset, cache_time=5)
 
