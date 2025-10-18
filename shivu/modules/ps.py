@@ -36,90 +36,77 @@ ITEMS_PER_SESSION = 2
 
 
 async def get_rarity_config():
-    """Get rarity configuration from spawn settings or use default"""
-    try:
-        if get_spawn_settings:
-            settings = await get_spawn_settings()
-            rarities = settings.get('rarities', {})
-            
-            # Convert spawn settings to store config
-            config = {}
-            price_ranges = {
-                '🟢': (10000, 20000),
-                '🟣': (20000, 40000),
-                '🟡': (40000, 80000),
-                '💮': (100000, 200000),
-                '💫': (120000, 250000),
-                '✨': (80000, 150000),
-                '🎭': (90000, 180000),
-                '🎐': (150000, 300000),
-                '🔮': (200000, 400000),
-                '💋': (180000, 350000),
-                '🌤': (100000, 200000),
-                '☃️': (100000, 200000),
-                '☔️': (90000, 180000),
-                '💝': (150000, 300000),
-                '🎃': (150000, 300000),
-                '🎄': (150000, 300000),
-                '🏵': (500000, 1000000),
-                '🎗': (400000, 800000),
-                '🎥': (300000, 600000),
-                '👼': (250000, 500000),
-            }
-            
-            for emoji, data in rarities.items():
-                if data.get('enabled', True):
-                    name = data.get('name', 'Unknown')
-                    chance = data.get('chance', 1.0)
-                    min_price, max_price = price_ranges.get(emoji, (50000, 100000))
-                    
-                    # Format as "emoji name"
-                    key = f"{emoji} {name}"
-                    config[key] = {
-                        'chance': chance,
-                        'min_price': min_price,
-                        'max_price': max_price
-                    }
-            
-            if config:
-                return config
-        
-        return DEFAULT_RARITY_CONFIG.copy()
-    
-    except Exception as e:
-        LOGGER.error(f"Error getting rarity config: {e}")
-        return DEFAULT_RARITY_CONFIG.copy()
+    """Get rarity configuration - ALWAYS use default config for store"""
+    return DEFAULT_RARITY_CONFIG.copy()
 
 
-async def choose_rarity():
-    """Choose rarity based on probability from spawn settings"""
+def get_character_rarity_display(character):
+    """Get the proper rarity display string from character data"""
     try:
-        config = await get_rarity_config()
+        char_rarity = character.get('rarity', '🟢 Common')
         
-        if not config:
-            return "🟢 Common"
-        
-        # Calculate total chance
-        total = sum(data["chance"] for data in config.values())
-        
-        if total <= 0:
-            return list(config.keys())[0] if config else "🟢 Common"
-        
-        # Choose based on probability
-        roll = random.random() * total
-        cumulative = 0
-        
-        for rarity, data in config.items():
-            cumulative += data["chance"]
-            if roll <= cumulative:
-                return rarity
+        # If rarity is already in correct format (emoji + name), return it
+        if isinstance(char_rarity, str):
+            # Check if it's just emoji or has name
+            if ' ' in char_rarity:
+                return char_rarity
+            else:
+                # Just emoji, try to find name
+                emoji = char_rarity
+                # Map emoji to name from default config
+                for key in DEFAULT_RARITY_CONFIG.keys():
+                    if key.startswith(emoji):
+                        return key
+                return f"{emoji} Unknown"
         
         # Fallback
-        return list(config.keys())[0] if config else "🟢 Common"
+        return "🟢 Common"
     
     except Exception as e:
-        LOGGER.error(f"Error choosing rarity: {e}")
+        LOGGER.error(f"Error getting character rarity display: {e}")
         return "🟢 Common"
+
+
+def get_price_range_for_character(character):
+    """Get price range based on character's actual rarity"""
+    try:
+        char_rarity = character.get('rarity', '🟢 Common')
+        
+        # Extract emoji from rarity
+        if isinstance(char_rarity, str) and ' ' in char_rarity:
+            rarity_emoji = char_rarity.split(' ')[0]
+        else:
+            rarity_emoji = char_rarity
+        
+        # Price ranges based on rarity emoji
+        price_ranges = {
+            '🟢': (10000, 20000),      # Common
+            '🟣': (20000, 40000),      # Rare
+            '🟡': (40000, 80000),      # Legendary
+            '💮': (100000, 200000),    # Special Edition
+            '💫': (120000, 250000),    # Neon
+            '✨': (80000, 150000),     # Manga
+            '🎭': (90000, 180000),     # Cosplay
+            '🎐': (150000, 300000),    # Celestial
+            '🔮': (200000, 400000),    # Premium Edition
+            '💋': (180000, 350000),    # Erotic
+            '🌤': (100000, 200000),    # Summer
+            '☃️': (100000, 200000),    # Winter
+            '☔️': (90000, 180000),     # Monsoon
+            '💝': (150000, 300000),    # Valentine
+            '🎃': (150000, 300000),    # Halloween
+            '🎄': (150000, 300000),    # Christmas
+            '🏵': (500000, 1000000),   # Mythic
+            '🎗': (400000, 800000),    # Special Events
+            '🎥': (300000, 600000),    # AMV
+            '👼': (250000, 500000),    # Tiny
+        }
+        
+        return price_ranges.get(rarity_emoji, (50000, 100000))
+    
+    except Exception as e:
+        LOGGER.error(f"Error getting price range: {e}")
+        return (50000, 100000)
 
 
 async def is_character_allowed(character):
@@ -153,7 +140,7 @@ async def is_character_allowed(character):
 
 
 async def random_character():
-    """Get a random allowed character from database"""
+    """Get a random character from database"""
     try:
         # Get all characters
         all_chars = await characters_collection.find({}).to_list(length=None)
@@ -161,18 +148,15 @@ async def random_character():
         if not all_chars:
             return None
         
-        # Filter allowed characters
-        allowed_chars = []
-        for char in all_chars:
-            if await is_character_allowed(char):
-                allowed_chars.append(char)
+        # Filter out removed characters
+        available_chars = [c for c in all_chars if not c.get('removed', False)]
         
-        if not allowed_chars:
-            LOGGER.warning("No allowed characters found for store")
+        if not available_chars:
+            LOGGER.warning("No available characters found for store")
             return None
         
-        # Return random allowed character
-        return random.choice(allowed_chars)
+        # Return random character
+        return random.choice(available_chars)
     
     except Exception as e:
         LOGGER.error(f"Error getting random character: {e}")
@@ -200,7 +184,6 @@ def make_caption(char, rarity, price, page, total):
 async def generate_session(user_id):
     """Generate new session with random characters"""
     try:
-        config = await get_rarity_config()
         session = []
         
         for _ in range(ITEMS_PER_SESSION):
@@ -208,20 +191,16 @@ async def generate_session(user_id):
             if not char:
                 continue
             
-            rarity = await choose_rarity()
+            # Get character's actual rarity display
+            rarity_display = get_character_rarity_display(char)
             
-            # Get price range for this rarity
-            if rarity in config:
-                cfg = config[rarity]
-            else:
-                # Fallback to default
-                cfg = {"min_price": 50000, "max_price": 100000}
-            
-            price = random.randint(cfg["min_price"], cfg["max_price"])
+            # Get price range based on character's actual rarity
+            min_price, max_price = get_price_range_for_character(char)
+            price = random.randint(min_price, max_price)
             
             session.append({
                 "id": char["id"],
-                "rarity": rarity,
+                "rarity": rarity_display,  # Use character's actual rarity
                 "price": price,
                 "img": char.get("img_url"),
                 "purchased": False
