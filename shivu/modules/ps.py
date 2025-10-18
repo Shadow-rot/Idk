@@ -12,7 +12,7 @@ from shivu import application, user_collection, user_totals_collection, db, LOGG
 
 characters_collection = db["anime_characters_lol"]
 ps_config_collection = db["ps_config"]
-SUDO_USERS = [6737275496, 5147822244]  # Add your admin IDs here
+SUDO_USERS = [6737275496, 123456789]  # Add your admin IDs here
 
 # Rarity configuration with spawn chances and price ranges
 RARITY_CONFIG = {
@@ -313,30 +313,36 @@ async def show_ps_page(message_or_query, context, session, page, is_new=False):
         daily_refreshes = refresh_data.get(today, 0)
         refreshes_left = MAX_DAILY_REFRESHES - daily_refreshes
         
-        # Navigation buttons
+        # Navigation buttons - Compact design
         buttons = []
-        nav = []
         
+        # Row 1: Previous and Next navigation (smaller buttons)
+        nav_row = []
         prev_available = [i for i in range(page) if not session[i].get("purchased", False)]
         if prev_available:
-            nav.append(InlineKeyboardButton("◀", callback_data=f"ps_page_{prev_available[-1]}"))
-        
-        # Show refresh with cost and remaining uses
-        if refreshes_left > 0:
-            nav.append(InlineKeyboardButton(
-                f"🔄 ʀᴇғʀᴇsʜ ({REFRESH_COST:,}💰 | {refreshes_left}/3)", 
-                callback_data="ps_refresh"
-            ))
-        else:
-            nav.append(InlineKeyboardButton("🔄 ʀᴇғʀᴇsʜ (0/3)", callback_data="ps_refresh_limit"))
+            nav_row.append(InlineKeyboardButton("◀️", callback_data=f"ps_page_{prev_available[-1]}"))
         
         next_available = [i for i in range(page + 1, len(session)) if not session[i].get("purchased", False)]
         if next_available:
-            nav.append(InlineKeyboardButton("▶", callback_data=f"ps_page_{next_available[0]}"))
+            nav_row.append(InlineKeyboardButton("▶️", callback_data=f"ps_page_{next_available[0]}"))
         
-        if nav:
-            buttons.append(nav)
-        buttons.append([InlineKeyboardButton("✅ ʙᴜʏ", callback_data=f"ps_buy_{data['id']}_{page}")])
+        if nav_row:
+            buttons.append(nav_row)
+        
+        # Row 2: Buy button (prominent)
+        buttons.append([InlineKeyboardButton("💰 ʙᴜʏ ɴᴏᴡ", callback_data=f"ps_buy_{data['id']}_{page}")])
+        
+        # Row 3: Refresh button with info
+        if refreshes_left > 0:
+            buttons.append([InlineKeyboardButton(
+                f"🔄 ʀᴇғʀᴇsʜ • {REFRESH_COST:,}💎 • {refreshes_left}/3 ʟᴇғᴛ", 
+                callback_data="ps_refresh"
+            )])
+        else:
+            buttons.append([InlineKeyboardButton(
+                "🔄 ʀᴇғʀᴇsʜ • 0/3 ʟᴇғᴛ", 
+                callback_data="ps_refresh_limit"
+            )])
         markup = InlineKeyboardMarkup(buttons)
         
         if is_new:
@@ -468,7 +474,6 @@ async def ps_callback(update: Update, context: CallbackContext):
                 await query.answer("ᴄʜᴀʀᴀᴄᴛᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ ɪɴ ᴅᴀᴛᴀʙᴀsᴇ.", show_alert=True)
                 return
             
-            balance = user_data.get("balance", 0)
             caption = (
                 f"╭──────────────╮\n"
                 f"│  ᴄᴏɴғɪʀᴍ ʙᴜʏ │\n"
@@ -649,26 +654,37 @@ async def show_panel(message_or_query, is_new=False):
         # Sort rarities by chance (descending)
         sorted_rarities = sorted(config.items(), key=lambda x: x[1].get('chance', 0), reverse=True)
         
-        for rarity, settings in sorted_rarities:
+        # Create compact 2-column layout for rarity buttons
+        row = []
+        for i, (rarity, settings) in enumerate(sorted_rarities):
             enabled = settings.get('enabled', True)
+            emoji = rarity.split(' ')[0]
+            status = "✅" if enabled else "❌"
+            
             chance = settings.get('chance', 0)
             min_price = settings.get('min_price', 0)
             max_price = settings.get('max_price', 0)
             
-            status = "✅" if enabled else "❌"
             caption += f"{status} {rarity}\n"
             caption += f"   • ᴄʜᴀɴᴄᴇ: {chance}%\n"
             caption += f"   • ᴘʀɪᴄᴇ: {min_price:,} - {max_price:,}\n\n"
             
-            # Create toggle button
-            emoji = rarity.split(' ')[0]
+            # Create compact button
             button_text = f"{status} {emoji}"
             callback_data = f"psp_toggle_{emoji}"
             
-            buttons.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+            row.append(InlineKeyboardButton(button_text, callback_data=callback_data))
+            
+            # Add row after every 2 buttons or at the end
+            if len(row) == 2 or i == len(sorted_rarities) - 1:
+                buttons.append(row)
+                row = []
         
-        buttons.append([InlineKeyboardButton("🔄 ʀᴇғʀᴇsʜ", callback_data="psp_refresh")])
-        buttons.append([InlineKeyboardButton("❌ ᴄʟᴏsᴇ", callback_data="psp_close")])
+        # Action buttons
+        buttons.append([
+            InlineKeyboardButton("🔄 ʀᴇғʀᴇsʜ", callback_data="psp_refresh"),
+            InlineKeyboardButton("❌ ᴄʟᴏsᴇ", callback_data="psp_close")
+        ])
         
         markup = InlineKeyboardMarkup(buttons)
         
