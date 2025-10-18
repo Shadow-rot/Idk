@@ -12,7 +12,7 @@ from shivu import application, user_collection, user_totals_collection, db, LOGG
 
 characters_collection = db["anime_characters_lol"]
 ps_config_collection = db["ps_config"]
-SUDO_USERS = [6737275496, 123456789]  # Add your admin IDs here
+SUDO_USERS = [6737275496, 5147822244]  # Add your admin IDs here
 
 # Rarity configuration with spawn chances and price ranges
 RARITY_CONFIG = {
