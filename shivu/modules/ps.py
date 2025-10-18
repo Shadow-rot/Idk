@@ -16,12 +16,12 @@ SUDO_USERS = [6737275496, 5147822244]  # Add your admin IDs here
 
 # Rarity configuration with spawn chances and price ranges
 RARITY_CONFIG = {
-    "🟢 Common": {"chance": 60, "min_price": 10000, "max_price": 20000, "enabled": True},
-    "🟣 Rare": {"chance": 25, "min_price": 20000, "max_price": 40000, "enabled": True},
-    "🟡 Legendary": {"chance": 10, "min_price": 40000, "max_price": 80000, "enabled": True},
-    "💮 Special Edition": {"chance": 4, "min_price": 100000, "max_price": 200000, "enabled": True},
-    "💫 Neon": {"chance": 0.8, "min_price": 120000, "max_price": 250000, "enabled": True},
-    "🎐 Celestial": {"chance": 0.2, "min_price": 150000, "max_price": 300000, "enabled": True},
+    "🟢 Common": {"chance": 60, "min_price": 10000000000, "max_price": 2000000000, "enabled": True},
+    "🟣 Rare": {"chance": 25, "min_price": 2000000000, "max_price": 4000000000, "enabled": True},
+    "🟡 Legendary": {"chance": 10, "min_price": 4000000000, "max_price": 800000000, "enabled": True},
+    "💮 Special Edition": {"chance": 4, "min_price": 1000000000, "max_price": 20000000000, "enabled": True},
+    "💫 Neon": {"chance": 0.8, "min_price": 1200000000, "max_price": 250000000, "enabled": True},
+    "🎐 Celestial": {"chance": 0.2, "min_price": 1500000000, "max_price": 3000000000, "enabled": True},
 }
 
 REFRESH_INTERVAL = 86400  # 24 hours
