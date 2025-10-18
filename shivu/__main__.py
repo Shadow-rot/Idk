@@ -6,7 +6,7 @@ import asyncio
 import traceback
 from html import escape
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters, Application, CallbackQueryHandler
+from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters, CallbackQueryHandler
 from telegram.error import BadRequest, Forbidden
 
 from shivu import (
@@ -35,11 +35,9 @@ last_characters = {}
 first_correct_guesses = {}
 last_user = {}
 warned_users = {}
-
-# ==================== CUSTOM MODULE IMPORTS ====================
 spawn_settings_collection = None
 
-# Import all modules
+# ==================== IMPORT ALL MODULES ====================
 for module_name in ALL_MODULES:
     try:
         importlib.import_module("shivu.modules." + module_name)
@@ -47,18 +45,16 @@ for module_name in ALL_MODULES:
     except Exception as e:
         LOGGER.error(f"❌ Failed to import {module_name}: {e}")
 
-# Try to import spawn settings from rarity module
+# Load spawn settings if available
 try:
     from shivu.modules.rarity import spawn_settings_collection as ssc
     spawn_settings_collection = ssc
-    LOGGER.info("✅ Loaded spawn_settings_collection from rarity module")
 except:
-    LOGGER.warning("⚠️ Rarity module spawn settings not available")
+    pass
 
 
 # ==================== HELPER FUNCTIONS ====================
 def escape_markdown(text):
-    """Escape markdown special characters"""
     if not text:
         return ""
     escape_chars = r'\*_`\\~>#+-=|{}.!'
@@ -66,7 +62,6 @@ def escape_markdown(text):
 
 
 async def is_character_allowed(character):
-    """Check if character is allowed to spawn based on settings"""
     try:
         if character.get('removed', False):
             return False
@@ -100,18 +95,15 @@ async def is_character_allowed(character):
 
                 disabled_animes = old_settings.get('disabled_animes', [])
                 char_anime = character.get('anime', '').lower()
-
                 if char_anime in [anime.lower() for anime in disabled_animes]:
                     return False
 
         return True
-    except Exception as e:
-        LOGGER.error(f"Error checking character spawn permission: {e}")
+    except:
         return True
 
 
 async def get_chat_message_frequency(chat_id):
-    """Get message frequency for a specific chat"""
     try:
         chat_frequency = await user_totals_collection.find_one({'chat_id': chat_id})
         if chat_frequency:
@@ -122,13 +114,11 @@ async def get_chat_message_frequency(chat_id):
                 'message_frequency': DEFAULT_MESSAGE_FREQUENCY
             })
             return DEFAULT_MESSAGE_FREQUENCY
-    except Exception as e:
-        LOGGER.error(f"Error fetching chat frequency: {e}")
+    except:
         return DEFAULT_MESSAGE_FREQUENCY
 
 
 async def update_grab_task(user_id: int):
-    """Update grab task count for pass system"""
     try:
         user = await user_collection.find_one({'id': user_id})
         if user and 'pass_data' in user:
@@ -136,13 +126,12 @@ async def update_grab_task(user_id: int):
                 {'id': user_id},
                 {'$inc': {'pass_data.tasks.grabs': 1}}
             )
-    except Exception as e:
-        LOGGER.error(f"Error updating grab task: {e}")
+    except:
+        pass
 
 
 # ==================== MESSAGE COUNTER ====================
 async def message_counter(update: Update, context: CallbackContext) -> None:
-    """Count messages and spawn characters at intervals"""
     try:
         if update.effective_chat.type not in ['group', 'supergroup']:
             return
@@ -174,8 +163,8 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
                                 f"<b>ᴅᴏɴ'ᴛ sᴘᴀᴍ</b> {escape(update.effective_user.first_name)}...\n"
                                 "<b>ʏᴏᴜʀ ᴍᴇssᴀɢᴇs ᴡɪʟʟ ʙᴇ ɪɢɴᴏʀᴇᴅ ғᴏʀ 10 ᴍɪɴᴜᴛᴇs...!!</b>"
                             )
-                        except Exception as e:
-                            LOGGER.error(f"Error sending spam warning: {e}")
+                        except:
+                            pass
                         warned_users[user_id] = time.time()
                         return
             else:
@@ -192,12 +181,10 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
 
     except Exception as e:
         LOGGER.error(f"Error in message_counter: {e}")
-        LOGGER.error(traceback.format_exc())
 
 
 # ==================== SPAWN CHARACTER ====================
 async def send_image(update: Update, context: CallbackContext) -> None:
-    """Send a random character image to the chat"""
     chat_id = update.effective_chat.id
 
     try:
@@ -258,8 +245,8 @@ async def send_image(update: Update, context: CallbackContext) -> None:
 
                     if weighted_chars:
                         character = random.choice(weighted_chars)
-        except Exception as e:
-            LOGGER.error(f"Error in weighted selection: {e}")
+        except:
+            pass
 
         if not character:
             character = random.choice(allowed_characters)
@@ -279,19 +266,17 @@ async def send_image(update: Update, context: CallbackContext) -> None:
         await context.bot.send_photo(
             chat_id=chat_id,
             photo=character['img_url'],
-            caption=f"""***{rarity_emoji} ʟᴏᴏᴋ ᴀ ᴡᴀɪғᴜ ʜᴀꜱ sᴘᴀᴡɴᴇᴅ !! ᴍᴀᴋᴇ ʜᴇʀ ʏᴏᴜʀ's ʙʏ ɢɪᴠɪɴɢ
+            caption=f"""***{rarity_emoji} ʟᴏᴏᴋ ᴀ ᴡᴀɪғᴜ ʜᴀs sᴘᴀᴡɴᴇᴅ !! ᴍᴀᴋᴇ ʜᴇʀ ʏᴏᴜʀ's ʙʏ ɢɪᴠɪɴɢ
 /grab 𝚆𝚊𝚒𝚏𝚞 𝚗𝚊𝚖𝚎***""",
             parse_mode='Markdown'
         )
 
     except Exception as e:
         LOGGER.error(f"Error in send_image: {e}")
-        LOGGER.error(traceback.format_exc())
 
 
 # ==================== GUESS HANDLER ====================
 async def guess(update: Update, context: CallbackContext) -> None:
-    """Handle character guessing"""
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
 
@@ -444,61 +429,16 @@ async def guess(update: Update, context: CallbackContext) -> None:
 
     except Exception as e:
         LOGGER.error(f"Error in guess: {e}")
-        LOGGER.error(traceback.format_exc())
 
 
-# ==================== MAIN FUNCTION ====================
+# ==================== MAIN ====================
 def main() -> None:
-    """Run bot"""
-    try:
-        LOGGER.info("="*50)
-        LOGGER.info("REGISTERING HANDLERS")
-        LOGGER.info("="*50)
-
-        # Add grab command
-        application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
-        LOGGER.info("✅ Registered: /grab, /g commands")
-
-        # Add message counter (must be last)
-        application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
-        LOGGER.info("✅ Registered: message counter")
-
-        LOGGER.info("="*50)
-        LOGGER.info("🚀 Starting bot polling...")
-        LOGGER.info("="*50)
-
-        application.run_polling(drop_pending_updates=True)
-
-    except Exception as e:
-        LOGGER.error(f"Error in main: {e}")
-        LOGGER.error(traceback.format_exc())
-        raise
+    application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
+    application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
+    application.run_polling(drop_pending_updates=True)
 
 
-# ==================== ENTRY POINT ====================
 if __name__ == "__main__":
-    try:
-        LOGGER.info("="*50)
-        LOGGER.info("🤖 SHIVU BOT STARTING")
-        LOGGER.info("="*50)
-
-        shivuu.start()
-        LOGGER.info("✅ Pyrogram client started")
-
-        main()
-
-    except KeyboardInterrupt:
-        LOGGER.info("⚠️ Bot stopped by user")
-    except Exception as e:
-        LOGGER.error(f"❌ Fatal error: {e}")
-        LOGGER.error(traceback.format_exc())
-        raise
-    finally:
-        try:
-            shivuu.stop()
-            LOGGER.info("✅ Pyrogram client stopped")
-        except:
-            pass
-        LOGGER.info("="*50)
-        LOGGER.info("🛑 BOT SHUTDOWN COMPLETE")
-        LOGGER.info("="*50)
+    shivuu.start()
+    LOGGER.info("Bot started")
+    main()
