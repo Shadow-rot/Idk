@@ -141,20 +141,20 @@ def normalize_chances(rarities):
 def find_rarity_emoji(rarity_input):
     """Find rarity emoji from input (name or emoji)"""
     rarity_input = rarity_input.lower().strip()
-    
+
     # Check if input is emoji
     if rarity_input in DEFAULT_RARITIES:
         return rarity_input
-    
+
     # Check if input is name
     if rarity_input in NAME_TO_EMOJI:
         return NAME_TO_EMOJI[rarity_input]
-    
+
     # Partial name matching
     for name, emoji in NAME_TO_EMOJI.items():
         if rarity_input in name:
             return emoji
-    
+
     return None
 
 
@@ -415,7 +415,7 @@ async def rnormalize_command(update: Update, context: CallbackContext):
 
         # Get enabled rarities before normalization
         enabled_rarities = {k: v for k, v in rarities.items() if v['enabled']}
-        
+
         if not enabled_rarities:
             await update.message.reply_text("❌ No rarities are enabled!")
             return
@@ -580,24 +580,24 @@ async def rhelp_command(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ An error occurred.")
 
 
-# ==================== HANDLER REGISTRATION ====================
-def register_rarity_handlers():
-    """Register handlers for rarity control system"""
-    try:
-        application.add_handler(CommandHandler("rview", rview_command, block=False))
-        application.add_handler(CommandHandler("renable", renable_command, block=False))
-        application.add_handler(CommandHandler("rdisable", rdisable_command, block=False))
-        application.add_handler(CommandHandler("rchance", rchance_command, block=False))
-        application.add_handler(CommandHandler("rnormalize", rnormalize_command, block=False))
-        application.add_handler(CommandHandler("rreset", rreset_command, block=False))
-        application.add_handler(CommandHandler("renableall", renableall_command, block=False))
-        application.add_handler(CommandHandler("rdisableall", rdisableall_command, block=False))
-        application.add_handler(CommandHandler("rhelp", rhelp_command, block=False))
-        
-        LOGGER.info("✅ Registered spawn rarity control handlers (command-based)")
-    except Exception as e:
-        LOGGER.error(f"❌ Failed to register rarity handlers: {e}")
+# ==================== AUTO-REGISTER HANDLERS ====================
+# This runs when the module is imported
+try:
+    application.add_handler(CommandHandler("rview", rview_command, block=False))
+    application.add_handler(CommandHandler("renable", renable_command, block=False))
+    application.add_handler(CommandHandler("rdisable", rdisable_command, block=False))
+    application.add_handler(CommandHandler("rchance", rchance_command, block=False))
+    application.add_handler(CommandHandler("rnormalize", rnormalize_command, block=False))
+    application.add_handler(CommandHandler("rreset", rreset_command, block=False))
+    application.add_handler(CommandHandler("renableall", renableall_command, block=False))
+    application.add_handler(CommandHandler("rdisableall", rdisableall_command, block=False))
+    application.add_handler(CommandHandler("rhelp", rhelp_command, block=False))
+
+    LOGGER.info("✅ Rarity control handlers registered automatically")
+except Exception as e:
+    LOGGER.error(f"❌ Failed to register rarity handlers: {e}")
+    LOGGER.error(traceback.format_exc())
 
 
 # Export for use in main bot file
-__all__ = ['register_rarity_handlers', 'spawn_settings_collection', 'get_spawn_settings']
+__all__ = ['spawn_settings_collection', 'get_spawn_settings']
