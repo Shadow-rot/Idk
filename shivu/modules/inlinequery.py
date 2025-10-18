@@ -282,46 +282,72 @@ async def inlinequery(update: Update, context) -> None:
             # Create appropriate inline result based on media type
             result_id = f"{char_id}_{offset}_{time.time()}"
 
-            if is_video:
-                # Check if it's a GIF
-                if is_gif_url(char_img):
-                    # Use MPEG4 Gif for better GIF support
-                    results.append(
-                        InlineQueryResultMpeg4Gif(
-                            id=result_id,
-                            mpeg4_url=char_img,
-                            thumbnail_url=char_img,
-                            caption=caption,
-                            parse_mode='HTML',
-                            reply_markup=button
+            # Skip if no valid URL
+            if not char_img:
+                continue
+
+            try:
+                if is_video:
+                    # Check if it's a GIF
+                    if is_gif_url(char_img):
+                        # Use MPEG4 Gif for better GIF support
+                        results.append(
+                            InlineQueryResultMpeg4Gif(
+                                id=result_id,
+                                mpeg4_url=char_img,
+                                thumbnail_url=char_img,
+                                caption=caption,
+                                parse_mode='HTML',
+                                reply_markup=button
+                            )
                         )
-                    )
+                    else:
+                        # Use Video result for MP4/other videos
+                        # Note: Telegram requires direct video URLs with proper MIME type
+                        results.append(
+                            InlineQueryResultVideo(
+                                id=result_id,
+                                video_url=char_img,
+                                mime_type='video/mp4',
+                                thumbnail_url=char_img,
+                                title=f"{char_name}",
+                                description=f"{char_anime} - {rarity_text}",
+                                caption=caption,
+                                parse_mode='HTML',
+                                reply_markup=button,
+                                video_width=640,
+                                video_height=360
+                            )
+                        )
                 else:
-                    # Use Video result for MP4/other videos
+                    # Use Photo result for images
                     results.append(
-                        InlineQueryResultVideo(
+                        InlineQueryResultPhoto(
                             id=result_id,
-                            video_url=char_img,
-                            mime_type='video/mp4',
+                            photo_url=char_img,
                             thumbnail_url=char_img,
-                            title=f"{char_name} - {char_anime}",
                             caption=caption,
                             parse_mode='HTML',
                             reply_markup=button
                         )
                     )
-            else:
-                # Use Photo result for images
-                results.append(
-                    InlineQueryResultPhoto(
-                        id=result_id,
-                        photo_url=char_img,
-                        thumbnail_url=char_img,
-                        caption=caption,
-                        parse_mode='HTML',
-                        reply_markup=button
+            except Exception as result_error:
+                # If video result fails, try as photo (fallback)
+                print(f"Error creating inline result for {char_id}: {result_error}")
+                try:
+                    results.append(
+                        InlineQueryResultPhoto(
+                            id=result_id,
+                            photo_url=char_img,
+                            thumbnail_url=char_img,
+                            caption=caption,
+                            parse_mode='HTML',
+                            reply_markup=button
+                        )
                     )
-                )
+                except:
+                    # Skip this character if both fail
+                    continue
 
         await update.inline_query.answer(results, next_offset=next_offset, cache_time=5)
 
