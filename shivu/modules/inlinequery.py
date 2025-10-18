@@ -7,7 +7,9 @@ from pymongo import ASCENDING
 # Telegram imports
 from telegram import (
     Update, 
-    InlineQueryResultPhoto, 
+    InlineQueryResultPhoto,
+    InlineQueryResultVideo,
+    InlineQueryResultMpeg4Gif,
     InlineKeyboardButton, 
     InlineKeyboardMarkup,
 )
@@ -55,6 +57,21 @@ def to_small_caps(text):
     return ''.join(small_caps_map.get(c, c) for c in text)
 
 
+def is_video_url(url):
+    """Check if URL points to a video file (MP4, etc)"""
+    if not url:
+        return False
+    video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv']
+    return any(url.lower().endswith(ext) for ext in video_extensions)
+
+
+def is_gif_url(url):
+    """Check if URL points to a GIF file"""
+    if not url:
+        return False
+    return url.lower().endswith('.gif')
+
+
 async def get_global_count(character_id: str) -> int:
     """Get global grab count with caching"""
     cache_key = f"global_{character_id}"
@@ -87,7 +104,7 @@ async def get_anime_count(anime_name: str) -> int:
 
 # Inline query handler
 async def inlinequery(update: Update, context) -> None:
-    """Handle inline queries for character search"""
+    """Handle inline queries for character search - supports both images and videos"""
     query = update.inline_query.query
     offset = int(update.inline_query.offset) if update.inline_query.offset else 0
 
@@ -192,6 +209,11 @@ async def inlinequery(update: Update, context) -> None:
             char_anime = character.get('anime', 'Unknown')
             char_rarity = character.get('rarity', '🟢 Common')
             char_img = character.get('img_url', '')
+            is_video = character.get('is_video', False)  # Check if it's a video
+
+            # Auto-detect if is_video flag is missing
+            if not is_video and char_img:
+                is_video = is_video_url(char_img)
 
             # Extract rarity emoji and text
             if isinstance(char_rarity, str):
@@ -221,11 +243,12 @@ async def inlinequery(update: Update, context) -> None:
                 user_first_name = user.get('first_name', 'User')
                 user_id_int = user.get('id')
 
-                # Add favorite indicator
+                # Add favorite indicator and media type
                 fav_indicator = "💖 " if is_favorite else ""
+                media_indicator = "🎥 " if is_video else "🖼 "
 
                 caption = (
-                    f"<b>{fav_indicator}🔮 {to_small_caps('look at')} <a href='tg://user?id={user_id_int}'>{escape(user_first_name)}</a>{to_small_caps('s waifu')}</b>\n\n"
+                    f"<b>{fav_indicator}{media_indicator}🔮 {to_small_caps('look at')} <a href='tg://user?id={user_id_int}'>{escape(user_first_name)}</a>{to_small_caps('s waifu')}</b>\n\n"
                     f"<b>🆔 {to_small_caps('id')}</b> <code>{char_id}</code>\n"
                     f"<b>🧬 {to_small_caps('name')}</b> <code>{escape(char_name)}</code> x{user_character_count}\n"
                     f"<b>📺 {to_small_caps('anime')}</b> <code>{escape(char_anime)}</code> {user_anime_count}/{anime_total}\n"
@@ -237,9 +260,10 @@ async def inlinequery(update: Update, context) -> None:
             else:
                 # Global search caption
                 global_count = await get_global_count(char_id)
+                media_indicator = "🎥 " if is_video else "🖼 "
 
                 caption = (
-                    f"<b>🔮 {to_small_caps('look at this waifu')}</b>\n\n"
+                    f"<b>{media_indicator}🔮 {to_small_caps('look at this waifu')}</b>\n\n"
                     f"<b>🆔 {to_small_caps('id')}</b> : <code>{char_id}</code>\n"
                     f"<b>🧬 {to_small_caps('name')}</b> : <code>{escape(char_name)}</code>\n"
                     f"<b>📺 {to_small_caps('anime')}</b> : <code>{escape(char_anime)}</code>\n"
@@ -255,16 +279,49 @@ async def inlinequery(update: Update, context) -> None:
                 )]
             ])
 
-            results.append(
-                InlineQueryResultPhoto(
-                    id=f"{char_id}_{offset}_{time.time()}",
-                    photo_url=char_img,
-                    thumbnail_url=char_img,
-                    caption=caption,
-                    parse_mode='HTML',
-                    reply_markup=button
+            # Create appropriate inline result based on media type
+            result_id = f"{char_id}_{offset}_{time.time()}"
+
+            if is_video:
+                # Check if it's a GIF
+                if is_gif_url(char_img):
+                    # Use MPEG4 Gif for better GIF support
+                    results.append(
+                        InlineQueryResultMpeg4Gif(
+                            id=result_id,
+                            mpeg4_url=char_img,
+                            thumbnail_url=char_img,
+                            caption=caption,
+                            parse_mode='HTML',
+                            reply_markup=button
+                        )
+                    )
+                else:
+                    # Use Video result for MP4/other videos
+                    results.append(
+                        InlineQueryResultVideo(
+                            id=result_id,
+                            video_url=char_img,
+                            mime_type='video/mp4',
+                            thumbnail_url=char_img,
+                            title=f"{char_name} - {char_anime}",
+                            caption=caption,
+                            parse_mode='HTML',
+                            reply_markup=button
+                        )
+                    )
+            else:
+                # Use Photo result for images
+                results.append(
+                    InlineQueryResultPhoto(
+                        id=result_id,
+                        photo_url=char_img,
+                        thumbnail_url=char_img,
+                        caption=caption,
+                        parse_mode='HTML',
+                        reply_markup=button
+                    )
                 )
-            )
 
         await update.inline_query.answer(results, next_offset=next_offset, cache_time=5)
 
@@ -442,4 +499,4 @@ async def show_smashers_callback(update: Update, context) -> None:
 application.add_handler(InlineQueryHandler(inlinequery, block=False))
 application.add_handler(CallbackQueryHandler(show_smashers_callback, pattern=r'^show_smashers_', block=False))
 
-LOGGER.info("[INLINE] Handlers registered successfully")
+LOGGER.info("[INLINE] Handlers registered successfully with video support")
