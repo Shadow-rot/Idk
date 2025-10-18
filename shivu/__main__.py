@@ -41,29 +41,6 @@ warned_users = {}
 spawn_settings_collection = None
 
 
-def import_custom_modules():
-    """Import all custom modules with error handling"""
-    global spawn_settings_collection
-
-    LOGGER.info("="*50)
-    LOGGER.info("IMPORTING CUSTOM MODULES")
-    LOGGER.info("="*50)
-
-    # Import rarity module
-    try:
-        from shivu.modules.rarity import register_rarity_handlers, spawn_settings_collection as ssc
-        spawn_settings_collection = ssc
-        LOGGER.info("✅ Imported: rarity module")
-        return True
-    except ImportError as e:
-        LOGGER.warning(f"⚠️ Rarity module not found: {e}")
-        return False
-    except Exception as e:
-        LOGGER.error(f"❌ Failed to import rarity: {e}")
-        LOGGER.error(traceback.format_exc())
-        return False
-
-
 def import_standard_modules():
     """Import all standard modules"""
     LOGGER.info("="*50)
@@ -87,18 +64,40 @@ def import_standard_modules():
     return success_count, fail_count
 
 
+def import_custom_modules():
+    """Import all custom modules with error handling"""
+    global spawn_settings_collection
+
+    LOGGER.info("="*50)
+    LOGGER.info("IMPORTING CUSTOM MODULES")
+    LOGGER.info("="*50)
+
+    # Import rarity module
+    try:
+        from shivu.modules.rarity import spawn_settings_collection as ssc
+        spawn_settings_collection = ssc
+        LOGGER.info("✅ Imported: rarity module")
+        return True
+    except ImportError as e:
+        LOGGER.warning(f"⚠️ Rarity module not found: {e}")
+        return False
+    except Exception as e:
+        LOGGER.error(f"❌ Failed to import rarity: {e}")
+        LOGGER.error(traceback.format_exc())
+        return False
+
+
 # ==================== PASS SYSTEM INTEGRATION ====================
 async def update_grab_task(user_id: int):
     """Update grab task count for pass system"""
     try:
-        # Check if user has pass_data
         user = await user_collection.find_one({'id': user_id})
         if user and 'pass_data' in user:
             await user_collection.update_one(
                 {'id': user_id},
                 {'$inc': {'pass_data.tasks.grabs': 1}}
             )
-            LOGGER.info(f"[PASS] Grab task updated for user {user_id}")
+            LOGGER.debug(f"[PASS] Grab task updated for user {user_id}")
     except Exception as e:
         LOGGER.error(f"[PASS] Error updating grab task: {e}")
 
@@ -115,35 +114,27 @@ def escape_markdown(text):
 async def is_character_allowed(character):
     """Check if character is allowed to spawn based on settings"""
     try:
-        # Check if character is removed
         if character.get('removed', False):
             LOGGER.debug(f"Character {character.get('id')} is marked as removed")
             return False
 
-        # If spawn settings collection is available, check settings
         if spawn_settings_collection is not None:
-            # Check rarity control settings
             settings = await spawn_settings_collection.find_one({'type': 'rarity_control'})
             if settings:
                 char_rarity = character.get('rarity', '🟢 Common')
-
-                # Extract emoji from rarity
                 if isinstance(char_rarity, str) and ' ' in char_rarity:
                     rarity_emoji = char_rarity.split(' ')[0]
                 else:
                     rarity_emoji = char_rarity
 
-                # Check if this rarity is enabled
                 rarities = settings.get('rarities', {})
                 if rarity_emoji in rarities:
                     if not rarities[rarity_emoji].get('enabled', True):
                         LOGGER.debug(f"Character {character.get('id')} has disabled rarity: {rarity_emoji}")
                         return False
 
-            # Check old global settings for backward compatibility
             old_settings = await spawn_settings_collection.find_one({'type': 'global'})
             if old_settings:
-                # Check disabled rarities (old system)
                 disabled_rarities = old_settings.get('disabled_rarities', [])
                 char_rarity = character.get('rarity', 'Common')
 
@@ -156,7 +147,6 @@ async def is_character_allowed(character):
                     LOGGER.debug(f"Character {character.get('id')} has disabled rarity: {rarity_emoji}")
                     return False
 
-                # Check disabled animes
                 disabled_animes = old_settings.get('disabled_animes', [])
                 char_anime = character.get('anime', '').lower()
 
@@ -177,7 +167,6 @@ async def get_chat_message_frequency(chat_id):
         if chat_frequency:
             return chat_frequency.get('message_frequency', DEFAULT_MESSAGE_FREQUENCY)
         else:
-            # Initialize chat settings in database
             await user_totals_collection.insert_one({
                 'chat_id': chat_id,
                 'message_frequency': DEFAULT_MESSAGE_FREQUENCY
@@ -192,11 +181,9 @@ async def get_chat_message_frequency(chat_id):
 async def message_counter(update: Update, context: CallbackContext) -> None:
     """Count messages and spawn characters at intervals"""
     try:
-        # Ignore non-group messages
         if update.effective_chat.type not in ['group', 'supergroup']:
             return
 
-        # Ignore bot messages and commands
         if not update.message or not update.message.text:
             return
 
@@ -206,20 +193,16 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
         chat_id = str(update.effective_chat.id)
         user_id = update.effective_user.id
 
-        # Initialize lock for this chat
         if chat_id not in locks:
             locks[chat_id] = asyncio.Lock()
         lock = locks[chat_id]
 
         async with lock:
-            # Get message frequency
             message_frequency = await get_chat_message_frequency(chat_id)
 
-            # Anti-spam check
             if chat_id in last_user and last_user[chat_id]['user_id'] == user_id:
                 last_user[chat_id]['count'] += 1
                 if last_user[chat_id]['count'] >= 10:
-                    # Check if user was recently warned
                     if user_id in warned_users and time.time() - warned_users[user_id] < 600:
                         return
                     else:
@@ -235,20 +218,16 @@ async def message_counter(update: Update, context: CallbackContext) -> None:
             else:
                 last_user[chat_id] = {'user_id': user_id, 'count': 1}
 
-            # Initialize message count for this chat
             if chat_id not in message_counts:
                 message_counts[chat_id] = 0
 
-            # Increment message count
             message_counts[chat_id] += 1
-
             LOGGER.debug(f"Chat {chat_id}: Message {message_counts[chat_id]}/{message_frequency}")
 
-            # Check if it's time to spawn
             if message_counts[chat_id] >= message_frequency:
                 LOGGER.info(f"[SPAWN] Triggering spawn in chat {chat_id} (reached {message_frequency} messages)")
                 await send_image(update, context)
-                message_counts[chat_id] = 0  # Reset counter
+                message_counts[chat_id] = 0
 
     except Exception as e:
         LOGGER.error(f"[ERROR] Error in message_counter: {e}")
@@ -263,7 +242,6 @@ async def send_image(update: Update, context: CallbackContext) -> None:
     try:
         LOGGER.info(f"[SPAWN] Starting spawn process for chat {chat_id}")
 
-        # Fetch all characters
         all_characters = list(await collection.find({}).to_list(length=None))
 
         if not all_characters:
@@ -272,16 +250,13 @@ async def send_image(update: Update, context: CallbackContext) -> None:
 
         LOGGER.info(f"[SPAWN] Total characters in database: {len(all_characters)}")
 
-        # Initialize sent characters list for this chat
         if chat_id not in sent_characters:
             sent_characters[chat_id] = []
 
-        # Reset if all characters have been sent
         if len(sent_characters[chat_id]) >= len(all_characters):
             LOGGER.info(f"[SPAWN] Resetting sent characters for chat {chat_id}")
             sent_characters[chat_id] = []
 
-        # Filter characters that haven't been sent yet
         available_characters = [
             c for c in all_characters
             if 'id' in c and c.get('id') not in sent_characters[chat_id]
@@ -293,7 +268,6 @@ async def send_image(update: Update, context: CallbackContext) -> None:
 
         LOGGER.info(f"[SPAWN] Available characters before filtering: {len(available_characters)}")
 
-        # Filter by spawn settings
         allowed_characters = []
         for char in available_characters:
             if await is_character_allowed(char):
@@ -305,7 +279,6 @@ async def send_image(update: Update, context: CallbackContext) -> None:
             LOGGER.warning(f"[SPAWN] No allowed characters to spawn in chat {chat_id}")
             return
 
-        # Get rarity spawn settings for weighted selection
         character = None
         try:
             if spawn_settings_collection is not None:
@@ -313,7 +286,6 @@ async def send_image(update: Update, context: CallbackContext) -> None:
                 if settings and settings.get('rarities'):
                     rarities = settings['rarities']
 
-                    # Group characters by rarity
                     rarity_groups = {}
                     for char in allowed_characters:
                         char_rarity = char.get('rarity', '🟢 Common')
@@ -326,13 +298,10 @@ async def send_image(update: Update, context: CallbackContext) -> None:
                             rarity_groups[rarity_emoji] = []
                         rarity_groups[rarity_emoji].append(char)
 
-                    # Build weighted selection based on chances
                     weighted_chars = []
                     for emoji, chars in rarity_groups.items():
                         if emoji in rarities and rarities[emoji].get('enabled', True):
                             chance = rarities[emoji].get('chance', 0)
-                            # Add each character with its rarity weight
-                            # Multiply by 10 to get better distribution
                             weight = max(1, int(chance * 10))
                             for char in chars:
                                 weighted_chars.extend([char] * weight)
@@ -344,27 +313,22 @@ async def send_image(update: Update, context: CallbackContext) -> None:
             LOGGER.error(f"[SPAWN] Error in weighted selection: {e}")
             LOGGER.error(traceback.format_exc())
 
-        # Fallback to random selection if weighted selection failed
         if not character:
             character = random.choice(allowed_characters)
             LOGGER.info(f"[SPAWN] Selected character using random selection (fallback)")
 
-        # Mark character as sent
         sent_characters[chat_id].append(character['id'])
         last_characters[chat_id] = character
 
-        # Clear previous guess tracker
         if chat_id in first_correct_guesses:
             del first_correct_guesses[chat_id]
 
-        # Get rarity emoji
         rarity = character.get('rarity', 'Common')
         if isinstance(rarity, str) and ' ' in rarity:
             rarity_emoji = rarity.split(' ')[0]
         else:
             rarity_emoji = ''
 
-        # Send character image
         caption = (
             f"***{rarity_emoji} ʟᴏᴏᴋ ᴀ ᴡᴀɪғᴜ ʜᴀꜱ ꜱᴘᴀᴡɴᴇᴅ !! "
             f"ᴍᴀᴋᴇ ʜᴇʀ ʏᴏᴜʀ'ꜱ ʙʏ ɢɪᴠɪɴɢ\n/grab 𝚆𝚊𝚒𝚏𝚞 𝚗𝚊𝚖𝚎***"
@@ -391,11 +355,9 @@ async def guess(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
 
     try:
-        # Check if there's an active character
         if chat_id not in last_characters:
             return
 
-        # Check if already guessed
         if chat_id in first_correct_guesses:
             await update.message.reply_text(
                 '🚫 𝙒ᴀɪғᴜ ᴀʟʀᴇᴀᴅʏ ɢʀᴀʙʙᴇᴅ ʙʏ 𝙨ᴏᴍᴇᴏɴᴇ ᴇʟ𝙨ᴇ ⚡, '
@@ -403,10 +365,8 @@ async def guess(update: Update, context: CallbackContext) -> None:
             )
             return
 
-        # Get user's guess
         guess_text = ' '.join(context.args).lower() if context.args else ''
 
-        # Validate guess
         if not guess_text:
             await update.message.reply_text('𝙋𝙡𝙚𝙖𝙨𝙚 𝙥𝙧𝙤𝙫𝙞𝙙𝙚 𝙖 𝙣𝙖𝙢𝙚!')
             return
@@ -415,11 +375,9 @@ async def guess(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text("𝙉𝙖𝙝𝙝 𝙔𝙤𝙪 𝘾𝙖𝙣'𝙩 𝙪𝙨𝙚 𝙏𝙝𝙞𝙨 𝙏𝙮𝙥𝙚𝙨 𝙤𝙛 𝙬𝙤𝙧𝙙𝙨 ❌️")
             return
 
-        # Get character name parts
         character_name = last_characters[chat_id].get('name', '').lower()
         name_parts = character_name.split()
 
-        # Check if guess matches
         is_correct = (
             sorted(name_parts) == sorted(guess_text.split()) or
             any(part == guess_text for part in name_parts) or
@@ -427,10 +385,8 @@ async def guess(update: Update, context: CallbackContext) -> None:
         )
 
         if is_correct:
-            # Mark as guessed
             first_correct_guesses[chat_id] = user_id
 
-            # Update or create user
             user = await user_collection.find_one({'id': user_id})
             if user:
                 update_fields = {}
@@ -455,10 +411,8 @@ async def guess(update: Update, context: CallbackContext) -> None:
                     'characters': [last_characters[chat_id]],
                 })
 
-            # Update grab task for pass system
             await update_grab_task(user_id)
 
-            # Update group user totals
             group_user_total = await group_user_totals_collection.find_one({
                 'user_id': user_id,
                 'group_id': chat_id
@@ -491,7 +445,6 @@ async def guess(update: Update, context: CallbackContext) -> None:
                     'count': 1,
                 })
 
-            # Update group totals
             group_info = await top_global_groups_collection.find_one({'group_id': chat_id})
             if group_info:
                 update_fields = {}
@@ -515,7 +468,6 @@ async def guess(update: Update, context: CallbackContext) -> None:
                     'count': 1,
                 })
 
-            # Send success message
             character = last_characters[chat_id]
             keyboard = [[
                 InlineKeyboardButton(
@@ -524,7 +476,6 @@ async def guess(update: Update, context: CallbackContext) -> None:
                 )
             ]]
 
-            # Get rarity properly
             rarity = character.get('rarity', '🟢 Common')
             if isinstance(rarity, str) and ' ' in rarity:
                 rarity_parts = rarity.split(' ', 1)
@@ -568,63 +519,27 @@ def register_all_handlers():
     LOGGER.info("="*50)
 
     try:
-        # Add grab command handlers
+        # Register grab commands
         application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
         LOGGER.info("✅ Registered: /grab, /g commands")
 
-        # Register rarity module handlers FIRST (before other modules)
+        # Register rarity module handlers FIRST
         try:
             from shivu.modules.rarity import register_rarity_handlers
             register_rarity_handlers()
             LOGGER.info("✅ Registered: rarity handlers")
         except (ImportError, AttributeError) as e:
-            LOGGER.warning(f"⚠️ Rarity module not found: {e}")
+            LOGGER.warning(f"⚠️ Rarity module not found or no registration function: {e}")
         except Exception as e:
             LOGGER.error(f"❌ Failed to register rarity handlers: {e}")
             LOGGER.error(traceback.format_exc())
 
-        # Register other custom module handlers
-        handlers_to_register = [
-            ('pass_system', [
-                ('pass_command', 'pass'),
-                ('pclaim_command', 'pclaim'),
-                ('sweekly_command', 'sweekly'),
-                ('tasks_command', 'tasks'),
-                ('upgrade_command', 'upgrade'),
-                ('invite_command', 'invite'),
-                ('passhelp_command', 'passhelp'),
-                ('addinvite_command', 'addinvite'),
-                ('addgrab_command', 'addgrab'),
-                ('approve_elite_command', 'approveelite'),
-            ]),
-            ('remove', 'register_remove_handlers'),
-            ('ckill', 'register_ckill_handler'),
-            ('kill', 'register_kill_handler'),
-            ('hclaim', 'register_hclaim_handler'),
-            ('favorite', 'register_favorite_handlers'),
-            ('gift', 'register_gift_handlers'),
-            ('trade', 'register_trade_handlers'),
-            ('upload', 'register_upload_handlers'),
-            ('leaderboard', 'register_leaderboard_handlers'),
-            ('collection', 'register_collection_handlers'),
-            ('change', 'register_change_handlers'),
-            ('sudo', 'register_sudo_handlers'),
-        ]
-
         # Register pass system handlers
         try:
             from shivu.modules.pass_system import (
-                pass_command,
-                pclaim_command,
-                sweekly_command,
-                tasks_command,
-                upgrade_command,
-                invite_command,
-                passhelp_command,
-                addinvite_command,
-                addgrab_command,
-                approve_elite_command,
-                pass_callback
+                pass_command, pclaim_command, sweekly_command, tasks_command,
+                upgrade_command, invite_command, passhelp_command, addinvite_command,
+                addgrab_command, approve_elite_command, pass_callback
             )
 
             application.add_handler(CommandHandler("pass", pass_command, block=False))
@@ -665,10 +580,13 @@ def register_all_handlers():
         for module_name, register_func_name in module_configs:
             try:
                 module = importlib.import_module(f"shivu.modules.{module_name}")
-                register_func = getattr(module, register_func_name)
-                register_func()
-                LOGGER.info(f"✅ Registered: {module_name} handlers")
-            except (ImportError, AttributeError):
+                if hasattr(module, register_func_name):
+                    register_func = getattr(module, register_func_name)
+                    register_func()
+                    LOGGER.info(f"✅ Registered: {module_name} handlers")
+                else:
+                    LOGGER.warning(f"⚠️ {module_name} module found but no {register_func_name} function")
+            except ImportError:
                 LOGGER.warning(f"⚠️ {module_name.capitalize()} module not found, skipping")
             except Exception as e:
                 LOGGER.error(f"❌ Failed to register {module_name} handlers: {e}")
@@ -684,7 +602,7 @@ def register_all_handlers():
 
         LOGGER.info("="*50)
         LOGGER.info("✅ ALL HANDLERS REGISTERED SUCCESSFULLY")
-        LOGGER.info(f"📊 Spawn frequency: {DEFAULT_MESSAGE_FREQUENCY} messages")
+        LOGGER.info(f"📊 Default spawn frequency: {DEFAULT_MESSAGE_FREQUENCY} messages")
         LOGGER.info("="*50)
 
     except Exception as e:
