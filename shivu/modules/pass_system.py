@@ -826,7 +826,7 @@ async def passhelp_command(update: Update, context: CallbackContext) -> None:
 
 <b>{to_small_caps('pass tiers')}:</b>
 {to_small_caps('free')}: 1,000 {to_small_caps('weekly')} | 5,000 {to_small_caps('streak')}
-{to_small_caps('premium')}: 5,000 {to_small_caps('weekly')} | 25,000 {to_small_caps('streak')} | 3 {to_small_caps('mythic per claim')}
+{to_small_caps('premium')}: 5,000 {to_small_caps('weekly')} | 25,000 {to_small_caps('streak')} | 3
 {to_small_caps('elite')}: 15,000 {to_small_caps('weekly')} | 100,000 {to_small_caps('streak')} | 10 {to_small_caps('mythic per claim')}
 
 <b>{to_small_caps('tasks for mythic unlock')}:</b>
@@ -1079,7 +1079,6 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
 {to_small_caps('instant mythics')}: 5 {to_small_caps('characters')}
 {to_small_caps('weekly reward')}: 15,000
 {to_small_caps('streak bonus')}: 100,000
-{to_small_caps('mythic per claim')}: 1
 {to_small_caps('multiplier')}: 2x
 
 {to_small_caps('choose your upgrade')}
@@ -1195,7 +1194,7 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                 f"<b>{to_small_caps('pass tiers')}:</b>\n"
                 f"{to_small_caps('free')}: {to_small_caps('basic rewards')}\n"
                 f"{to_small_caps('premium')}: {to_small_caps('50k gold for 30 days')}\n"
-                f"{to_small_caps('elite')}: {to_small_caps('10 inr for 30 days')}\n\n"
+                f"{to_small_caps('elite')}: {to_small_caps('50 inr for 30 days')}\n\n"
                 f"{to_small_caps('complete all tasks for free mythic')}"
             )
 
@@ -1450,7 +1449,6 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                 f"🏵 {to_small_caps('instant mythics')}: 5 {to_small_caps('characters')}\n"
                 f"📅 {to_small_caps('weekly reward')}: 15,000 {to_small_caps('gold')}\n"
                 f"🔥 {to_small_caps('streak bonus')}: 100,000 {to_small_caps('gold')}\n"
-                f"⚡ {to_small_caps('mythic per claim')}: 10\n"
                 f"✨ {to_small_caps('grab multiplier')}: 2.0x\n"
                 f"⏰ {to_small_caps('duration')}: 30 {to_small_caps('days')}"
             )
@@ -1496,7 +1494,7 @@ async def pass_callback(update: Update, context: CallbackContext) -> None:
                         f"{to_small_caps('user id')}: <code>{user_id}</code>\n"
                         f"{to_small_caps('username')}: @{query.from_user.username or 'none'}\n"
                         f"{to_small_caps('name')}: {query.from_user.first_name}\n"
-                        f"{to_small_caps('amount')}: ₹10\n"
+                        f"{to_small_caps('amount')}: ₹50\n"
                         f"{to_small_caps('time')}: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n\n"
                         f"<b>{to_small_caps('to approve')}:</b>\n"
                         f"<code>/approveelite {user_id}</code>"
