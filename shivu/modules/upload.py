@@ -91,107 +91,178 @@ async def upload_to_catbox(file_bytes, filename):
     url = "https://catbox.moe/user/api.php"
 
     try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
             data = aiohttp.FormData()
             data.add_field('reqtype', 'fileupload')
             data.add_field('fileToUpload', file_bytes, filename=filename)
 
             async with session.post(url, data=data) as response:
                 if response.status == 200:
-                    return (await response.text()).strip()
+                    result = (await response.text()).strip()
+                    # Verify the URL is accessible
+                    if result and result.startswith('http'):
+                        return result
                 return None
     except Exception as e:
         print(f"Catbox upload error: {e}")
         return None
 
 
-async def upload_to_tmpfiles(file_bytes, filename):
-    """Upload file to tmpfiles.org (fallback)"""
-    url = "https://tmpfiles.org/api/v1/upload"
+async def upload_to_imgbb(file_bytes, filename):
+    """Upload to ImgBB (reliable for images, free tier available)"""
+    # You'll need an API key from https://api.imgbb.com/
+    # For now, this is a placeholder - you can add your key
+    api_key = "YOUR_IMGBB_API_KEY"  # Get from https://api.imgbb.com/
     
-    try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
-            data = aiohttp.FormData()
-            data.add_field('file', file_bytes, filename=filename)
-            
-            async with session.post(url, data=data) as response:
-                if response.status == 200:
-                    result = await response.json()
-                    if result.get('status') == 'success':
-                        # tmpfiles returns URL like: https://tmpfiles.org/12345
-                        # We need direct link: https://tmpfiles.org/dl/12345
-                        file_url = result['data']['url']
-                        return file_url.replace('tmpfiles.org/', 'tmpfiles.org/dl/')
-                return None
-    except Exception as e:
-        print(f"tmpfiles upload error: {e}")
+    if api_key == "YOUR_IMGBB_API_KEY":
         return None
-
-
-async def upload_to_fileio(file_bytes, filename):
-    """Upload file to file.io (fallback 2)"""
-    url = "https://file.io"
+    
+    url = "https://api.imgbb.com/1/upload"
     
     try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+        import base64
+        
+        # ImgBB requires base64 encoding
+        b64_image = base64.b64encode(file_bytes.read()).decode('utf-8')
+        
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
             data = aiohttp.FormData()
-            data.add_field('file', file_bytes, filename=filename)
+            data.add_field('key', api_key)
+            data.add_field('image', b64_image)
             
             async with session.post(url, data=data) as response:
                 if response.status == 200:
                     result = await response.json()
                     if result.get('success'):
-                        return result['link']
+                        return result['data']['url']
                 return None
     except Exception as e:
-        print(f"file.io upload error: {e}")
+        print(f"ImgBB upload error: {e}")
         return None
 
 
 async def upload_to_telegra_ph(file_bytes, filename):
-    """Upload file to Telegraph (fallback 3 - images only)"""
+    """Upload file to Telegraph (works reliably for images)"""
     url = "https://telegra.ph/upload"
-    
+
     try:
         # Check if it's an image
-        if not any(filename.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif']):
+        if not any(filename.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']):
             return None
-            
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
             data = aiohttp.FormData()
             data.add_field('file', file_bytes, filename=filename)
-            
+
             async with session.post(url, data=data) as response:
                 if response.status == 200:
                     result = await response.json()
                     if isinstance(result, list) and len(result) > 0:
-                        return f"https://telegra.ph{result[0]['src']}"
+                        img_url = f"https://telegra.ph{result[0]['src']}"
+                        # Verify URL is accessible
+                        async with session.head(img_url) as check:
+                            if check.status == 200:
+                                return img_url
                 return None
     except Exception as e:
         print(f"Telegraph upload error: {e}")
         return None
 
 
+async def upload_to_pixeldrain(file_bytes, filename):
+    """Upload to Pixeldrain (good for both images and videos)"""
+    url = "https://pixeldrain.com/api/file"
+    
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=120)) as session:
+            data = aiohttp.FormData()
+            data.add_field('file', file_bytes, filename=filename)
+            
+            async with session.post(url, data=data) as response:
+                if response.status == 201:
+                    result = await response.json()
+                    if result.get('success'):
+                        file_id = result['id']
+                        # Return direct view URL
+                        return f"https://pixeldrain.com/api/file/{file_id}?download"
+                return None
+    except Exception as e:
+        print(f"Pixeldrain upload error: {e}")
+        return None
+
+
+async def upload_to_gofile(file_bytes, filename):
+    """Upload to Gofile (reliable, no limits)"""
+    try:
+        # First get server
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=120)) as session:
+            async with session.get("https://api.gofile.io/getServer") as resp:
+                if resp.status != 200:
+                    return None
+                server_data = await resp.json()
+                if server_data['status'] != 'ok':
+                    return None
+                server = server_data['data']['server']
+            
+            # Upload file
+            url = f"https://{server}.gofile.io/uploadFile"
+            data = aiohttp.FormData()
+            data.add_field('file', file_bytes, filename=filename)
+            
+            async with session.post(url, data=data) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    if result['status'] == 'ok':
+                        return result['data']['downloadPage']
+                return None
+    except Exception as e:
+        print(f"Gofile upload error: {e}")
+        return None
+
+
+async def verify_url_accessible(url):
+    """Verify if URL is accessible by Telegram"""
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
+            async with session.head(url, allow_redirects=True) as response:
+                return response.status == 200
+    except:
+        return False
+
+
 async def upload_with_fallback(file_bytes, filename):
-    """Try multiple upload services in order"""
+    """Try multiple upload services in order with verification"""
     services = [
         ("Catbox", upload_to_catbox),
-        ("tmpfiles.org", upload_to_tmpfiles),
-        ("file.io", upload_to_fileio),
-        ("Telegraph", upload_to_telegra_ph)
+        ("Telegraph", upload_to_telegra_ph),
+        ("Pixeldrain", upload_to_pixeldrain),
+        ("ImgBB", upload_to_imgbb),
+        ("Gofile", upload_to_gofile)
     ]
-    
+
     for service_name, upload_func in services:
         try:
             print(f"Trying {service_name}...")
-            url = await upload_func(file_bytes, filename)
+            
+            # Reset file pointer
+            if hasattr(file_bytes, 'seek'):
+                file_bytes.seek(0)
+            
+            url = await upload_func(file_bytes if hasattr(file_bytes, 'read') else io.BytesIO(file_bytes), filename)
+            
             if url:
-                print(f"✅ Successfully uploaded to {service_name}")
-                return url, service_name
+                # Verify URL is accessible
+                print(f"Verifying {service_name} URL...")
+                if await verify_url_accessible(url):
+                    print(f"✅ Successfully uploaded and verified with {service_name}")
+                    return url, service_name
+                else:
+                    print(f"⚠️ {service_name} URL not accessible, trying next...")
+                    continue
         except Exception as e:
             print(f"❌ {service_name} failed: {e}")
             continue
-    
+
     return None, None
 
 
@@ -203,7 +274,15 @@ def is_video_url(url):
     return any(url.lower().endswith(ext) for ext in video_extensions)
 
 
-async def create_character_entry(media_url, character_name, anime, rarity, user_id, user_name, context, is_new=True, is_video=False):
+def is_video_file(filename):
+    """Check if filename is a video"""
+    if not filename:
+        return False
+    video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv']
+    return any(filename.lower().endswith(ext) for ext in video_extensions)
+
+
+async def create_character_entry(media_url, character_name, anime, rarity, user_id, user_name, context, is_new=True, is_video=False, file_bytes=None, filename=None):
     """Create character entry in database and post to channel"""
     char_id = str(await get_next_sequence_number('character_id')).zfill(2)
 
@@ -228,42 +307,94 @@ async def create_character_entry(media_url, character_name, anime, rarity, user_
     )
 
     try:
-        # Send video or photo based on type
-        if is_video:
-            message = await context.bot.send_video(
-                chat_id=CHARA_CHANNEL_ID,
-                video=media_url,
-                caption=caption,
-                parse_mode='HTML'
-            )
-            # Save file_id for inline queries
-            character['file_id'] = message.video.file_id
-            character['file_unique_id'] = message.video.file_unique_id
-        else:
-            message = await context.bot.send_photo(
-                chat_id=CHARA_CHANNEL_ID,
-                photo=media_url,
-                caption=caption,
-                parse_mode='HTML'
-            )
-            # Save file_id for inline queries
-            character['file_id'] = message.photo[-1].file_id
-            character['file_unique_id'] = message.photo[-1].file_unique_id
+        message = None
         
-        character['message_id'] = message.message_id
-        await collection.insert_one(character)
-        return True, f'✅ Character added successfully!\n🆔 ID: {char_id}\n📁 Type: {media_type}'
+        # Try sending via URL first
+        try:
+            if is_video:
+                message = await context.bot.send_video(
+                    chat_id=CHARA_CHANNEL_ID,
+                    video=media_url,
+                    caption=caption,
+                    parse_mode='HTML',
+                    read_timeout=60,
+                    write_timeout=60
+                )
+                character['file_id'] = message.video.file_id
+                character['file_unique_id'] = message.video.file_unique_id
+            else:
+                message = await context.bot.send_photo(
+                    chat_id=CHARA_CHANNEL_ID,
+                    photo=media_url,
+                    caption=caption,
+                    parse_mode='HTML',
+                    read_timeout=60,
+                    write_timeout=60
+                )
+                character['file_id'] = message.photo[-1].file_id
+                character['file_unique_id'] = message.photo[-1].file_unique_id
+        except Exception as url_error:
+            print(f"URL upload failed: {url_error}")
+            
+            # Fallback: Try uploading file bytes directly if available
+            if file_bytes and filename:
+                print("Trying direct file upload as fallback...")
+                if hasattr(file_bytes, 'seek'):
+                    file_bytes.seek(0)
+                
+                if is_video or is_video_file(filename):
+                    message = await context.bot.send_video(
+                        chat_id=CHARA_CHANNEL_ID,
+                        video=file_bytes,
+                        caption=caption,
+                        parse_mode='HTML',
+                        read_timeout=120,
+                        write_timeout=120
+                    )
+                    character['file_id'] = message.video.file_id
+                    character['file_unique_id'] = message.video.file_unique_id
+                else:
+                    message = await context.bot.send_photo(
+                        chat_id=CHARA_CHANNEL_ID,
+                        photo=file_bytes,
+                        caption=caption,
+                        parse_mode='HTML',
+                        read_timeout=60,
+                        write_timeout=60
+                    )
+                    character['file_id'] = message.photo[-1].file_id
+                    character['file_unique_id'] = message.photo[-1].file_unique_id
+            else:
+                raise url_error
+
+        if message:
+            character['message_id'] = message.message_id
+            await collection.insert_one(character)
+            return True, f'✅ Character added successfully!\n🆔 ID: {char_id}\n📁 Type: {media_type}'
+        else:
+            raise Exception("Failed to send message")
+            
     except Exception as e:
+        # Save to database anyway for manual fix
         await collection.insert_one(character)
-        return False, f"Character added to database but channel upload failed.\nError: {str(e)}"
+        error_msg = str(e)
+        return False, (
+            f"⚠️ Character added to database but channel upload failed.\n\n"
+            f"🆔 ID: {char_id}\n"
+            f"❌ Error: {error_msg}\n\n"
+            f"💡 The character is saved. You can try updating it later with:\n"
+            f"`/update {char_id} img_url <new_url>`"
+        )
 
 
 def validate_url(url):
     """Validate if URL is accessible"""
     try:
-        urllib.request.urlopen(url, timeout=10)
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        urllib.request.urlopen(req, timeout=15)
         return True
-    except Exception:
+    except Exception as e:
+        print(f"URL validation failed: {e}")
         return False
 
 
@@ -303,7 +434,9 @@ async def upload(update: Update, context: CallbackContext) -> None:
             try:
                 # Get file and determine type
                 is_video = False
-                
+                file = None
+                filename = None
+
                 if reply_msg.photo:
                     file = await reply_msg.photo[-1].get_file()
                     filename = f"char_{update.effective_user.id}.jpg"
@@ -314,30 +447,31 @@ async def upload(update: Update, context: CallbackContext) -> None:
                 else:  # Document
                     file = await reply_msg.document.get_file()
                     filename = reply_msg.document.file_name or f"char_{update.effective_user.id}"
-                    # Check if document is a video
                     if reply_msg.document.mime_type and 'video' in reply_msg.document.mime_type:
                         is_video = True
 
                 # Download file
                 file_bytes = await file.download_as_bytearray()
-                
+                file_io = io.BytesIO(file_bytes)
+
                 # Try uploading with multiple services
                 await processing_msg.edit_text('⏳ Uploading to cloud services...')
-                media_url, service = await upload_with_fallback(io.BytesIO(file_bytes), filename)
+                media_url, service = await upload_with_fallback(file_io, filename)
 
                 if not media_url:
                     await processing_msg.edit_text(
-                        '❌ All upload services failed. Please try again later or use a direct URL.\n\n'
-                        'Tried: Catbox, tmpfiles.org, file.io, Telegraph'
+                        '⚠️ All cloud upload services failed.\n'
+                        '🔄 Attempting direct upload to Telegram...'
                     )
-                    return
-
-                media_type = "video" if is_video else "image"
-                await processing_msg.edit_text(
-                    f'✅ {media_type.title()} uploaded to {service}!\n'
-                    f'🔗 {media_url}\n\n'
-                    f'⏳ Adding to database...'
-                )
+                    # Use a dummy URL, we'll upload directly
+                    media_url = f"https://example.com/{filename}"
+                else:
+                    media_type = "video" if is_video else "image"
+                    await processing_msg.edit_text(
+                        f'✅ {media_type.title()} uploaded to {service}!\n'
+                        f'🔗 {media_url}\n\n'
+                        f'⏳ Adding to database...'
+                    )
 
                 character_name = args[0].replace('-', ' ').title()
                 anime = args[1].replace('-', ' ').title()
@@ -347,10 +481,12 @@ async def upload(update: Update, context: CallbackContext) -> None:
                     await processing_msg.edit_text('❌ Invalid rarity number. Check format guide.')
                     return
 
+                # Pass file_bytes for fallback direct upload
+                file_io.seek(0)
                 success, message = await create_character_entry(
                     media_url, character_name, anime, rarity,
                     update.effective_user.id, update.effective_user.first_name,
-                    context, is_video=is_video
+                    context, is_video=is_video, file_bytes=file_io, filename=filename
                 )
 
                 await processing_msg.edit_text(message)
@@ -359,7 +495,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
                 await processing_msg.edit_text(f'❌ Error: {str(e)}')
                 return
 
-        # Handle URL-based upload (supports both image and video URLs)
+        # Handle URL-based upload
         else:
             args = context.args
             if len(args) != 4:
@@ -371,9 +507,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
                 await update.message.reply_text('❌ Invalid or inaccessible URL.')
                 return
 
-            # Detect if URL is for a video
             is_video = is_video_url(media_url)
-
             character_name = args[1].replace('-', ' ').title()
             anime = args[2].replace('-', ' ').title()
             rarity = parse_rarity(args[3])
@@ -423,7 +557,7 @@ async def delete(update: Update, context: CallbackContext) -> None:
                 message_id=character['message_id']
             )
         except Exception:
-            pass  # Message might already be deleted
+            pass
 
         await update.message.reply_text('✅ Character deleted successfully.')
 
@@ -476,19 +610,16 @@ async def update_character(update: Update, context: CallbackContext) -> None:
 
         # Update database
         update_data = {field: new_value}
-        
-        # If updating img_url, also update is_video flag
+
         if field == 'img_url':
             update_data['is_video'] = is_video_url(new_value)
-        
+
         await collection.find_one_and_update({'id': char_id}, {'$set': update_data})
         character = await collection.find_one({'id': char_id})
 
-        # Determine if current entry is video
         is_video = character.get('is_video', False)
         media_type = "🎥 Video" if is_video else "🖼 Image"
 
-        # Update channel message
         caption = (
             f'<b>{character["id"]}:</b> {character["name"]}\n'
             f'<b>{character["anime"]}</b>\n'
@@ -500,21 +631,20 @@ async def update_character(update: Update, context: CallbackContext) -> None:
 
         try:
             if field == 'img_url':
-                # Delete old message and send new one
                 await context.bot.delete_message(
                     chat_id=CHARA_CHANNEL_ID, 
                     message_id=character['message_id']
                 )
-                
-                # Send video or photo based on new URL
+
                 if is_video:
                     message = await context.bot.send_video(
                         chat_id=CHARA_CHANNEL_ID,
                         video=new_value,
                         caption=caption,
-                        parse_mode='HTML'
+                        parse_mode='HTML',
+                        read_timeout=60,
+                        write_timeout=60
                     )
-                    # Update file_id
                     await collection.find_one_and_update(
                         {'id': char_id},
                         {'$set': {
@@ -528,9 +658,10 @@ async def update_character(update: Update, context: CallbackContext) -> None:
                         chat_id=CHARA_CHANNEL_ID,
                         photo=new_value,
                         caption=caption,
-                        parse_mode='HTML'
+                        parse_mode='HTML',
+                        read_timeout=60,
+                        write_timeout=60
                     )
-                    # Update file_id
                     await collection.find_one_and_update(
                         {'id': char_id},
                         {'$set': {
@@ -540,7 +671,6 @@ async def update_character(update: Update, context: CallbackContext) -> None:
                         }}
                     )
             else:
-                # Just update caption
                 await context.bot.edit_message_caption(
                     chat_id=CHARA_CHANNEL_ID,
                     message_id=character['message_id'],
