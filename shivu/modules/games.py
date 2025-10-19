@@ -191,13 +191,19 @@ async def gamble(update: Update, context: CallbackContext):
         return
 
     await change_balance(user_id, -amount)
-    outcome = random.choice(['l', 'r'])
-    if outcome == pick:
+    # Weighted outcome: 35% chance to win, 65% chance to lose
+    outcome = random.choices(['win', 'lose'], weights=[35, 65], k=1)[0]
+    
+    if outcome == 'win':
+        # Show random side but player wins
+        display_outcome = random.choice(['l', 'r'])
         win_amount = amount * 2
         await change_balance(user_id, win_amount)
-        text = f"🎰 Result: {outcome} — You won {win_amount} coins!"
+        text = f"🎰 Result: {display_outcome} — You won {win_amount} coins!"
     else:
-        text = f"🎰 Result: {outcome} — You lost {amount} coins."
+        # Player loses - show the opposite of their pick
+        display_outcome = 'r' if pick == 'l' else 'l'
+        text = f"🎰 Result: {display_outcome} — You lost {amount} coins."
 
     _user_cooldowns[user_id] = datetime.utcnow()
     await update.message.reply_text(text, reply_markup=play_again_button("gamble", f"{amount}:{pick}"))
