@@ -1177,7 +1177,7 @@ async def profile_cmd(update: Update, context: CallbackContext):
 # ------------------------
 # REGISTER HANDLERS
 # ------------------------
-application.add_handler(CommandHandler("start", start_wizard, block=False))
+application.add_handler(CommandHandler("starts", start_wizard, block=False))
 application.add_handler(CommandHandler("cast", cast_spell, block=False))
 application.add_handler(CommandHandler("heal", heal_cmd, block=False))
 application.add_handler(CommandHandler("shield", shield_cmd, block=False))
