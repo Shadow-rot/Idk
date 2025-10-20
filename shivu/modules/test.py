@@ -3,7 +3,7 @@ import random
 import time
 import asyncio
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAnimation
 from telegram.ext import CommandHandler, CallbackQueryHandler, CallbackContext
 from shivu import application, db
 
@@ -402,12 +402,12 @@ async def start_wizard(update: Update, context: CallbackContext):
     else:
         user = update.effective_user
         is_callback = False
-    
+
     wizard = await get_wizard(user.id, user.first_name, user.username)
-    
+
     hp_bar = create_progress_bar(wizard['hp'], wizard['max_hp'])
     mana_bar = create_progress_bar(wizard['mana'], wizard['max_mana'])
-    
+
     text = (
         f"✦━━━━━━━━━━━━━━━━━━━━✦\n"
         f"    ✨ ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ꜱᴘᴇʟʟᴄᴀꜱᴛ ✨\n"
@@ -425,7 +425,7 @@ async def start_wizard(update: Update, context: CallbackContext):
         f"━━━━━━━━━━━━━━━━━━━━━\n\n"
         f"⚡ ᴜꜱᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ɴᴀᴠɪɢᴀᴛᴇ"
     )
-    
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🪄 ʙᴇɢɪɴ ᴊᴏᴜʀɴᴇʏ", callback_data="menu:journey"),
@@ -444,26 +444,37 @@ async def start_wizard(update: Update, context: CallbackContext):
             InlineKeyboardButton("👤 ᴘʀᴏꜰɪʟᴇ", callback_data="menu:profile")
         ]
     ])
-    
+
     gif = get_gif('portal')
-    
+
     if is_callback:
         # Edit existing message
         try:
             await query.edit_message_media(
-                media=telegram.InputMediaAnimation(
+                media=InputMediaAnimation(  # ✅ Now properly imported
                     media=gif,
                     caption=text,
                     parse_mode='HTML'
                 ),
                 reply_markup=keyboard
             )
-        except:
-            await query.edit_message_caption(
-                caption=text,
-                parse_mode='HTML',
-                reply_markup=keyboard
-            )
+        except Exception as e:
+            # Fallback if media edit fails
+            try:
+                await query.edit_message_caption(
+                    caption=text,
+                    parse_mode='HTML',
+                    reply_markup=keyboard
+                )
+            except:
+                # If all else fails, send new message
+                await send_animated_message(
+                    context,
+                    query.message.chat_id,
+                    text,
+                    gif,
+                    reply_markup=keyboard
+                )
     else:
         # Send new message
         await send_animated_message(
