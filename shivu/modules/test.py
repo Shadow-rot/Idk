@@ -390,11 +390,19 @@ def create_progress_bar(current: int, maximum: int, length: int = 10) -> str:
     return bar
 
 # ------------------------
-# COMMAND: /starts
+# COMMAND: /starts - FIXED MAIN MENU
 # ------------------------
 async def start_wizard(update: Update, context: CallbackContext):
     """Cinematic wizard welcome"""
-    user = update.effective_user
+    # Handle both command and callback
+    if update.callback_query:
+        query = update.callback_query
+        user = query.from_user
+        is_callback = True
+    else:
+        user = update.effective_user
+        is_callback = False
+    
     wizard = await get_wizard(user.id, user.first_name, user.username)
     
     hp_bar = create_progress_bar(wizard['hp'], wizard['max_hp'])
@@ -438,10 +446,36 @@ async def start_wizard(update: Update, context: CallbackContext):
     ])
     
     gif = get_gif('portal')
-    await send_animated_message(context, update.effective_chat.id, text, gif, reply_markup=keyboard)
+    
+    if is_callback:
+        # Edit existing message
+        try:
+            await query.edit_message_media(
+                media=telegram.InputMediaAnimation(
+                    media=gif,
+                    caption=text,
+                    parse_mode='HTML'
+                ),
+                reply_markup=keyboard
+            )
+        except:
+            await query.edit_message_caption(
+                caption=text,
+                parse_mode='HTML',
+                reply_markup=keyboard
+            )
+    else:
+        # Send new message
+        await send_animated_message(
+            context,
+            update.effective_chat.id,
+            text,
+            gif,
+            reply_markup=keyboard
+        )
 
 # ------------------------
-# MENU CALLBACK HANDLER
+# MENU CALLBACK HANDLER - FIXED
 # ------------------------
 async def menu_callback(update: Update, context: CallbackContext):
     """Handle menu button clicks"""
@@ -453,56 +487,85 @@ async def menu_callback(update: Update, context: CallbackContext):
     
     user_id = query.from_user.id
     
+    # Route to correct function based on action
     if action == "journey":
-        text = (
-            f"✦━━━━━━━━━━━━━━━━━━━━✦\n"
-            f"      🗺️ ʏᴏᴜʀ ᴊᴏᴜʀɴᴇʏ\n"
-            f"✦━━━━━━━━━━━━━━━━━━━━✦\n\n"
-            f"<b>ǫᴜɪᴄᴋ ᴄᴏᴍᴍᴀɴᴅꜱ:</b>\n\n"
-            f"⚔️ /cast [spell] - ᴀᴛᴛᴀᴄᴋ ꜱᴏᴍᴇᴏɴᴇ\n"
-            f"   <i>ʀᴇᴘʟʏ ᴛᴏ ᴛʜᴇɪʀ ᴍᴇꜱꜱᴀɢᴇ</i>\n\n"
-            f"💚 /heal - ʀᴇꜱᴛᴏʀᴇ ʜᴘ\n"
-            f"🛡️ /shield - ʙʟᴏᴄᴋ ᴅᴀᴍᴀɢᴇ\n"
-            f"🧪 /use [item] - ᴜꜱᴇ ᴘᴏᴛɪᴏɴ\n\n"
-            f"💡 <i>ᴛɪᴘ: ʀᴇᴘʟʏ ᴛᴏ ꜱᴏᴍᴇᴏɴᴇ'ꜱ ᴍᴇꜱꜱᴀɢᴇ\n"
-            f"   ᴀɴᴅ ᴜꜱᴇ /cast fireball</i>"
-        )
-        await query.edit_message_caption(caption=text, parse_mode='HTML')
-    
+        await show_journey_menu(query, user_id)
     elif action == "spells":
         await show_spells_menu(query, user_id)
-    
     elif action == "shop":
         await show_shop_menu(query, user_id)
-    
     elif action == "inventory":
         await show_inventory_menu(query, user_id)
-    
     elif action == "duel":
-        text = (
-            f"✦━━━━━━━━━━━━━━━━━━━━✦\n"
-            f"      ⚔️ ᴅᴜᴇʟ ᴀʀᴇɴᴀ\n"
-            f"✦━━━━━━━━━━━━━━━━━━━━✦\n\n"
-            f"🎯 <b>ʜᴏᴡ ᴛᴏ ᴅᴜᴇʟ:</b>\n\n"
-            f"1️⃣ ʀᴇᴘʟʏ ᴛᴏ ꜱᴏᴍᴇᴏɴᴇ'ꜱ ᴍᴇꜱꜱᴀɢᴇ\n"
-            f"2️⃣ ᴛʏᴘᴇ /duel\n"
-            f"3️⃣ ᴡᴀɪᴛ ꜰᴏʀ ᴛʜᴇᴍ ᴛᴏ ᴀᴄᴄᴇᴘᴛ\n"
-            f"4️⃣ ᴛᴀᴋᴇ ᴛᴜʀɴꜱ ᴄᴀꜱᴛɪɴɢ ꜱᴘᴇʟʟꜱ\n\n"
-            f"⚡ ᴡɪɴɴᴇʀ ɢᴇᴛꜱ xᴘ & ᴄᴏɪɴꜱ!"
-        )
-        await query.edit_message_caption(caption=text, parse_mode='HTML')
-    
+        await show_duel_info(query, user_id)
     elif action == "rank":
         await show_rankings(query)
-    
     elif action == "daily":
         await claim_daily_reward(query, user_id)
-    
     elif action == "profile":
         await show_profile(query, user_id)
+    elif action == "main":
+        # Back to main menu
+        await start_wizard(update, context)
 
 # ------------------------
-# SHOW SPELLS MENU
+# SHOW JOURNEY MENU - NEW
+# ------------------------
+async def show_journey_menu(query, user_id: int):
+    """Show journey/commands info"""
+    text = (
+        f"✦━━━━━━━━━━━━━━━━━━━━✦\n"
+        f"      🗺️ ʏᴏᴜʀ ᴊᴏᴜʀɴᴇʏ\n"
+        f"✦━━━━━━━━━━━━━━━━━━━━✦\n\n"
+        f"<b>Qᴜɪᴄᴋ ᴄᴏᴍᴍᴀɴᴅꜱ:</b>\n\n"
+        f"⚔️ /cast [spell] - ᴀᴛᴛᴀᴄᴋ ꜱᴏᴍᴇᴏɴᴇ\n"
+        f"   <i>ʀᴇᴘʟʏ ᴛᴏ ᴛʜᴇɪʀ ᴍᴇꜱꜱᴀɢᴇ</i>\n\n"
+        f"💚 /heal - ʀᴇꜱᴛᴏʀᴇ ʜᴘ\n"
+        f"🛡️ /shield - ʙʟᴏᴄᴋ ᴅᴀᴍᴀɢᴇ\n"
+        f"🧪 /use [item] - ᴜꜱᴇ ᴘᴏᴛɪᴏɴ\n\n"
+        f"💡 <i>ᴛɪᴘ: ʀᴇᴘʟʏ ᴛᴏ ꜱᴏᴍᴇᴏɴᴇ'ꜱ ᴍᴇꜱꜱᴀɢᴇ\n"
+        f"   ᴀɴᴅ ᴜꜱᴇ /cast fireball</i>"
+    )
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("« ʙᴀᴄᴋ ᴛᴏ ᴍᴇɴᴜ", callback_data="menu:main")]
+    ])
+    
+    await query.edit_message_caption(
+        caption=text,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+# ------------------------
+# SHOW DUEL INFO - NEW
+# ------------------------
+async def show_duel_info(query, user_id: int):
+    """Show duel information"""
+    text = (
+        f"✦━━━━━━━━━━━━━━━━━━━━✦\n"
+        f"      ⚔️ ᴅᴜᴇʟ ᴀʀᴇɴᴀ\n"
+        f"✦━━━━━━━━━━━━━━━━━━━━✦\n\n"
+        f"🎯 <b>ʜᴏᴡ ᴛᴏ ᴅᴜᴇʟ:</b>\n\n"
+        f"1️⃣ ʀᴇᴘʟʏ ᴛᴏ ꜱᴏᴍᴇᴏɴᴇ'ꜱ ᴍᴇꜱꜱᴀɢᴇ\n"
+        f"2️⃣ ᴛʏᴘᴇ /duel\n"
+        f"3️⃣ ᴡᴀɪᴛ ꜰᴏʀ ᴛʜᴇᴍ ᴛᴏ ᴀᴄᴄᴇᴘᴛ\n"
+        f"4️⃣ ᴛᴀᴋᴇ ᴛᴜʀɴꜱ ᴄᴀꜱᴛɪɴɢ ꜱᴘᴇʟʟꜱ\n\n"
+        f"⚡ ᴡɪɴɴᴇʀ ɢᴇᴛꜱ xᴘ & ᴄᴏɪɴꜱ!"
+    )
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("« ʙᴀᴄᴋ ᴛᴏ ᴍᴇɴᴜ", callback_data="menu:main")]
+    ])
+    
+    await query.edit_message_caption(
+        caption=text,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+# ------------------------
+# SHOW SPELLS MENU - FIXED
 # ------------------------
 async def show_spells_menu(query, user_id: int):
     """Show user's spellbook"""
@@ -532,7 +595,7 @@ async def show_spells_menu(query, user_id: int):
     await query.edit_message_caption(caption=text, parse_mode='HTML', reply_markup=keyboard)
 
 # ------------------------
-# SHOW SHOP MENU
+# SHOW SHOP MENU - FIXED
 # ------------------------
 async def show_shop_menu(query, user_id: int):
     """Holographic shop interface"""
@@ -557,7 +620,6 @@ async def show_shop_menu(query, user_id: int):
     for spell_key, spell in SPELLS.items():
         if spell_key not in wizard.get('spells', []) and spell['price'] > 0:
             if wizard['level'] >= spell['level_req']:
-                status = "✅"
                 text += f"{spell['emoji']} {spell['name']} - {spell['price']}💰\n"
                 text += f"   ⚔️ {spell['damage']} ᴅᴍɢ | ʟᴠʟ {spell['level_req']}\n\n"
                 buttons.append([InlineKeyboardButton(f"{spell['emoji']} ʙᴜʏ {spell['name'].split()[1]}", callback_data=f"buy:spell:{spell_key}")])
@@ -570,7 +632,7 @@ async def show_shop_menu(query, user_id: int):
     await query.edit_message_caption(caption=text, parse_mode='HTML', reply_markup=keyboard)
 
 # ------------------------
-# BUY CALLBACK
+# BUY CALLBACK - FIXED
 # ------------------------
 async def buy_callback(update: Update, context: CallbackContext):
     """Handle purchases"""
@@ -603,6 +665,9 @@ async def buy_callback(update: Update, context: CallbackContext):
         })
         
         await query.answer(f"✅ ʙᴏᴜɢʜᴛ {item['name']}!", show_alert=True)
+        
+        # Refresh wizard data and show updated shop
+        wizard = await get_wizard(user_id)
         await show_shop_menu(query, user_id)
     
     elif buy_type == "spell":
@@ -632,10 +697,13 @@ async def buy_callback(update: Update, context: CallbackContext):
         })
         
         await query.answer(f"✨ ʟᴇᴀʀɴᴇᴅ {spell['name']}!", show_alert=True)
+        
+        # Refresh wizard data and show updated shop
+        wizard = await get_wizard(user_id)
         await show_shop_menu(query, user_id)
 
 # ------------------------
-# SHOW INVENTORY
+# SHOW INVENTORY - FIXED
 # ------------------------
 async def show_inventory_menu(query, user_id: int):
     """Show user inventory"""
@@ -651,7 +719,7 @@ async def show_inventory_menu(query, user_id: int):
     
     buttons = []
     
-    if not inventory:
+    if not inventory or sum(inventory.values()) == 0:
         text += "📦 ʏᴏᴜʀ ɪɴᴠᴇɴᴛᴏʀʏ ɪꜱ ᴇᴍᴘᴛʏ!\n\n"
     else:
         for item_key, count in inventory.items():
@@ -669,7 +737,7 @@ async def show_inventory_menu(query, user_id: int):
     await query.edit_message_caption(caption=text, parse_mode='HTML', reply_markup=keyboard)
 
 # ------------------------
-# USE ITEM CALLBACK
+# USE ITEM CALLBACK - FIXED
 # ------------------------
 async def use_item_callback(update: Update, context: CallbackContext):
     """Handle item usage"""
@@ -728,10 +796,12 @@ async def use_item_callback(update: Update, context: CallbackContext):
     await update_wizard(user_id, update_data)
     
     await query.answer(f"✅ {effect_text}", show_alert=True)
+    
+    # Refresh and show updated inventory
     await show_inventory_menu(query, user_id)
 
 # ------------------------
-# SHOW RANKINGS
+# SHOW RANKINGS - FIXED
 # ------------------------
 async def show_rankings(query):
     """Show leaderboard"""
@@ -763,7 +833,7 @@ async def show_rankings(query):
     await query.edit_message_caption(caption=text, parse_mode='HTML', reply_markup=keyboard)
 
 # ------------------------
-# CLAIM DAILY REWARD
+# CLAIM DAILY REWARD - FIXED
 # ------------------------
 async def claim_daily_reward(query, user_id: int):
     """Claim daily reward"""
@@ -805,7 +875,7 @@ async def claim_daily_reward(query, user_id: int):
     await query.edit_message_caption(caption=text, parse_mode='HTML', reply_markup=keyboard)
 
 # ------------------------
-# SHOW PROFILE
+# SHOW PROFILE - FIXED
 # ------------------------
 async def show_profile(query, user_id: int):
     """Show detailed profile"""
@@ -1239,7 +1309,7 @@ async def duel_cmd(update: Update, context: CallbackContext):
     asyncio.create_task(timeout_duel())
 
 # ------------------------
-# DUEL CALLBACK
+# DUEL CALLBACK - FIXED
 # ------------------------
 async def duel_callback(update: Update, context: CallbackContext):
     """Handle duel responses"""
@@ -1307,29 +1377,25 @@ async def duel_callback(update: Update, context: CallbackContext):
         await query.edit_message_caption(caption=text, parse_mode='HTML')
 
 # ------------------------
-# BACK TO MAIN MENU
+# REGISTER HANDLERS - FIXED
 # ------------------------
-async def back_to_main(update: Update, context: CallbackContext):
-    """Return to main menu"""
-    query = update.callback_query
+def register_handlers():
+    """Register all command and callback handlers"""
+    # Command handlers
+    application.add_handler(CommandHandler("starts", start_wizard, block=False))
+    application.add_handler(CommandHandler("cast", cast_spell, block=False))
+    application.add_handler(CommandHandler("heal", heal_cmd, block=False))
+    application.add_handler(CommandHandler("shield", shield_cmd, block=False))
+    application.add_handler(CommandHandler("use", use_cmd, block=False))
+    application.add_handler(CommandHandler("duel", duel_cmd, block=False))
     
-    if query.data == "menu:main":
-        await start_wizard(query, context)
+    # Callback handlers with specific patterns
+    application.add_handler(CallbackQueryHandler(menu_callback, pattern=r"^menu:", block=False))
+    application.add_handler(CallbackQueryHandler(buy_callback, pattern=r"^buy:", block=False))
+    application.add_handler(CallbackQueryHandler(use_item_callback, pattern=r"^use:", block=False))
+    application.add_handler(CallbackQueryHandler(duel_callback, pattern=r"^duel:", block=False))
 
-# ------------------------
-# REGISTER HANDLERS
-# ------------------------
-application.add_handler(CommandHandler("starts", start_wizard, block=False))
-application.add_handler(CommandHandler("cast", cast_spell, block=False))
-application.add_handler(CommandHandler("heal", heal_cmd, block=False))
-application.add_handler(CommandHandler("shield", shield_cmd, block=False))
-application.add_handler(CommandHandler("use", use_cmd, block=False))
-application.add_handler(CommandHandler("duel", duel_cmd, block=False))
-
-# Callback handlers
-application.add_handler(CallbackQueryHandler(menu_callback, pattern=r"^menu:", block=False))
-application.add_handler(CallbackQueryHandler(buy_callback, pattern=r"^buy:", block=False))
-application.add_handler(CallbackQueryHandler(use_item_callback, pattern=r"^use:", block=False))
-application.add_handler(CallbackQueryHandler(duel_callback, pattern=r"^duel:", block=False))
+# Call register function
+register_handlers()
 
 # End of spellcast_futuristic.py
