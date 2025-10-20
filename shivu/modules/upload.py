@@ -175,6 +175,24 @@ def parse_rarity(rarity_str):
         return None
 
 
+def is_telegram_compatible_url(url):
+    """Check if URL is compatible with Telegram Bot API"""
+    if not url or url.startswith('direct_upload://'):
+        return False
+    
+    # Telegram-compatible domains
+    compatible_domains = [
+        'telegra.ph',
+        'telegraph',
+        'cdn.discordapp.com',
+        'media.discordapp.net',
+        'imgur.com',
+        'i.imgur.com'
+    ]
+    
+    return any(domain in url.lower() for domain in compatible_domains)
+
+
 async def create_character_entry(media_url, character_name, anime, rarity, user_id, user_name, context, is_new=True, is_video=False, file_bytes=None, filename=None):
     char_id = str(await get_next_sequence_number('character_id')).zfill(2)
     
@@ -201,6 +219,7 @@ async def create_character_entry(media_url, character_name, anime, rarity, user_
     try:
         message = None
         
+        # ALWAYS prefer file_bytes upload (most reliable method)
         if file_bytes and filename:
             if hasattr(file_bytes, 'seek'):
                 file_bytes.seek(0)
@@ -227,29 +246,94 @@ async def create_character_entry(media_url, character_name, anime, rarity, user_
                 )
                 character['file_id'] = message.photo[-1].file_id
                 character['file_unique_id'] = message.photo[-1].file_unique_id
-        else:
-            if is_video:
-                message = await context.bot.send_video(
-                    chat_id=CHARA_CHANNEL_ID,
-                    video=media_url,
-                    caption=caption,
-                    parse_mode='HTML',
-                    read_timeout=60,
-                    write_timeout=60
-                )
-                character['file_id'] = message.video.file_id
-                character['file_unique_id'] = message.video.file_unique_id
+        
+        # Fallback to URL only if compatible with Telegram
+        elif media_url and is_telegram_compatible_url(media_url):
+            try:
+                if is_video:
+                    message = await context.bot.send_video(
+                        chat_id=CHARA_CHANNEL_ID,
+                        video=media_url,
+                        caption=caption,
+                        parse_mode='HTML',
+                        read_timeout=60,
+                        write_timeout=60
+                    )
+                    character['file_id'] = message.video.file_id
+                    character['file_unique_id'] = message.video.file_unique_id
+                else:
+                    message = await context.bot.send_photo(
+                        chat_id=CHARA_CHANNEL_ID,
+                        photo=media_url,
+                        caption=caption,
+                        parse_mode='HTML',
+                        read_timeout=60,
+                        write_timeout=60
+                    )
+                    character['file_id'] = message.photo[-1].file_id
+                    character['file_unique_id'] = message.photo[-1].file_unique_id
+            except Exception as url_error:
+                # If URL fails, download and re-upload as file
+                print(f"URL upload failed, downloading file: {url_error}")
+                downloaded = await download_file(media_url)
+                if downloaded:
+                    file_io = io.BytesIO(downloaded)
+                    if is_video:
+                        message = await context.bot.send_video(
+                            chat_id=CHARA_CHANNEL_ID,
+                            video=file_io,
+                            caption=caption,
+                            parse_mode='HTML',
+                            read_timeout=120,
+                            write_timeout=120
+                        )
+                        character['file_id'] = message.video.file_id
+                        character['file_unique_id'] = message.video.file_unique_id
+                    else:
+                        message = await context.bot.send_photo(
+                            chat_id=CHARA_CHANNEL_ID,
+                            photo=file_io,
+                            caption=caption,
+                            parse_mode='HTML',
+                            read_timeout=60,
+                            write_timeout=60
+                        )
+                        character['file_id'] = message.photo[-1].file_id
+                        character['file_unique_id'] = message.photo[-1].file_unique_id
+                else:
+                    raise Exception("Failed to download file for re-upload")
+        
+        # If URL is not Telegram-compatible, download and upload
+        elif media_url and not media_url.startswith('direct_upload://'):
+            downloaded = await download_file(media_url)
+            if downloaded:
+                file_io = io.BytesIO(downloaded)
+                if is_video:
+                    message = await context.bot.send_video(
+                        chat_id=CHARA_CHANNEL_ID,
+                        video=file_io,
+                        caption=caption,
+                        parse_mode='HTML',
+                        read_timeout=120,
+                        write_timeout=120
+                    )
+                    character['file_id'] = message.video.file_id
+                    character['file_unique_id'] = message.video.file_unique_id
+                else:
+                    message = await context.bot.send_photo(
+                        chat_id=CHARA_CHANNEL_ID,
+                        photo=file_io,
+                        caption=caption,
+                        parse_mode='HTML',
+                        read_timeout=60,
+                        write_timeout=60
+                    )
+                    character['file_id'] = message.photo[-1].file_id
+                    character['file_unique_id'] = message.photo[-1].file_unique_id
             else:
-                message = await context.bot.send_photo(
-                    chat_id=CHARA_CHANNEL_ID,
-                    photo=media_url,
-                    caption=caption,
-                    parse_mode='HTML',
-                    read_timeout=60,
-                    write_timeout=60
-                )
-                character['file_id'] = message.photo[-1].file_id
-                character['file_unique_id'] = message.photo[-1].file_unique_id
+                raise Exception("Unable to download file from URL")
+        else:
+            raise Exception("No valid upload method available")
         
         if message:
             character['message_id'] = message.message_id
@@ -456,6 +540,8 @@ async def update_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         file_bytes = None
+        file_io = None
+        
         if field in ['name', 'anime']:
             new_value = new_value.replace('-', ' ').title()
         elif field == 'rarity':
@@ -477,11 +563,13 @@ async def update_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 file_io = io.BytesIO(file_bytes)
                 
                 reup_url, service = await upload_with_fallback(file_io, filename)
-                if reup_url:
+                if reup_url and is_telegram_compatible_url(reup_url):
                     new_value = reup_url
                     await processing_msg.edit_text(f'✅ Re-uploaded to {service}!')
                 else:
+                    # Keep file_io for direct upload
                     await processing_msg.delete()
+                    file_io.seek(0)
         
         update_data = {field: new_value}
         
@@ -507,7 +595,8 @@ async def update_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if field == 'img_url':
                 await context.bot.delete_message(chat_id=CHARA_CHANNEL_ID, message_id=character['message_id'])
                 
-                if file_bytes:
+                # Try with file_io first (most reliable)
+                if file_io:
                     file_io.seek(0)
                     if is_video:
                         message = await context.bot.send_video(
@@ -543,7 +632,8 @@ async def update_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 'file_unique_id': message.photo[-1].file_unique_id
                             }}
                         )
-                else:
+                # Try with URL only if it's Telegram-compatible
+                elif is_telegram_compatible_url(new_value):
                     if is_video:
                         message = await context.bot.send_video(
                             chat_id=CHARA_CHANNEL_ID,
@@ -578,6 +668,8 @@ async def update_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 'file_unique_id': message.photo[-1].file_unique_id
                             }}
                         )
+                else:
+                    raise Exception("URL not compatible with Telegram. Please provide a Telegraph/Imgur URL.")
             else:
                 await context.bot.edit_message_caption(
                     chat_id=CHARA_CHANNEL_ID,
