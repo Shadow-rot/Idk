@@ -1,16 +1,13 @@
 import importlib
 import time
 import random
-import re
 import asyncio
 from html import escape
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import CommandHandler, MessageHandler, filters
+from telegram.ext import CommandHandler, MessageHandler, filters, CallbackQueryHandler
 
 from shivu import db, shivuu, application, LOGGER
 from shivu.modules import ALL_MODULES
-from shivu.callback import global_callback_handler
-from telegram.ext import CallbackQueryHandler
 
 collection = db['anime_characters_lol']
 user_collection = db['user_collection_lmaoooo']
@@ -29,36 +26,20 @@ last_user = {}
 warned_users = {}
 spawn_settings_collection = None
 
-# Import all modules
+# Import all modules dynamically
 for module_name in ALL_MODULES:
     try:
         importlib.import_module("shivu.modules." + module_name)
-        LOGGER.info(f"✅ Imported: {module_name}")
+        LOGGER.info(f"Imported: {module_name}")
     except Exception as e:
-        LOGGER.error(f"❌ Failed to import {module_name}: {e}")
-
-# Initialize plugin manager with all loaded modules
-try:
-    from shivu.modules.plugins_manager import initialize_plugin_manager
-    initialize_plugin_manager(ALL_MODULES)
-    LOGGER.info("✅ Plugin manager initialized")
-except Exception as e:
-    LOGGER.error(f"❌ Failed to initialize plugin manager: {e}")
-
-# Register plugin manager handlers
-try:
-    from shivu.modules.plugins_manager import register_handlers
-    register_handlers(application)
-    LOGGER.info("✅ Plugin manager handlers registered")
-except Exception as e:
-    LOGGER.error(f"❌ Failed to register plugin manager: {e}")
+        LOGGER.error(f"Failed to import {module_name}: {e}")
 
 # Import spawn settings
 try:
     from shivu.modules.rarity import spawn_settings_collection as ssc
     spawn_settings_collection = ssc
-except:
-    pass
+except Exception as e:
+    LOGGER.error(f"Could not import spawn settings: {e}")
 
 
 async def is_character_allowed(character):
@@ -324,13 +305,22 @@ async def guess(update: Update, context):
 
 
 def main():
+    # Only register handlers that are defined in this main.py file
     application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
-    application.add_handler(CallbackQueryHandler(global_callback_handler))
     application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
+    
+    # Import callback handler if it exists
+    try:
+        from shivu.callback import global_callback_handler
+        application.add_handler(CallbackQueryHandler(global_callback_handler))
+    except ImportError:
+        LOGGER.warning("Could not import global_callback_handler from shivu.callback")
+    
+    LOGGER.info("Starting bot...")
     application.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
     shivuu.start()
-    LOGGER.info("Bot started")
+    LOGGER.info("Bot started successfully")
     main()
