@@ -3,13 +3,19 @@ from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler
 from shivu import application, user_collection
 
+VIDEOS = [
+    "https://files.catbox.moe/25ntg5.mp4",
+    "https://files.catbox.moe/1fx72l.mp4"
+]
+
 TIPS = [
-    "Use /claim daily to get free gold",
-    "Invite friends to earn 1000 gold",
-    "Play games to increase your xp",
-    "Collect rare slaves to get rich",
-    "Use /bal to check your wallet",
-    "Trade slaves with others to grow"
+    "ᴜsᴇ /claim ᴅᴀɪʟʏ ғᴏʀ ғʀᴇᴇ ɢᴏʟᴅ",
+    "ɪɴᴠɪᴛᴇ ғʀɪᴇɴᴅs ᴛᴏ ᴇᴀʀɴ 1000 ɢᴏʟᴅ",
+    "ᴘʟᴀʏ ɢᴀᴍᴇs ᴛᴏ ɪɴᴄʀᴇᴀsᴇ xᴘ",
+    "ᴄᴏʟʟᴇᴄᴛ ʀᴀʀᴇ sʟᴀᴠᴇs ᴛᴏ ɢᴇᴛ ʀɪᴄʜ",
+    "ᴜsᴇ /bal ᴛᴏ ᴄʜᴇᴄᴋ ʏᴏᴜʀ ᴡᴀʟʟᴇᴛ",
+    "ᴛʀᴀᴅᴇ sʟᴀᴠᴇs ᴛᴏ ɢʀᴏᴡ ғᴀsᴛᴇʀ",
+    "ᴄᴏᴍᴘʟᴇᴛᴇ ᴅᴀɪʟʏ ᴛᴀsᴋs ғᴏʀ ʙᴏɴᴜs"
 ]
 
 async def get_balance(user_id):
@@ -19,217 +25,175 @@ async def get_balance(user_id):
     except:
         return 0
 
+def get_random_video():
+    return random.choice(VIDEOS)
+
 def main_keyboard(uid):
     return [
-        [InlineKeyboardButton("Games", callback_data=f'hlp_gm_{uid}'),
-         InlineKeyboardButton("Economy", callback_data=f'hlp_ec_{uid}')],
-        [InlineKeyboardButton("Slaves", callback_data=f'hlp_sl_{uid}'),
-         InlineKeyboardButton("Beasts", callback_data=f'hlp_bs_{uid}')],
-        [InlineKeyboardButton("Pass", callback_data=f'hlp_ps_{uid}'),
-         InlineKeyboardButton("Info", callback_data=f'hlp_if_{uid}')],
-        [InlineKeyboardButton("Leaderboard", callback_data=f'hlp_lb_{uid}'),
-         InlineKeyboardButton("Rewards", callback_data=f'hlp_rw_{uid}')],
-        [InlineKeyboardButton("Guide", callback_data=f'hlp_gd_{uid}'),
-         InlineKeyboardButton("Tips", callback_data=f'hlp_tp_{uid}')]
+        [InlineKeyboardButton("ɢᴀᴍᴇs", callback_data=f'hlp_gm_{uid}'),
+         InlineKeyboardButton("ᴇᴄᴏɴᴏᴍʏ", callback_data=f'hlp_ec_{uid}'),
+         InlineKeyboardButton("sʟᴀᴠᴇs", callback_data=f'hlp_sl_{uid}')],
+        [InlineKeyboardButton("ᴘᴀss", callback_data=f'hlp_ps_{uid}'),
+         InlineKeyboardButton("ɪɴғᴏ", callback_data=f'hlp_if_{uid}'),
+         InlineKeyboardButton("ʟᴇᴀᴅᴇʀʙᴏᴀʀᴅ", callback_data=f'hlp_lb_{uid}')],
+        [InlineKeyboardButton("ʀᴇᴡᴀʀᴅs", callback_data=f'hlp_rw_{uid}'),
+         InlineKeyboardButton("ɢᴜɪᴅᴇ", callback_data=f'hlp_gd_{uid}'),
+         InlineKeyboardButton("ᴛɪᴘs", callback_data=f'hlp_tp_{uid}')]
     ]
 
-def main_caption(name, bal):
-    return f"""<blockquote>Help Center
+def main_caption(name, bal, video_url):
+    return f"""<a href="{video_url}">&#8205;</a><blockquote>ʜᴇʟᴘ ᴄᴇɴᴛᴇʀ
 
-Hey {name}
+ʜᴇʏ <code>{name}</code>
+ɴᴇᴇᴅ ʜᴇʟᴘ? ᴄʜᴏᴏsᴇ ʙᴇʟᴏᴡ
 
-Need help? Choose a category below
-
-Your balance: {bal}
+ʙᴀʟᴀɴᴄᴇ: <code>{bal}</code>
 
 {random.choice(TIPS)}</blockquote>"""
 
 CATEGORIES = {
-    'gm': """<blockquote>Game Zone
+    'gm': lambda v: f"""<a href="{v}">&#8205;</a><blockquote>ɢᴀᴍᴇ ᴢᴏɴᴇ
 
-Test your luck and skills
+ɢᴀᴍʙʟɪɴɢ:
+<code>/sbet 10000 heads</code> - ᴄᴏɪɴ ᴛᴏss
+<code>/roll 10000 even</code> - ᴅɪᴄᴇ ʀᴏʟʟ
+<code>/gamble 10000 l</code> - ʟᴇғᴛ/ʀɪɢʜᴛ
+<code>/slot 5000</code> - sʟᴏᴛ ᴍᴀᴄʜɪɴᴇ
 
-Gambling Games:
-/sbet 10000 heads - coin toss
-/roll 10000 even - dice roll
-/gamble 10000 l - left or right
+sᴋɪʟʟ:
+<code>/basket 5000</code> - ʙᴀsᴋᴇᴛʙᴀʟʟ
+<code>/dart 2000</code> - ᴅᴀʀᴛ ɢᴀᴍᴇ
 
-Skill Games:
-/basket 5000 - basketball
-/dart 2000 - dart game
+sᴘᴇᴄɪᴀʟ:
+<code>/riddle</code> - sᴏʟᴠᴇ ᴀɴᴅ ᴇᴀʀɴ
+<code>/stour</code> - sʟᴀᴠᴇ ᴄᴏɴᴛʀᴀᴄᴛs
+<code>/quiz</code> - ᴛʀɪᴠɪᴀ ǫᴜᴇsᴛɪᴏɴs</blockquote>""",
 
-Special:
-/riddle - solve and earn
-/stour - slave contracts
+    'ec': lambda v: f"""<a href="{v}">&#8205;</a><blockquote>ᴇᴄᴏɴᴏᴍʏ
 
-Earn xp and gold while playing</blockquote>""",
-    
-    'ec': """<blockquote>Economy
+ᴄʜᴇᴄᴋ ʙᴀʟᴀɴᴄᴇ:
+<code>/bal</code> - ᴡᴀʟʟᴇᴛ ᴀɴᴅ ʙᴀɴᴋ
+<code>/sinv</code> - ɪɴᴠᴇɴᴛᴏʀʏ
+<code>/profile</code> - ғᴜʟʟ sᴛᴀᴛs
 
-Manage your wealth
+ᴛʀᴀɴsᴀᴄᴛɪᴏɴs:
+<code>/pay @user 1000</code> - sᴇɴᴅ ɢᴏʟᴅ
+<code>/claim</code> - ᴅᴀɪʟʏ 2000 ɢᴏʟᴅ
+<code>/deposit 5000</code> - ʙᴀɴᴋ ᴅᴇᴘᴏsɪᴛ
+<code>/withdraw 5000</code> - ʙᴀɴᴋ ᴡɪᴛʜᴅʀᴀᴡ
 
-Check Balance:
-/bal - wallet and bank
-/sinv - inventory
+ғʀᴇᴇ ʀᴇᴡᴀʀᴅs:
+<code>/daily</code> - ᴅᴀɪʟʏ ʙᴏɴᴜs
+<code>/weekly</code> - ᴡᴇᴇᴋʟʏ ʙᴏɴᴜs</blockquote>""",
 
-Transactions:
-/pay @user 1000 - send gold
-/claim - daily 2000 gold
+    'sl': lambda v: f"""<a href="{v}">&#8205;</a><blockquote>sʟᴀᴠᴇ ᴄᴏʟʟᴇᴄᴛɪᴏɴ
 
-Free Rewards:
-/daily - daily bonus
-/weekly - weekly bonus
+ᴄᴀᴛᴄʜɪɴɢ:
+<code>/grab name</code> - ᴄᴀᴛᴄʜ sʟᴀᴠᴇ
+sᴘᴀᴡɴs ᴇᴠᴇʀʏ 100 ᴍᴇssᴀɢᴇs
 
-Max pay 70b every 20 min</blockquote>""",
-    
-    'sl': """<blockquote>Slave Collection
+ᴠɪᴇᴡ ᴄᴏʟʟᴇᴄᴛɪᴏɴ:
+<code>/harem</code> - ʏᴏᴜʀ sʟᴀᴠᴇs
+<code>/slaves</code> - ᴀʟʟ sʟᴀᴠᴇs
+<code>/smode</code> - sᴏʀᴛ ʙʏ ʀᴀɴᴋ
+<code>/sinfo id</code> - sʟᴀᴠᴇ ᴅᴇᴛᴀɪʟs
 
-Catch and collect anime slaves
+ᴛʀᴀᴅɪɴɢ:
+<code>/trade</code> - ᴛʀᴀᴅᴇ sʟᴀᴠᴇs
+<code>/gift @user id</code> - ɢɪғᴛ sʟᴀᴠᴇ</blockquote>""",
 
-Catching:
-/grab name - catch slave
-Spawns every 100 messages
+    'ps': lambda v: f"""<a href="{v}">&#8205;</a><blockquote>sʟᴀᴠᴇ ᴘᴀss
 
-View Collection:
-/harem - your slaves
-/slaves - all slaves
-/smode - sort by rank
+ᴡᴇᴇᴋʟʏ ʀᴇᴡᴀʀᴅs:
+<code>/claim</code> - ᴄʟᴀɪᴍ ᴡᴇᴇᴋʟʏ
+<code>/sweekly</code> - ʙᴏɴᴜs ᴀғᴛᴇʀ 6 ᴄʟᴀɪᴍs
+<code>/pbonus</code> - ᴄᴏᴍᴘʟᴇᴛᴇ ᴛᴀsᴋs
 
-Trading:
-/trade - trade with others
-/sinfo id - slave details
+ʙᴇɴᴇғɪᴛs:
+ᴇxᴄʟᴜsɪᴠᴇ sʟᴀᴠᴇs
+ᴇxᴛʀᴀ ɢᴏʟᴅ ʀᴇᴡᴀʀᴅs
+sᴘᴇᴄɪᴀʟ ᴇᴠᴇɴᴛs ᴀᴄᴄᴇss
+ᴘʀɪᴏʀɪᴛʏ sᴜᴘᴘᴏʀᴛ
 
-Build your empire</blockquote>""",
-    
-    'bs': """<blockquote>Beast System
+<code>/pass</code> - ᴠɪᴇᴡ ᴘᴀss sᴛᴀᴛᴜs</blockquote>""",
 
-Summon powerful beasts
+    'if': lambda v: f"""<a href="{v}">&#8205;</a><blockquote>ɪɴғᴏʀᴍᴀᴛɪᴏɴ
 
-Shop:
-/beastshop - view beasts
-/buybeast - purchase beast
+ᴘᴇʀsᴏɴᴀʟ sᴛᴀᴛs:
+<code>/sinv</code> - ᴄʜᴇᴄᴋ ᴛᴏᴋᴇɴs
+<code>/xp</code> - ᴄʜᴇᴄᴋ ʟᴇᴠᴇʟ
+<code>/sinfo</code> - ғᴜʟʟ ᴘʀᴏғɪʟᴇ
+<code>/rank</code> - ʏᴏᴜʀ ʀᴀɴᴋɪɴɢ
 
-Manage:
-/beast - your beasts
-/binfo id - beast info
-/setbeast - set main beast
+ʟᴇᴀᴅᴇʀʙᴏᴀʀᴅs:
+<code>/tops</code> - ᴛᴏᴘ ᴘʟᴀʏᴇʀs
+<code>/topchat</code> - ᴛᴏᴘ ᴄʜᴀᴛs
+<code>/topgroups</code> - ᴛᴏᴘ ɢʀᴏᴜᴘs
+<code>/xtop</code> - xᴘ ʀᴀɴᴋɪɴɢs
+<code>/gstop</code> - ɢᴏʟᴅ ʀᴀɴᴋɪɴɢs</blockquote>""",
 
-Battles:
-Use beasts in tournaments
-Level up through battles
+    'lb': lambda v: f"""<a href="{v}">&#8205;</a><blockquote>ʟᴇᴀᴅᴇʀʙᴏᴀʀᴅs
 
-Collect rare beasts</blockquote>""",
-    
-    'ps': """<blockquote>Slave Pass
+ʀᴀɴᴋɪɴɢs:
+<code>/tops</code> - ʀɪᴄʜᴇsᴛ ʜᴜɴᴛᴇʀs
+<code>/xtop</code> - ʜɪɢʜᴇsᴛ xᴘ
+<code>/gstop</code> - ᴍᴏsᴛ ɢᴏʟᴅ
+<code>/tophunters</code> - ᴇʟɪᴛᴇ ʟɪsᴛ
 
-Premium membership
+ɢʀᴏᴜᴘ sᴛᴀᴛs:
+<code>/topchat</code> - ᴀᴄᴛɪᴠᴇ ᴄʜᴀᴛs
+<code>/topgroups</code> - ᴛᴏᴘ ɢʀᴏᴜᴘs
 
-Weekly Rewards:
-/claim - claim weekly
-/sweekly - bonus after 6 claims
-/pbonus - complete tasks
+ᴄʟɪᴍʙ ᴛᴏ ᴛʜᴇ ᴛᴏᴘ</blockquote>""",
 
-Benefits:
-Exclusive slaves
-Extra gold rewards
-Special events access
-Priority support
+    'rw': lambda v: f"""<a href="{v}">&#8205;</a><blockquote>ᴅᴀɪʟʏ ʀᴇᴡᴀʀᴅs
 
-How to Use:
-/pass - view pass status
+ᴅᴀɪʟʏ ᴄʟᴀɪᴍs:
+<code>/claim</code> - 2000 ɢᴏʟᴅ ᴅᴀɪʟʏ
+<code>/daily</code> - ʙᴏɴᴜs ɢᴏʟᴅ
+<code>/hclaim</code> - ᴅᴀɪʟʏ sʟᴀᴠᴇ
 
-Upgrade to premium today</blockquote>""",
-    
-    'if': """<blockquote>Information
+ᴡᴇᴇᴋʟʏ ʙᴏɴᴜsᴇs:
+<code>/weekly</code> - ʙɪɢ ᴡᴇᴇᴋʟʏ ʀᴇᴡᴀʀᴅ
+<code>/sweekly</code> - ᴘᴀss ʙᴏɴᴜs
 
-Check stats and rankings
+ʀᴇғᴇʀʀᴀʟ ʀᴇᴡᴀʀᴅs:
+ɪɴᴠɪᴛᴇ ғʀɪᴇɴᴅs - 1000 ɢᴏʟᴅ
+ᴛʜᴇʏ ɢᴇᴛ - 500 ɢᴏʟᴅ</blockquote>""",
 
-Personal Stats:
-/sinv - check tokens
-/xp - check level
-/sinfo - full profile
+    'gd': lambda v: f"""<a href="{v}">&#8205;</a><blockquote>ǫᴜɪᴄᴋ sᴛᴀʀᴛ ɢᴜɪᴅᴇ
 
-Leaderboards:
-/tops - top players
-/topchat - top chats
-/topgroups - top groups
-/xtop - xp rankings
-/gstop - gold rankings
+ɢᴇᴛ sᴛᴀʀᴛᴇᴅ:
+<code>/start</code> - ᴄʀᴇᴀᴛᴇ ᴀᴄᴄᴏᴜɴᴛ
+<code>/claim</code> - ᴄʟᴀɪᴍ ᴅᴀɪʟʏ
 
-Track your progress</blockquote>""",
-    
-    'lb': """<blockquote>Leaderboards
+ᴄᴀᴛᴄʜ sʟᴀᴠᴇs:
+ᴡᴀɪᴛ ғᴏʀ sᴘᴀᴡɴ ɪɴ ᴄʜᴀᴛ
+<code>/grab name</code> - ᴄᴀᴛᴄʜ
 
-Compete with top hunters
+ᴇᴀʀɴ ɢᴏʟᴅ:
+<code>/roll</code> - ᴘʟᴀʏ ɢᴀᴍᴇs
+ɪɴᴠɪᴛᴇ ғʀɪᴇɴᴅs
+ᴄᴏᴍᴘʟᴇᴛᴇ ᴛᴀsᴋs
 
-Rankings:
-/tops - richest hunters
-/xtop - highest xp
-/gstop - most gold
-/tophunters - elite list
-
-Group Stats:
-/topchat - active chats
-/topgroups - top groups
-
-Climb to the top</blockquote>""",
-    
-    'rw': """<blockquote>Daily Rewards
-
-Claim free rewards daily
-
-Daily Claims:
-/claim - 2000 gold daily
-/daily - bonus gold
-/hclaim - daily slave
-
-Weekly Bonuses:
-/weekly - big weekly reward
-/sweekly - pass bonus
-
-Referral Rewards:
-Invite friends - 1000 gold
-They get - 500 gold
-
-Never miss your rewards</blockquote>""",
-    
-    'gd': """<blockquote>Quick Start Guide
-
-New to the bot?
-
-1. Get Started:
-Type /start
-Claim daily with /claim
-
-2. Catch Slaves:
-Wait for spawn in chat
-Type /slave name
-
-3. Earn Gold:
-Play games - /roll
-Invite friends
-Complete tasks
-
-4. Level Up:
-Play games to gain xp
-Check with /xp
-
-Have fun and dominate</blockquote>"""
+ʟᴇᴠᴇʟ ᴜᴘ:
+ᴘʟᴀʏ ɢᴀᴍᴇs ᴛᴏ ɢᴀɪɴ xᴘ
+<code>/xp</code> - ᴄʜᴇᴄᴋ ʟᴇᴠᴇʟ</blockquote>"""
 }
 
 async def help_command(update: Update, context: CallbackContext):
     try:
         user = update.effective_user
         bal = await get_balance(user.id)
-        caption = main_caption(user.first_name, bal)
+        video_url = get_random_video()
+        caption = main_caption(user.first_name, bal, video_url)
         keyboard = main_keyboard(user.id)
-        
-        await context.bot.send_photo(
-            chat_id=update.effective_chat.id,
-            photo="https://te.legra.ph/file/b6661a11573417d03b4b4.png",
-            caption=caption,
+
+        await update.message.reply_text(
+            text=caption,
             reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="HTML"
+            parse_mode="HTML",
+            disable_web_page_preview=False
         )
     except Exception as e:
         print(f"Help error: {e}")
@@ -237,54 +201,55 @@ async def help_command(update: Update, context: CallbackContext):
 
 async def help_callback(update: Update, context: CallbackContext):
     query = update.callback_query
-    
+
     try:
         await query.answer()
         data = query.data.split('_')
         action = data[1]
         uid = int(data[2])
-        
+
         if query.from_user.id != uid:
-            await query.answer("This isn't for you", show_alert=True)
+            await query.answer("ᴛʜɪs ɪsɴ'ᴛ ғᴏʀ ʏᴏᴜ", show_alert=True)
             return
-        
+
+        video_url = get_random_video()
+
         if action == 'bk':
             bal = await get_balance(uid)
-            caption = main_caption(query.from_user.first_name, bal)
+            caption = main_caption(query.from_user.first_name, bal, video_url)
             keyboard = main_keyboard(uid)
         elif action == 'tp':
-            caption = f"""<blockquote>Pro Tips
+            caption = f"""<a href="{video_url}">&#8205;</a><blockquote>ᴘʀᴏ ᴛɪᴘs
 
-Helpful tips for hunters
-
-Random Tip:
+ʀᴀɴᴅᴏᴍ ᴛɪᴘ:
 {random.choice(TIPS)}
 
-More Tips:
-Claim daily rewards
-Play games for xp
-Trade rare slaves
-Join events
-Use pass for bonuses
-Invite friends
+ᴍᴏʀᴇ ᴛɪᴘs:
+ᴄʟᴀɪᴍ ᴅᴀɪʟʏ ʀᴇᴡᴀʀᴅs
+ᴘʟᴀʏ ɢᴀᴍᴇs ғᴏʀ xᴘ
+ᴛʀᴀᴅᴇ ʀᴀʀᴇ sʟᴀᴠᴇs
+ᴊᴏɪɴ ᴇᴠᴇɴᴛs
+ᴜsᴇ ᴘᴀss ғᴏʀ ʙᴏɴᴜsᴇs
+ɪɴᴠɪᴛᴇ ғʀɪᴇɴᴅs
 
-Tap for new tip</blockquote>"""
+ᴛᴀᴘ ғᴏʀ ɴᴇᴡ ᴛɪᴘ</blockquote>"""
             keyboard = [
-                [InlineKeyboardButton("New Tip", callback_data=f'hlp_tp_{uid}')],
-                [InlineKeyboardButton("Back", callback_data=f'hlp_bk_{uid}')]
+                [InlineKeyboardButton("ɴᴇᴡ ᴛɪᴘ", callback_data=f'hlp_tp_{uid}')],
+                [InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f'hlp_bk_{uid}')]
             ]
         else:
-            caption = CATEGORIES.get(action, "")
-            keyboard = [[InlineKeyboardButton("Back", callback_data=f'hlp_bk_{uid}')]]
+            caption = CATEGORIES.get(action, lambda v: "")(video_url)
+            keyboard = [[InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f'hlp_bk_{uid}')]]
         
-        await query.edit_message_caption(
-            caption=caption,
+        await query.edit_message_text(
+            text=caption,
             reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='HTML'
+            parse_mode='HTML',
+            disable_web_page_preview=False
         )
     except Exception as e:
         print(f"Callback error: {e}")
-        await query.answer("An error occurred", show_alert=True)
+        await query.answer("ᴀɴ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ", show_alert=True)
 
 application.add_handler(CommandHandler(['help', 'menu', 'panel'], help_command, block=False))
 application.add_handler(CallbackQueryHandler(help_callback, pattern=r'^hlp_[a-z]{2}_\d+$', block=False))
