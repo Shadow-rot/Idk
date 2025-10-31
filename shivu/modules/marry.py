@@ -218,7 +218,7 @@ async def propose(update: Update, context: CallbackContext):
                 caption='sʜᴇ ʀᴇᴊᴇᴄᴛᴇᴅ ʏᴏᴜʀ ᴘʀᴏᴘᴏsᴀʟ ᴀɴᴅ ʀᴀɴ ᴀᴡᴀʏ 💔'
             )
         else:
-            chars = await get_unique_chars(user_id, ['💮 Special Edition', '💫 Neon', '✨ Manga', '🎐 Celestial'])
+            chars = await get_unique_chars(user_id, ['💮 Special Edition', '🔮 Premium Edition', '✨ Manga', '🎐 Celestial'])
             if not chars:
                 # Refund on no characters
                 await user_collection.update_one({'id': user_id}, {'$inc': {'balance': PROPOSAL_COST}})
