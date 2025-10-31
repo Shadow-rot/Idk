@@ -208,13 +208,13 @@ async def propose(update: Update, context: CallbackContext):
             caption='ғɪɴᴀʟʟʏ ᴛʜᴇ ᴛɪᴍᴇ ᴛᴏ ᴘʀᴏᴘᴏsᴇ 💍'
         )
         await asyncio.sleep(2)
-        await update.message.reply_text("ᴘʀᴏᴘᴏsɪɴɢ...💕")
+        await update.message.reply_text("ᴘʀᴏᴘᴏsɪɴɢ... 💕")
         await asyncio.sleep(2)
 
         # 40% success rate
         if random.random() > 0.4:
             await update.message.reply_photo(
-                photo='https://graph.org/file/48c147582d2742105e6ec.jpg',
+                photo='https://files.catbox.moe/kvd5h7.jpg',
                 caption='sʜᴇ ʀᴇᴊᴇᴄᴛᴇᴅ ʏᴏᴜʀ ᴘʀᴏᴘᴏsᴀʟ ᴀɴᴅ ʀᴀɴ ᴀᴡᴀʏ 💔'
             )
         else:
