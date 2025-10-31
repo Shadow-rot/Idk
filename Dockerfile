@@ -62,7 +62,7 @@ RUN apt update && apt upgrade -y && \
 RUN pip3 install --upgrade pip setuptools
 
 # Clone your bot
-RUN git clone https://github.com/Mynameishekhar/ptb /root/ptb
+RUN git clone https://github.com/Shadow-rot/ptb /root/ptb
 WORKDIR /root/ptb
 
 ENV PATH="/home/bot/bin:$PATH"
