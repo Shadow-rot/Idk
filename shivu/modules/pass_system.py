@@ -99,7 +99,7 @@ async def pass_command(update: Update, context: CallbackContext):
 {to_small_caps('weekly')}: {PASS_CONFIG[tier]['weekly_reward']:,}
 {to_small_caps('streak bonus')}: {PASS_CONFIG[tier]['streak_bonus']:,}
 {to_small_caps('tier')}: {tier_status}"""
-        keyboard = [[InlineKeyboardButton(to_small_caps("claim"), callback_data=f"pass_claim_{user_id}"), InlineKeyboardButton(to_small_caps("tasks"), callback_data=f"pass_tasks_{user_id}")], [InlineKeyboardButton(to_small_caps("upgrade"), callback_data=f"pass_upgrade_{user_id}"), InlineKeyboardButton(to_small_caps("invite"), callback_data=f"pass_invite_{user_id}")]]
+        keyboard = [[InlineKeyboardButton(to_small_caps("claim"), callback_data="ps_claim"), InlineKeyboardButton(to_small_caps("tasks"), callback_data="ps_tasks")], [InlineKeyboardButton(to_small_caps("upgrade"), callback_data="ps_upgrade"), InlineKeyboardButton(to_small_caps("invite"), callback_data="ps_invite")]]
         await update.message.reply_photo(photo="https://files.catbox.moe/z8fhwx.jpg", caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
     except Exception as e:
         LOGGER.error(f"Pass error: {e}")
@@ -217,7 +217,7 @@ async def upgrade_command(update: Update, context: CallbackContext):
         user = await user_collection.find_one({'id': user_id})
         balance = user.get('balance', 0)
         caption = f"{to_small_caps('upgrade')}\n\n{to_small_caps('balance')}: <code>{balance:,}</code>\n{to_small_caps('tier')}: {PASS_CONFIG[tier]['name']}\n\n{to_small_caps('premium')}: 50,000 {to_small_caps('gold')} 30d\n{to_small_caps('elite')}: 50 INR 30d"
-        keyboard = [[InlineKeyboardButton(to_small_caps("premium"), callback_data=f"pass_buypremium_{user_id}")], [InlineKeyboardButton(to_small_caps("elite"), callback_data=f"pass_buyelite_{user_id}")]]
+        keyboard = [[InlineKeyboardButton(to_small_caps("premium"), callback_data="ps_buypremium")], [InlineKeyboardButton(to_small_caps("elite"), callback_data="ps_buyelite")]]
         await update.message.reply_photo(photo="https://files.catbox.moe/z8fhwx.jpg", caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
     except Exception as e:
         LOGGER.error(f"Upgrade error: {e}")
@@ -311,19 +311,15 @@ async def approve_elite_command(update: Update, context: CallbackContext):
 
 async def pass_callback(update: Update, context: CallbackContext):
     query = update.callback_query
+    await query.answer()
     try:
         data = query.data
-        if not data.startswith('pass_'):
-            await query.answer()
+        if not data.startswith('ps_'):
             return
         parts = data.split('_')
         action = parts[1]
-        user_id = int(parts[-1]) if len(parts) >= 3 else query.from_user.id
-        if query.from_user.id != user_id:
-            await query.answer(to_small_caps("not authorized"), show_alert=True)
-            return
+        user_id = query.from_user.id
         if action == 'claim':
-            await query.answer()
             tier = await check_and_update_tier(user_id)
             pass_data = await get_or_create_pass_data(user_id)
             last_claim = pass_data.get('last_weekly_claim')
@@ -337,16 +333,67 @@ async def pass_callback(update: Update, context: CallbackContext):
             new_claims = pass_data.get('weekly_claims', 0) + 1
             await user_collection.update_one({'id': user_id}, {'$set': {'pass_data.last_weekly_claim': datetime.utcnow(), 'pass_data.weekly_claims': new_claims}, '$inc': {'balance': reward}})
             await query.message.reply_text(f"{to_small_caps('claimed')}: <code>{reward:,}</code>", parse_mode='HTML')
+        elif action == 'tasks':
+            pass_data = await get_or_create_pass_data(user_id)
+            tasks = pass_data.get('tasks', {})
+            task_list = []
+            for k, v in MYTHIC_TASKS.items():
+                current = tasks.get(k, 0)
+                required = v['required']
+                task_list.append(f"{to_small_caps(k)}: {current}/{required}")
+            caption = f"{to_small_caps('tasks')}\n\n" + "\n".join(task_list)
+            keyboard = [[InlineKeyboardButton(to_small_caps("back"), callback_data="ps_back")]]
+            await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+        elif action == 'invite':
+            pass_data = await get_or_create_pass_data(user_id)
+            total_invites = pass_data.get('tasks', {}).get('invites', 0)
+            total_earnings = pass_data.get('total_invite_earnings', 0)
+            bot_username = context.bot.username
+            invite_link = f"https://t.me/{bot_username}?start=r_{user_id}"
+            caption = f"{to_small_caps('invite')}\n\n{to_small_caps('referrals')}: {total_invites}\n{to_small_caps('earned')}: {total_earnings:,}\n\n<code>{invite_link}</code>"
+            keyboard = [[InlineKeyboardButton(to_small_caps("back"), callback_data="ps_back")]]
+            await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+        elif action == 'upgrade':
+            tier = await check_and_update_tier(user_id)
+            user = await user_collection.find_one({'id': user_id})
+            balance = user.get('balance', 0)
+            caption = f"{to_small_caps('upgrade')}\n\n{to_small_caps('balance')}: <code>{balance:,}</code>\n{to_small_caps('tier')}: {PASS_CONFIG[tier]['name']}\n\n{to_small_caps('premium')}: 50,000 {to_small_caps('gold')}\n{to_small_caps('elite')}: 50 INR"
+            keyboard = [[InlineKeyboardButton(to_small_caps("premium"), callback_data="ps_buypremium")], [InlineKeyboardButton(to_small_caps("elite"), callback_data="ps_buyelite")], [InlineKeyboardButton(to_small_caps("back"), callback_data="ps_back")]]
+            await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+        elif action == 'back':
+            tier = await check_and_update_tier(user_id)
+            pass_data = await get_or_create_pass_data(user_id)
+            user = await user_collection.find_one({'id': user_id})
+            tier_name = PASS_CONFIG[tier]['name']
+            weekly_claims = pass_data.get('weekly_claims', 0)
+            streak_count = pass_data.get('streak_count', 0)
+            tasks = pass_data.get('tasks', {})
+            mythic_unlocked = pass_data.get('mythic_unlocked', False)
+            balance = user.get('balance', 0)
+            total_tasks = len(MYTHIC_TASKS)
+            completed_tasks = sum(1 for k, v in MYTHIC_TASKS.items() if tasks.get(k, 0) >= v['required'])
+            mythic_status = to_small_caps("unlocked") if mythic_unlocked else to_small_caps("locked")
+            grab_multiplier = PASS_CONFIG[tier]['grab_multiplier']
+            caption = f"""{tier_name}
+
+{to_small_caps('user')}: {escape(query.from_user.first_name)}
+{to_small_caps('balance')}: <code>{balance:,}</code>
+
+{to_small_caps('claims')}: {weekly_claims}/6
+{to_small_caps('streak')}: {streak_count}
+{to_small_caps('tasks')}: {completed_tasks}/{total_tasks}
+{to_small_caps('mythic')}: {mythic_status}
+{to_small_caps('multiplier')}: {grab_multiplier}x"""
+            keyboard = [[InlineKeyboardButton(to_small_caps("claim"), callback_data="ps_claim"), InlineKeyboardButton(to_small_caps("tasks"), callback_data="ps_tasks")], [InlineKeyboardButton(to_small_caps("upgrade"), callback_data="ps_upgrade"), InlineKeyboardButton(to_small_caps("invite"), callback_data="ps_invite")]]
+            await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
         elif action == 'buypremium':
-            await query.answer()
             user = await user_collection.find_one({'id': user_id})
             cost = PASS_CONFIG['premium']['cost']
             balance = user.get('balance', 0)
             caption = f"{to_small_caps('premium')}\n\n{to_small_caps('cost')}: <code>{cost:,}</code>\n{to_small_caps('balance')}: <code>{balance:,}</code>"
-            keyboard = [[InlineKeyboardButton(to_small_caps("confirm"), callback_data=f"pass_confirmprem_{user_id}"), InlineKeyboardButton(to_small_caps("cancel"), callback_data=f"pass_upgrade_{user_id}")]]
+            keyboard = [[InlineKeyboardButton(to_small_caps("confirm"), callback_data="ps_confirmprem"), InlineKeyboardButton(to_small_caps("cancel"), callback_data="ps_upgrade")]]
             await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
         elif action == 'confirmprem':
-            await query.answer()
             user = await user_collection.find_one({'id': user_id})
             cost = PASS_CONFIG['premium']['cost']
             if user.get('balance', 0) < cost:
@@ -356,12 +403,10 @@ async def pass_callback(update: Update, context: CallbackContext):
             await user_collection.update_one({'id': user_id}, {'$inc': {'balance': -cost}, '$set': {'pass_data.tier': 'premium', 'pass_data.premium_expires': expires}})
             await query.edit_message_caption(caption=f"{to_small_caps('premium activated')}\n{to_small_caps('expires')}: {expires.strftime('%Y-%m-%d')}", parse_mode='HTML')
         elif action == 'buyelite':
-            await query.answer()
             caption = f"{to_small_caps('elite payment')}\n\n{to_small_caps('amount')}: 50 INR\n{to_small_caps('upi')}: <code>{PASS_CONFIG['elite']['upi_id']}</code>\n\n{to_small_caps('send payment then click submit')}"
-            keyboard = [[InlineKeyboardButton(to_small_caps("submit"), callback_data=f"pass_submitelite_{user_id}")], [InlineKeyboardButton(to_small_caps("cancel"), callback_data=f"pass_upgrade_{user_id}")]]
+            keyboard = [[InlineKeyboardButton(to_small_caps("submit"), callback_data="ps_submitelite")], [InlineKeyboardButton(to_small_caps("cancel"), callback_data="ps_upgrade")]]
             await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
         elif action == 'submitelite':
-            await query.answer()
             await user_collection.update_one({'id': user_id}, {'$set': {'pass_data.pending_elite_payment': datetime.utcnow()}})
             try:
                 await context.bot.send_message(chat_id=OWNER_ID, text=f"{to_small_caps('elite payment')}\n{to_small_caps('user')}: <code>{user_id}</code>\n/approveelite {user_id}", parse_mode='HTML')
@@ -384,4 +429,4 @@ application.add_handler(CommandHandler("invite", invite_command, block=False))
 application.add_handler(CommandHandler("addinvite", addinvite_command, block=False))
 application.add_handler(CommandHandler("addgrab", addgrab_command, block=False))
 application.add_handler(CommandHandler("approveelite", approve_elite_command, block=False))
-application.add_handler(CallbackQueryHandler(pass_callback, pattern=r"^pass_", block=False))
+application.add_handler(CallbackQueryHandler(pass_callback, pattern=r"^ps_", block=False))
