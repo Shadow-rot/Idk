@@ -166,7 +166,8 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
     user_totals = await user_totals_collection.find_one({'id': user_id})
 
     if query.data == 'hlp_mn':
-        text = f"""<blockquote><b>{sc('help module')}</b>
+        video_html = f'<a href="{VIDEO_URL}">&#8205;</a>'
+        text = f"""{video_html}<blockquote><b>{sc('help module')}</b>
 /grab::{sc('guess character')}
 /fav::{sc('set favorite')}
 /harem::{sc('collection')}
@@ -182,7 +183,8 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
         referred_count = user_data.get('referred_users', 0)
         total_earnings = referred_count * REFERRER_REWARD
 
-        text = f"""<blockquote><b>{sc('referral network')}</b>
+        video_html = f'<a href="{VIDEO_URL}">&#8205;</a>'
+        text = f"""{video_html}<blockquote><b>{sc('referral network')}</b>
 {sc('referrals')}::<code>{referred_count}</code>
 {sc('earned')}::<code>{total_earnings:,}</code>ɢ
 {sc('you get')}::<code>{REFERRER_REWARD:,}</code>ɢ
@@ -196,7 +198,8 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
         await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
     elif query.data == 'crd_mn':
-        text = f"<blockquote><b>{sc('credits')}</b>\n{sc('system by dedicated team')}</blockquote>"
+        video_html = f'<a href="{VIDEO_URL}">&#8205;</a>'
+        text = f"{video_html}<blockquote><b>{sc('credits')}</b>\n{sc('system by dedicated team')}</blockquote>"
         keyboard = [
             [InlineKeyboardButton(sc("owner"), callback_data='own_vw')],
             [InlineKeyboardButton(sc("sudo"), callback_data='sud_ls')],
@@ -205,7 +208,8 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
         await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
     elif query.data == 'sud_ls':
-        text = f"<blockquote><b>{sc('sudo roster')}</b></blockquote>"
+        video_html = f'<a href="{VIDEO_URL}">&#8205;</a>'
+        text = f"{video_html}<blockquote><b>{sc('sudo roster')}</b></blockquote>"
         keyboard = [
             [InlineKeyboardButton("ʏᴏɪᴄʜɪ ɪsᴀɢɪ", url='https://t.me/ll_Yoichi_Isagi_ll')],
             [InlineKeyboardButton("ᴋᴀɪᴢᴇɴ", url='https://t.me/digital_paradoxx')],
@@ -216,7 +220,8 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
         await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
     elif query.data == 'own_vw':
-        text = f"<blockquote><b>{sc('owner profile')}</b></blockquote>"
+        video_html = f'<a href="{VIDEO_URL}">&#8205;</a>'
+        text = f"{video_html}<blockquote><b>{sc('owner profile')}</b></blockquote>"
         keyboard = [
             [InlineKeyboardButton("ᴛʜᴏʀғɪɴɴ", url='https://t.me/ll_Thorfinn_ll')],
             [InlineKeyboardButton(sc("back"), callback_data='crd_mn')]
@@ -228,7 +233,8 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
         total_characters = user_totals.get('count', 0) if user_totals else 0
         referred_count = user_data.get('referred_users', 0)
 
-        text = f"""<blockquote><b>{sc('system online')}</b>
+        video_html = f'<a href="{VIDEO_URL}">&#8205;</a>'
+        text = f"""{video_html}<blockquote><b>{sc('system online')}</b>
 {sc('balance')}::<code>{user_balance:,}</code>ɢ
 {sc('characters')}::<code>{total_characters}</code>
 {sc('referrals')}::<code>{referred_count}</code></blockquote>"""
