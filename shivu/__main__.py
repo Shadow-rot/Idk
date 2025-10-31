@@ -27,6 +27,7 @@ last_user = {}
 warned_users = {}
 spawn_settings_collection = None
 
+# Import all modules
 for module_name in ALL_MODULES:
     try:
         importlib.import_module("shivu.modules." + module_name)
@@ -34,6 +35,15 @@ for module_name in ALL_MODULES:
     except Exception as e:
         LOGGER.error(f"❌ Failed to import {module_name}: {e}")
 
+# Register plugin manager handlers
+try:
+    from shivu.modules.plugins_manager import register_handlers
+    register_handlers(application)
+    LOGGER.info("✅ Plugin manager handlers registered")
+except Exception as e:
+    LOGGER.error(f"❌ Failed to register plugin manager: {e}")
+
+# Import spawn settings
 try:
     from shivu.modules.rarity import spawn_settings_collection as ssc
     spawn_settings_collection = ssc
