@@ -10,7 +10,7 @@ class Config(object):
     PHOTO_URL = ["https://telegra.ph//file/e64337bbc6cdac7e6b178.jpg", "https://telegra.ph/file/ed23556d07d33db18402d.jpg", "https://telegra.ph//file/32556c77847dff110577c.jpg", "https://telegra.ph//file/0650844fc5db4049959bc.jpg"]
     SUPPORT_CHAT = "PICK_X_SUPPORT"
     UPDATE_CHAT = "PICK_X_UPDATE"
-    BOT_USERNAME = "shadwo_pro_bot"
+    BOT_USERNAME = "LovelyXubot"
     CHARA_CHANNEL_ID = "-1002621325936"
     api_id = "17944283"
     api_hash = "03f2f561ca86def71fe88d3ae16ed529"
