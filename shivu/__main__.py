@@ -35,6 +35,14 @@ for module_name in ALL_MODULES:
     except Exception as e:
         LOGGER.error(f"❌ Failed to import {module_name}: {e}")
 
+# Initialize plugin manager with all loaded modules
+try:
+    from shivu.modules.plugins_manager import initialize_plugin_manager
+    initialize_plugin_manager(ALL_MODULES)
+    LOGGER.info("✅ Plugin manager initialized")
+except Exception as e:
+    LOGGER.error(f"❌ Failed to initialize plugin manager: {e}")
+
 # Register plugin manager handlers
 try:
     from shivu.modules.plugins_manager import register_handlers
