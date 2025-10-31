@@ -326,8 +326,14 @@ async def guess(update: Update, context):
 def main():
     application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
 
+
+
 application.add_handler(CallbackQueryHandler(global_callback_handler))
+
+
     application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
+
+
     application.run_polling(drop_pending_updates=True)
 
 
