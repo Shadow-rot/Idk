@@ -69,7 +69,7 @@ __all__ = ALL_MODULES + ["ALL_MODULES"]
 
 # Initialize plugin manager with all available modules
 try:
-    from shivu.modules.pm import initialize_plugin_manager
+    from shivu.modules.plugins_manager import initialize_plugin_manager
     initialize_plugin_manager(ALL_MODULES)
     LOGGER.info("Plugin manager initialized successfully")
 except ImportError:
