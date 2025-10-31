@@ -12,8 +12,8 @@ class Config(object):
     UPDATE_CHAT = "PICK_X_UPDATE"
     BOT_USERNAME = "shadwo_pro_bot"
     CHARA_CHANNEL_ID = "-1002621325936"
-    api_id = "21705508"
-    api_hash = "1d590f4c3d2029a7ef7df087707d7441"
+    api_id = "17944283"
+    api_hash = "03f2f561ca86def71fe88d3ae16ed529"
 
     
 class Production(Config):
