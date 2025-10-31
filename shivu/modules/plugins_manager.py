@@ -9,7 +9,7 @@ LOGGER = logging.getLogger(__name__)
 
 OWNER_ID = 5147822244
 
-# Dictionary to track loaded plugins
+# Dictionary to track loaded plugins and their handler instances
 LOADED_PLUGINS = {}
 AVAILABLE_PLUGINS = []
 
@@ -65,11 +65,25 @@ async def enable_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             module = importlib.import_module(module_path)
 
-        # Update or create plugin data
-        LOADED_PLUGINS[plugin_name] = {
-            'module': module,
-            'enabled': True
-        }
+        # Create or update plugin data
+        if plugin_name not in LOADED_PLUGINS:
+            LOADED_PLUGINS[plugin_name] = {
+                'module': module,
+                'handlers': [],
+                'enabled': False
+            }
+        
+        plugin_data = LOADED_PLUGINS[plugin_name]
+        plugin_data['module'] = module
+
+        # Remove old handlers if they exist
+        for handler in plugin_data.get('handlers', []):
+            try:
+                application.remove_handler(handler)
+            except Exception as e:
+                LOGGER.warning(f"Failed to remove old handler: {e}")
+        
+        plugin_data['handlers'] = []
 
         # Try to register handlers if available
         handlers_count = 0
@@ -77,9 +91,12 @@ async def enable_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for handler in module.__handlers__:
                 try:
                     application.add_handler(handler)
+                    plugin_data['handlers'].append(handler)
                     handlers_count += 1
                 except Exception as e:
                     LOGGER.warning(f"Failed to add handler from {plugin_name}: {e}")
+
+        plugin_data['enabled'] = True
 
         LOGGER.info(f"Plugin {plugin_name} enabled by user {user_id}")
         
@@ -142,19 +159,18 @@ async def disable_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         from shivu import application
 
         plugin_data = LOADED_PLUGINS[plugin_name]
-        module = plugin_data.get('module')
 
-        # Try to remove handlers if available
+        # Remove all handlers that were stored during enable
         removed_handlers = 0
-        if module and hasattr(module, '__handlers__'):
-            for handler in module.__handlers__:
-                try:
-                    application.remove_handler(handler)
-                    removed_handlers += 1
-                except Exception as e:
-                    LOGGER.warning(f"Failed to remove handler from {plugin_name}: {e}")
+        for handler in plugin_data.get('handlers', []):
+            try:
+                application.remove_handler(handler)
+                removed_handlers += 1
+            except Exception as e:
+                LOGGER.warning(f"Failed to remove handler from {plugin_name}: {e}")
 
-        # Mark as disabled
+        # Clear handlers list and mark as disabled
+        plugin_data['handlers'] = []
         plugin_data['enabled'] = False
 
         LOGGER.info(f"Plugin {plugin_name} disabled by user {user_id}")
@@ -200,11 +216,7 @@ async def pinfo_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     response = "Plugin Information\n\n"
 
     for idx, (plugin_name, plugin_data) in enumerate(sorted(enabled_plugins.items()), 1):
-        module = plugin_data.get('module')
-        handler_count = 0
-        if module and hasattr(module, '__handlers__'):
-            handler_count = len(module.__handlers__)
-        
+        handler_count = len(plugin_data.get('handlers', []))
         status = f"{handler_count} handler(s)" if handler_count > 0 else "loaded"
         response += f"{idx}. {plugin_name} - {status}\n"
 
@@ -249,13 +261,21 @@ def initialize_plugin_manager(all_modules):
     # Store all available plugins except the manager itself
     AVAILABLE_PLUGINS = [m for m in all_modules if m != 'plugins_manager']
 
-    # Mark all initially loaded modules as enabled
+    # Mark all initially loaded modules as enabled and store their handlers
     for module_name in all_modules:
         if module_name != 'plugins_manager':
             module_path = f"shivu.modules.{module_name}"
             if module_path in sys.modules:
+                module = sys.modules[module_path]
+                handlers = []
+                
+                # Get handlers from module if available
+                if hasattr(module, '__handlers__'):
+                    handlers = list(module.__handlers__)
+                
                 LOADED_PLUGINS[module_name] = {
-                    'module': sys.modules[module_path],
+                    'module': module,
+                    'handlers': handlers,
                     'enabled': True
                 }
 
