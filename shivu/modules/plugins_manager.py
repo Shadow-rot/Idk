@@ -7,6 +7,8 @@ from telegram.ext import CommandHandler, ContextTypes
 
 LOGGER = logging.getLogger(__name__)
 
+OWNER_ID = 5147822244
+
 # Dictionary to track loaded plugins and their handlers
 LOADED_PLUGINS = {}
 AVAILABLE_PLUGINS = []
