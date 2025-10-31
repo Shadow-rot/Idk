@@ -1,8 +1,10 @@
-FROM python:3.8-slim-bullseye
+FROM python:3.8.5-slim-buster
 
-ENV PIP_NO_CACHE_DIR=1
+ENV PIP_NO_CACHE_DIR 1
 
-# Install Required Packages
+RUN sed -i.bak 's/us-west-2\.ec2\.//' /etc/apt/sources.list
+
+# Installing Required Packages
 RUN apt update && apt upgrade -y && \
     apt install --no-install-recommends -y \
     debian-keyring \
@@ -55,20 +57,21 @@ RUN apt update && apt upgrade -y && \
     xvfb \
     unzip \
     libopus0 \
-    libopus-dev && \
-    rm -rf /var/lib/apt/lists /var/cache/apt/archives /tmp
+    libopus-dev \
+    && rm -rf /var/lib/apt/lists /var/cache/apt/archives /tmp
 
-# Upgrade pip and setuptools
+# Pypi package Repo upgrade
 RUN pip3 install --upgrade pip setuptools
 
-# Clone your bot
-RUN git clone https://github.com/Shadow-rot/ptb /root/ptb
+# Copy Python Requirements to /root/FallenRobot
+RUN git clone https://github.com/Mynameishekhar/ptb /root/ptb
 WORKDIR /root/ptb
+
 
 ENV PATH="/home/bot/bin:$PATH"
 
-# Install dependencies
+# Install requirements
 RUN pip3 install -U -r requirements.txt
 
-# Start your bot
-CMD ["python3", "-m", "shivu"]
+# Starting Worker
+CMD ["python3","-m", "shivu"]
