@@ -328,7 +328,7 @@ def main():
 
 
 
-application.add_handler(CallbackQueryHandler(global_callback_handler))
+     application.add_handler(CallbackQueryHandler(global_callback_handler))
 
 
     application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
