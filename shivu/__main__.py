@@ -9,6 +9,8 @@ from telegram.ext import CommandHandler, MessageHandler, filters
 
 from shivu import db, shivuu, application, LOGGER
 from shivu.modules import ALL_MODULES
+from shivu.callback import global_callback_handler
+from telegram.ext import CallbackQueryHandler
 
 collection = db['anime_characters_lol']
 user_collection = db['user_collection_lmaoooo']
@@ -323,6 +325,8 @@ async def guess(update: Update, context):
 
 def main():
     application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
+
+application.add_handler(CallbackQueryHandler(global_callback_handler))
     application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
     application.run_polling(drop_pending_updates=True)
 
