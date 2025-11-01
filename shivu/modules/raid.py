@@ -8,7 +8,7 @@ from telegram.ext import Application
 
 # Import your existing setup
 from shivu.config import Development as Config
-from shivu import shivuu, db, user_collection, collection, OWNER_ID, sudo_users
+from shivu import shivuu, db, user_collection, collection, sudo_users
 
 # Collections
 raid_settings_collection = db['raid_settings']
@@ -16,6 +16,8 @@ raid_cooldown_collection = db['raid_cooldown']
 active_raids_collection = db['active_raids']
 
 LOGGER = logging.getLogger(__name__)
+
+OWNER_ID = 5147822244
 
 # Rarity mapping
 RARITY_MAP = {
