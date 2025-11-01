@@ -125,7 +125,7 @@ async def delete_expired_payment(msg, payment_id):
         except:
             pass
 
-async def pay_callback(update, context):
+async def hey_callback(update, context):
     query = update.callback_query
     await query.answer()
     
