@@ -8,7 +8,7 @@ from telegram.ext import Application
 
 # Import your existing setup
 from shivu.config import Development as Config
-from shivu import shivuu, db, user_collection, collection, sudo_users
+from shivu import shivuu, db, user_collection, collection, OWNER_ID, sudo_users
 
 # Collections
 raid_settings_collection = db['raid_settings']
@@ -17,33 +17,31 @@ active_raids_collection = db['active_raids']
 
 LOGGER = logging.getLogger(__name__)
 
-OWNER_ID = 5147822244
-
-# Rarity mapping
+# Rarity mapping - INTEGER KEYS for proper database matching
 RARITY_MAP = {
-    1: "🟢 ᴄᴏᴍᴍᴏɴ",
-    2: "🟣 ʀᴀʀᴇ",
-    3: "🟡 ʟᴇɢᴇɴᴅᴀʀʏ",
-    4: "💮 sᴘᴇᴄɪᴀʟ ᴇᴅɪᴛɪᴏɴ",
-    5: "💫 ɴᴇᴏɴ",
-    6: "✨ ᴍᴀɴɢᴀ",
-    7: "🎭 ᴄᴏsᴘʟᴀʏ",
-    8: "🎐 ᴄᴇʟᴇsᴛɪᴀʟ",
-    9: "🔮 ᴘʀᴇᴍɪᴜᴍ ᴇᴅɪᴛɪᴏɴ",
-    10: "💋 ᴇʀᴏᴛɪᴄ",
-    11: "🌤 sᴜᴍᴍᴇʀ",
-    12: "☃️ ᴡɪɴᴛᴇʀ",
-    13: "☔️ ᴍᴏɴsᴏᴏɴ",
-    14: "💝 ᴠᴀʟᴇɴᴛɪɴᴇ",
-    15: "🎃 ʜᴀʟʟᴏᴡᴇᴇɴ",
-    16: "🎄 ᴄʜʀɪsᴛᴍᴀs",
-    17: "🏵 ᴍʏᴛʜɪᴄ",
-    18: "🎗 sᴘᴇᴄɪᴀʟ ᴇᴠᴇɴᴛs",
-    19: "🎥 ᴀᴍᴠ",
-    20: "👼 ᴛɪɴʏ"
+    1: "🟢 Common",
+    2: "🟣 Rare",
+    3: "🟡 Legendary",
+    4: "💮 Special Edition",
+    5: "💫 Neon",
+    6: "✨ Manga",
+    7: "🎭 Cosplay",
+    8: "🎐 Celestial",
+    9: "🔮 Premium Edition",
+    10: "💋 Erotic",
+    11: "🌤 Summer",
+    12: "☃️ Winter",
+    13: "☔️ Monsoon",
+    14: "💝 Valentine",
+    15: "🎃 Halloween",
+    16: "🎄 Christmas",
+    17: "🏵 Mythic",
+    18: "🎗 Special Events",
+    19: "🎥 Amv",
+    20: "👼 Tiny"
 }
 
-# Default settings - Updated with critical chance
+# Default settings
 DEFAULT_SETTINGS = {
     "start_charge": 500,
     "join_phase_duration": 30,
@@ -58,7 +56,7 @@ DEFAULT_SETTINGS = {
     "coin_chance": 35,
     "loss_chance": 20,
     "nothing_chance": 15,
-    "critical_chance": 5  # New: Critical hit gives both coins + character
+    "critical_chance": 5
 }
 
 
@@ -121,26 +119,55 @@ async def update_user_balance(user_id, amount):
 
 
 async def get_random_character(allowed_rarities):
-    """Get a random character from allowed rarities"""
-    characters = await collection.find({"rarity": {"$in": allowed_rarities}}).to_list(length=None)
-    if characters:
-        return random.choice(characters)
-    return None
+    """Get a random character from allowed rarities - FIXED for proper matching"""
+    try:
+        # First, try matching with integer rarities
+        characters = await collection.find({"rarity": {"$in": allowed_rarities}}).to_list(length=None)
+        
+        # If no characters found with integer matching, try string matching
+        if not characters:
+            LOGGER.info(f"No characters found with integer rarities. Trying string matching...")
+            rarity_strings = [RARITY_MAP.get(r, f"Rarity {r}") for r in allowed_rarities]
+            characters = await collection.find({"rarity": {"$in": rarity_strings}}).to_list(length=None)
+        
+        if characters:
+            selected = random.choice(characters)
+            LOGGER.info(f"Selected character: {selected.get('name')} with rarity {selected.get('rarity')}")
+            return selected
+        else:
+            LOGGER.warning("No characters found in database with allowed rarities!")
+            return None
+    except Exception as e:
+        LOGGER.error(f"Error getting random character: {e}")
+        return None
 
 
 async def add_character_to_user(user_id, character):
-    """Add character to user's collection"""
-    await user_collection.update_one(
-        {"id": user_id},
-        {"$push": {"characters": {
-            "id": character["id"],
-            "name": character["name"],
-            "anime": character["anime"],
-            "rarity": character["rarity"],
+    """Add character to user's collection - matches harem format"""
+    try:
+        # Get the rarity value
+        char_rarity = character.get("rarity")
+        
+        # If rarity is integer, convert to string format for consistency
+        if isinstance(char_rarity, int):
+            char_rarity = RARITY_MAP.get(char_rarity, "🟢 Common")
+        
+        char_data = {
+            "id": character.get("id"),
+            "name": character.get("name"),
+            "anime": character.get("anime"),
+            "rarity": char_rarity,
             "img_url": character.get("img_url", "")
-        }}},
-        upsert=True
-    )
+        }
+        
+        await user_collection.update_one(
+            {"id": user_id},
+            {"$push": {"characters": char_data}},
+            upsert=True
+        )
+        LOGGER.info(f"Added character {char_data['name']} to user {user_id}")
+    except Exception as e:
+        LOGGER.error(f"Error adding character to user: {e}")
 
 
 @shivuu.on_message(filters.command(["raid"]) & filters.group)
@@ -276,7 +303,7 @@ async def join_raid_callback(client, callback_query: CallbackQuery):
 
 
 async def execute_raid(client, message, raid_id):
-    """Execute the raid and distribute rewards"""
+    """Execute the raid and distribute rewards with character images"""
     raid = await active_raids_collection.find_one({"raid_id": raid_id})
     if not raid:
         return
@@ -294,13 +321,20 @@ async def execute_raid(client, message, raid_id):
     total_coins_gained = 0
     total_characters = 0
     total_critical = 0
+    character_images = []  # Store character images to show
     
     for user_id in participants:
-        # Weighted random outcome
+        # Weighted random outcome - FIXED probability calculation
         rand = random.randint(1, 100)
         
-        # Check for critical hit first (rarest)
-        if rand <= settings.get("critical_chance", 5):
+        critical_threshold = settings.get("critical_chance", 5)
+        char_threshold = critical_threshold + settings["character_chance"]
+        coin_threshold = char_threshold + settings["coin_chance"]
+        loss_threshold = coin_threshold + settings["loss_chance"]
+        
+        LOGGER.info(f"User {user_id} rolled {rand} (Critical<={critical_threshold}, Char<={char_threshold}, Coin<={coin_threshold}, Loss<={loss_threshold})")
+        
+        if rand <= critical_threshold:
             # CRITICAL HIT - Both character AND coins!
             character = await get_random_character(settings["allowed_rarities"])
             coins = random.randint(settings["coin_min"], settings["coin_max"])
@@ -308,7 +342,14 @@ async def execute_raid(client, message, raid_id):
             if character:
                 await add_character_to_user(user_id, character)
                 await update_user_balance(user_id, coins)
-                rarity_text = RARITY_MAP.get(character["rarity"], "🟢 ᴄᴏᴍᴍᴏɴ")
+                
+                # Get rarity display
+                char_rarity = character.get("rarity")
+                if isinstance(char_rarity, int):
+                    rarity_text = RARITY_MAP.get(char_rarity, "🟢 Common")
+                else:
+                    rarity_text = char_rarity
+                
                 results.append({
                     "user_id": user_id,
                     "type": "critical",
@@ -316,9 +357,15 @@ async def execute_raid(client, message, raid_id):
                     "rarity": rarity_text,
                     "coins": coins
                 })
+                
+                # Add image for display
+                if character.get("img_url"):
+                    character_images.append(character.get("img_url"))
+                
                 total_characters += 1
                 total_coins_gained += coins
                 total_critical += 1
+                LOGGER.info(f"User {user_id} got CRITICAL: {character.get('name')}")
             else:
                 # Fallback: double coins if no character
                 coins = coins * 2
@@ -326,19 +373,32 @@ async def execute_raid(client, message, raid_id):
                 results.append({"user_id": user_id, "type": "coins", "amount": coins, "doubled": True})
                 total_coins_gained += coins
         
-        elif rand <= settings.get("critical_chance", 5) + settings["character_chance"]:
+        elif rand <= char_threshold:
             # Character reward
             character = await get_random_character(settings["allowed_rarities"])
             if character:
                 await add_character_to_user(user_id, character)
-                rarity_text = RARITY_MAP.get(character["rarity"], "🟢 ᴄᴏᴍᴍᴏɴ")
+                
+                # Get rarity display
+                char_rarity = character.get("rarity")
+                if isinstance(char_rarity, int):
+                    rarity_text = RARITY_MAP.get(char_rarity, "🟢 Common")
+                else:
+                    rarity_text = char_rarity
+                
                 results.append({
                     "user_id": user_id,
                     "type": "character",
                     "character": character,
                     "rarity": rarity_text
                 })
+                
+                # Add image for display
+                if character.get("img_url"):
+                    character_images.append(character.get("img_url"))
+                
                 total_characters += 1
+                LOGGER.info(f"User {user_id} got character: {character.get('name')}")
             else:
                 # Fallback to coins if no character found
                 coins = random.randint(settings["coin_min"], settings["coin_max"])
@@ -346,22 +406,25 @@ async def execute_raid(client, message, raid_id):
                 results.append({"user_id": user_id, "type": "coins", "amount": coins})
                 total_coins_gained += coins
         
-        elif rand <= settings.get("critical_chance", 5) + settings["character_chance"] + settings["coin_chance"]:
+        elif rand <= coin_threshold:
             # Coin reward
             coins = random.randint(settings["coin_min"], settings["coin_max"])
             await update_user_balance(user_id, coins)
             results.append({"user_id": user_id, "type": "coins", "amount": coins})
             total_coins_gained += coins
+            LOGGER.info(f"User {user_id} got coins: {coins}")
         
-        elif rand <= settings.get("critical_chance", 5) + settings["character_chance"] + settings["coin_chance"] + settings["loss_chance"]:
+        elif rand <= loss_threshold:
             # Coin loss
             loss = random.randint(settings["coin_loss_min"], settings["coin_loss_max"])
             await update_user_balance(user_id, -loss)
             results.append({"user_id": user_id, "type": "loss", "amount": loss})
+            LOGGER.info(f"User {user_id} lost coins: {loss}")
         
         else:
             # Nothing
             results.append({"user_id": user_id, "type": "nothing"})
+            LOGGER.info(f"User {user_id} got nothing")
     
     # Build result message
     result_text = (
@@ -410,7 +473,24 @@ async def execute_raid(client, message, raid_id):
         f"<i>ᴍᴇssᴀɢᴇ ᴘʀᴏᴠɪᴅᴇᴅ ʙʏ</i> <a href='https://t.me/siyaprobot'>sɪʏᴀ</a>"
     )
     
-    await message.edit_text(result_text)
+    # Send with character image if any characters were found
+    try:
+        if character_images:
+            # Show the first character image found
+            await message.delete()
+            await client.send_photo(
+                chat_id=raid["chat_id"],
+                photo=character_images[0],
+                caption=result_text
+            )
+        else:
+            # No characters found, just edit text
+            await message.edit_text(result_text)
+    except Exception as e:
+        LOGGER.error(f"Error sending raid results: {e}")
+        # Fallback to text only
+        await message.edit_text(result_text)
+    
     await active_raids_collection.delete_one({"raid_id": raid_id})
 
 
@@ -489,7 +569,7 @@ async def set_raid_rarities(client, message):
 
 @shivuu.on_message(filters.command(["setraidchances"]) & filters.user(OWNER_ID))
 async def set_raid_chances(client, message):
-    """Set raid reward chances - NEW COMMAND"""
+    """Set raid reward chances"""
     if len(message.command) < 6:
         await message.reply_text(
             "ᴜsᴀɢᴇ: `/setraidchances <character%> <coin%> <loss%> <nothing%> <critical%>`\n\n"
@@ -542,7 +622,7 @@ async def set_raid_chances(client, message):
 
 @shivuu.on_message(filters.command(["setraidcoins"]) & filters.user(OWNER_ID))
 async def set_raid_coins(client, message):
-    """Set raid coin reward range - NEW COMMAND"""
+    """Set raid coin reward range"""
     if len(message.command) < 3:
         await message.reply_text(
             "ᴜsᴀɢᴇ: `/setraidcoins <min> <max>`\n"
@@ -580,7 +660,7 @@ async def set_raid_coins(client, message):
 
 @shivuu.on_message(filters.command(["setraidloss"]) & filters.user(OWNER_ID))
 async def set_raid_loss(client, message):
-    """Set raid coin loss range - NEW COMMAND"""
+    """Set raid coin loss range"""
     if len(message.command) < 3:
         await message.reply_text(
             "ᴜsᴀɢᴇ: `/setraidloss <min> <max>`\n"
