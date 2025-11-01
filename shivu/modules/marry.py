@@ -204,7 +204,7 @@ async def propose(update: Update, context: CallbackContext):
         await user_collection.update_one({'id': user_id}, {'$inc': {'balance': -PROPOSAL_COST}})
 
         await update.message.reply_photo(
-            photo='https://te.legra.ph/file/4d0f83726fe8cd637d3ff.jpg',
+            photo='https://files.catbox.moe/unmo87.jpg',
             caption='ғɪɴᴀʟʟʏ ᴛʜᴇ ᴛɪᴍᴇ ᴛᴏ ᴘʀᴏᴘᴏsᴇ 💍'
         )
         await asyncio.sleep(2)
