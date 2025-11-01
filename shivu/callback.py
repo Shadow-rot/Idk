@@ -10,7 +10,7 @@ from shivu import application, LOGGER
 
 # Import your callback handlers
 from shivu.modules.fav import handle_fav_callback
-from shivu.modules.pay import pay_callback
+from shivu.modules.balance import pay_callback
 
 async def global_callback_router(update: Update, context: CallbackContext):
     """Route callback queries to appropriate handlers"""
