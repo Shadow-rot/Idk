@@ -3,20 +3,37 @@ import sys
 import asyncio
 from telegram import Update
 from telegram.ext import CommandHandler, ContextTypes
-from shivu import application, LOGGER, OWNER_ID
+from shivu import application, LOGGER
 from telegram.error import BadRequest
+
+# Import the global dictionaries from main
+from __main__ import (
+    locks,
+    message_counts,
+    sent_characters,
+    last_characters,
+    first_correct_guesses,
+    last_user,
+    warned_users,
+    spawn_messages,
+    spawn_message_links
+)
+
+# Owner ID
+OWNER_ID = 5147822244
+
 
 async def restart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Restart the bot - Owner only command"""
     user_id = update.effective_user.id
-    
+
     # Check if user is owner
     if user_id != OWNER_ID:
-        await update.message.reply_text("❌ This command is only for the bot owner.")
+        await update.message.reply_text("This command is only for the bot owner.")
         return
-    
-    response = await update.message.reply_text("🔄 **ʀᴇsᴛᴀʀᴛɪɴɢ ʙᴏᴛ...**", parse_mode='Markdown')
-    
+
+    response = await update.message.reply_text("Restarting bot...")
+
     try:
         # Clear all spawn data and locks
         LOGGER.info("Clearing spawn data before restart...")
@@ -29,27 +46,29 @@ async def restart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         warned_users.clear()
         spawn_messages.clear()
         spawn_message_links.clear()
-        
+
         await response.edit_text(
-            "✅ **ʀᴇsᴛᴀʀᴛ ᴘʀᴏᴄᴇss sᴛᴀʀᴛᴇᴅ!**\n\n"
-            "⏳ ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ғᴏʀ ғᴇᴡ sᴇᴄᴏɴᴅs...\n"
-            "🔄 ʙᴏᴛ ᴡɪʟʟ ʙᴇ ʙᴀᴄᴋ ᴏɴʟɪɴᴇ sʜᴏʀᴛʟʏ!",
-            parse_mode='Markdown'
+            "Restart process started!\n\n"
+            "Please wait for few seconds...\n"
+            "Bot will be back online shortly!"
         )
-        
+
         LOGGER.info("Bot restart initiated by owner")
-        
+
+        # Small delay to ensure message is sent
+        await asyncio.sleep(1)
+
         # Stop the application gracefully
         await application.stop()
         await application.shutdown()
-        
+
         # Restart the process
         os.execl(sys.executable, sys.executable, *sys.argv)
-        
+
     except Exception as e:
         LOGGER.error(f"Error during restart: {e}")
         try:
-            await response.edit_text(f"❌ **ᴇʀʀᴏʀ ᴅᴜʀɪɴɢ ʀᴇsᴛᴀʀᴛ:**\n`{str(e)}`", parse_mode='Markdown')
+            await response.edit_text(f"Error during restart:\n{str(e)}")
         except:
             pass
 
@@ -57,23 +76,22 @@ async def restart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def shutdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Shutdown the bot - Owner only command"""
     user_id = update.effective_user.id
-    
+
     # Check if user is owner
     if user_id != OWNER_ID:
-        await update.message.reply_text("❌ This command is only for the bot owner.")
+        await update.message.reply_text("This command is only for the bot owner.")
         return
-    
-    response = await update.message.reply_text("⚠️ **sʜᴜᴛᴛɪɴɢ ᴅᴏᴡɴ ʙᴏᴛ...**", parse_mode='Markdown')
-    
+
+    response = await update.message.reply_text("Shutting down bot...")
+
     try:
         await response.edit_text(
-            "🛑 **ʙᴏᴛ sʜᴜᴛᴅᴏᴡɴ ɪɴɪᴛɪᴀᴛᴇᴅ!**\n\n"
-            "👋 ɢᴏᴏᴅʙʏᴇ!",
-            parse_mode='Markdown'
+            "Bot shutdown initiated!\n\n"
+            "Goodbye!"
         )
-        
+
         LOGGER.info("Bot shutdown initiated by owner")
-        
+
         # Clear all data
         locks.clear()
         message_counts.clear()
@@ -84,16 +102,27 @@ async def shutdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         warned_users.clear()
         spawn_messages.clear()
         spawn_message_links.clear()
-        
+
+        # Small delay to ensure message is sent
+        await asyncio.sleep(1)
+
         # Stop the application
         await application.stop()
         await application.shutdown()
-        
+
         sys.exit(0)
-        
+
     except Exception as e:
         LOGGER.error(f"Error during shutdown: {e}")
         try:
-            await response.edit_text(f"❌ **ᴇʀʀᴏʀ ᴅᴜʀɪɴɢ sʜᴜᴛᴅᴏᴡɴ:**\n`{str(e)}`", parse_mode='Markdown')
+            await response.edit_text(f"Error during shutdown:\n{str(e)}")
         except:
             pass
+
+
+# Handler registration function
+def setup_restart_handlers(app):
+    """Setup restart and shutdown command handlers"""
+    app.add_handler(CommandHandler("restart", restart_command, block=False))
+    app.add_handler(CommandHandler("shutdown", shutdown_command, block=False))
+    LOGGER.info("Restart and shutdown handlers registered")
