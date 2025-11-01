@@ -15,7 +15,9 @@ TIPS = [
     "ᴄᴏʟʟᴇᴄᴛ ʀᴀʀᴇ sʟᴀᴠᴇs ᴛᴏ ɢᴇᴛ ʀɪᴄʜ",
     "ᴜsᴇ /bal ᴛᴏ ᴄʜᴇᴄᴋ ʏᴏᴜʀ ᴡᴀʟʟᴇᴛ",
     "ᴛʀᴀᴅᴇ sʟᴀᴠᴇs ᴛᴏ ɢʀᴏᴡ ғᴀsᴛᴇʀ",
-    "ᴄᴏᴍᴘʟᴇᴛᴇ ᴅᴀɪʟʏ ᴛᴀsᴋs ғᴏʀ ʙᴏɴᴜs"
+    "ᴄᴏᴍᴘʟᴇᴛᴇ ᴅᴀɪʟʏ ᴛᴀsᴋs ғᴏʀ ʙᴏɴᴜs",
+    "ᴅᴇᴘᴏsɪᴛ ɪɴ ʙᴀɴᴋ ғᴏʀ 5% ɪɴᴛᴇʀᴇsᴛ",
+    "ᴊᴏɪɴ ʀᴀɪᴅs ғᴏʀ ʙɪɢ ʀᴇᴡᴀʀᴅs"
 ]
 
 async def get_balance(user_id):
@@ -33,6 +35,9 @@ def main_keyboard(uid):
         [InlineKeyboardButton("ɢᴀᴍᴇs", callback_data=f'hlp_gm_{uid}'),
          InlineKeyboardButton("ᴇᴄᴏɴᴏᴍʏ", callback_data=f'hlp_ec_{uid}'),
          InlineKeyboardButton("sʟᴀᴠᴇs", callback_data=f'hlp_sl_{uid}')],
+        [InlineKeyboardButton("ʙᴀɴᴋɪɴɢ", callback_data=f'hlp_bn_{uid}'),
+         InlineKeyboardButton("ʀᴀɪᴅs", callback_data=f'hlp_rd_{uid}'),
+         InlineKeyboardButton("sᴛᴏʀᴇ", callback_data=f'hlp_st_{uid}')],
         [InlineKeyboardButton("ᴘᴀss", callback_data=f'hlp_ps_{uid}'),
          InlineKeyboardButton("ɪɴғᴏ", callback_data=f'hlp_if_{uid}'),
          InlineKeyboardButton("ʟᴇᴀᴅᴇʀʙᴏᴀʀᴅ", callback_data=f'hlp_lb_{uid}')],
@@ -40,6 +45,10 @@ def main_keyboard(uid):
          InlineKeyboardButton("ɢᴜɪᴅᴇ", callback_data=f'hlp_gd_{uid}'),
          InlineKeyboardButton("ᴛɪᴘs", callback_data=f'hlp_tp_{uid}')]
     ]
+
+def back_keyboard(uid):
+    return [[InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f'hlp_mn_{uid}'),
+             InlineKeyboardButton("ᴄʟᴏsᴇ", callback_data=f'hlp_cl_{uid}')]]
 
 def main_caption(name, bal, video_url):
     return f"""<a href="{video_url}">&#8205;</a><blockquote>ʜᴇʟᴘ ᴄᴇɴᴛᴇʀ
@@ -100,7 +109,72 @@ sᴘᴀᴡɴs ᴇᴠᴇʀʏ 100 ᴍᴇssᴀɢᴇs
 
 ᴛʀᴀᴅɪɴɢ:
 <code>/trade</code> - ᴛʀᴀᴅᴇ sʟᴀᴠᴇs
-<code>/gift @user id</code> - ɢɪғᴛ sʟᴀᴠᴇ</blockquote>""",
+<code>/gift @user id</code> - ɢɪғᴛ sʟᴀᴠᴇ
+
+ᴍᴀʀʀɪᴀɢᴇ:
+<code>/propose</code> - ᴘʀᴏᴘᴏsᴇ ᴛᴏ sʟᴀᴠᴇ
+<code>/marry</code> - ᴍᴀʀʀʏ sʟᴀᴠᴇ
+<code>/dice</code> - ᴍᴀʀʀɪᴀɢᴇ ɢᴀᴍᴇ
+
+sᴇᴀʀᴄʜ:
+<code>/check id</code> - ᴄʜᴇᴄᴋ ᴄʜᴀʀᴀᴄᴛᴇʀ
+<code>/find name</code> - ғɪɴᴅ ʙʏ ɴᴀᴍᴇ</blockquote>""",
+
+    'bn': lambda v: f"""<a href="{v}">&#8205;</a><blockquote>ʙᴀɴᴋɪɴɢ sʏsᴛᴇᴍ
+
+ʙᴀsɪᴄ:
+<code>/bal</code> - ᴠɪᴇᴡ ʙᴀʟᴀɴᴄᴇ
+<code>/cclaim</code> - ᴅᴀɪʟʏ 2000 ɢᴏʟᴅ
+<code>/xp</code> - ᴄʜᴇᴄᴋ ʟᴇᴠᴇʟ
+
+ʙᴀɴᴋ:
+<code>/deposit amount</code> - ᴅᴇᴘᴏsɪᴛ
+<code>/withdraw amount</code> - ᴡɪᴛʜᴅʀᴀᴡ
+5% ᴅᴀɪʟʏ ɪɴᴛᴇʀᴇsᴛ
+
+ʟᴏᴀɴs:
+<code>/loan amount</code> - ʙᴏʀʀᴏᴡ
+<code>/repay</code> - ᴘᴀʏ ʙᴀᴄᴋ
+ᴍᴀx 100ᴋ | 10% ɪɴᴛᴇʀᴇsᴛ | 3 ᴅᴀʏs
+
+ᴏᴛʜᴇʀ:
+<code>/pay amount</code> - ᴛʀᴀɴsғᴇʀ
+<code>/notifications</code> - ᴠɪᴇᴡ ɴᴏᴛɪᴄᴇs</blockquote>""",
+
+    'rd': lambda v: f"""<a href="{v}">&#8205;</a><blockquote>ʀᴀɪᴅ sʏsᴛᴇᴍ
+
+sᴛᴀʀᴛ ʀᴀɪᴅ:
+<code>/raid</code> - sᴛᴀʀᴛ ɴᴇᴡ ʀᴀɪᴅ
+ᴄᴏsᴛ: 500 ɢᴏʟᴅ
+ᴊᴏɪɴ ᴘʜᴀsᴇ: 30s
+
+ʀᴇᴡᴀʀᴅs:
+ᴄʜᴀʀᴀᴄᴛᴇʀs - 25%
+ɢᴏʟᴅ 500-2000 - 35%
+ʟᴏsᴇ 200-500 - 20%
+ɴᴏᴛʜɪɴɢ - 15%
+ᴄʀɪᴛɪᴄᴀʟ ʜɪᴛ - 5%
+
+ғᴇᴀᴛᴜʀᴇs:
+ᴍᴜʟᴛɪᴘʟᴀʏᴇʀ ᴇᴠᴇɴᴛ
+5 ᴍɪɴ ᴄᴏᴏʟᴅᴏᴡɴ
+ʀᴀɴᴅᴏᴍ ʀᴇᴡᴀʀᴅs</blockquote>""",
+
+    'st': lambda v: f"""<a href="{v}">&#8205;</a><blockquote>sᴛᴏʀᴇ sʏsᴛᴇᴍ
+
+ᴘʀᴇᴍɪᴜᴍ sᴛᴏʀᴇ:
+<code>/ps</code> - ᴏᴘᴇɴ sᴛᴏʀᴇ
+<code>/pstats</code> - ᴠɪᴇᴡ sᴛᴀᴛs
+
+ʜᴏᴡ ɪᴛ ᴡᴏʀᴋs:
+3 ʀᴀɴᴅᴏᴍ ᴄʜᴀʀᴀᴄᴛᴇʀs ᴇᴠᴇʀʏ 24ʜ
+ʀᴇғʀᴇsʜ ᴜᴘ ᴛᴏ 2x (ᴄᴏsᴛs ɢᴏʟᴅ)
+ʙᴜʏ ᴡɪᴛʜ ɢᴏʟᴅ
+ᴀᴜᴛᴏ ʀᴇsᴇᴛ ᴀғᴛᴇʀ ᴄᴏᴏʟᴅᴏᴡɴ
+
+ʀᴇɢᴜʟᴀʀ sᴛᴏʀᴇ:
+<code>/store</code> - ᴏᴘᴇɴ sʜᴏᴘ
+ʙᴜʏ ɪᴛᴇᴍs ᴀɴᴅ ᴜᴘɢʀᴀᴅᴇs</blockquote>""",
 
     'ps': lambda v: f"""<a href="{v}">&#8205;</a><blockquote>sʟᴀᴠᴇ ᴘᴀss
 
@@ -214,7 +288,13 @@ async def help_callback(update: Update, context: CallbackContext):
 
         video_url = get_random_video()
 
-        if action == 'bk':
+        # Close menu
+        if action == 'cl':
+            await query.message.delete()
+            return
+
+        # Back to main menu
+        if action == 'mn':
             bal = await get_balance(uid)
             caption = main_caption(query.from_user.first_name, bal, video_url)
             keyboard = main_keyboard(uid)
@@ -235,12 +315,13 @@ async def help_callback(update: Update, context: CallbackContext):
 ᴛᴀᴘ ғᴏʀ ɴᴇᴡ ᴛɪᴘ</blockquote>"""
             keyboard = [
                 [InlineKeyboardButton("ɴᴇᴡ ᴛɪᴘ", callback_data=f'hlp_tp_{uid}')],
-                [InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f'hlp_bk_{uid}')]
+                [InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f'hlp_mn_{uid}'),
+                 InlineKeyboardButton("ᴄʟᴏsᴇ", callback_data=f'hlp_cl_{uid}')]
             ]
         else:
             caption = CATEGORIES.get(action, lambda v: "")(video_url)
-            keyboard = [[InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f'hlp_bk_{uid}')]]
-        
+            keyboard = back_keyboard(uid)
+
         await query.edit_message_text(
             text=caption,
             reply_markup=InlineKeyboardMarkup(keyboard),
