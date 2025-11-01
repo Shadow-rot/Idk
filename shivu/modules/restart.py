@@ -6,21 +6,24 @@ from telegram.ext import CommandHandler, ContextTypes
 from shivu import application, LOGGER
 from telegram.error import BadRequest
 
-# Import the global dictionaries from main
-from __main__ import (
-    locks,
-    message_counts,
-    sent_characters,
-    last_characters,
-    first_correct_guesses,
-    last_user,
-    warned_users,
-    spawn_messages,
-    spawn_message_links
-)
-
 # Owner ID
 OWNER_ID = 5147822244
+
+# We'll access the global dictionaries from the main module at runtime
+def get_main_globals():
+    """Get references to the global dictionaries from main"""
+    import shivu.__main__ as main_module
+    return (
+        main_module.locks,
+        main_module.message_counts,
+        main_module.sent_characters,
+        main_module.last_characters,
+        main_module.first_correct_guesses,
+        main_module.last_user,
+        main_module.warned_users,
+        main_module.spawn_messages,
+        main_module.spawn_message_links
+    )
 
 
 async def restart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -35,6 +38,11 @@ async def restart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     response = await update.message.reply_text("Restarting bot...")
 
     try:
+        # Get references to global dictionaries
+        (locks, message_counts, sent_characters, last_characters,
+         first_correct_guesses, last_user, warned_users,
+         spawn_messages, spawn_message_links) = get_main_globals()
+        
         # Clear all spawn data and locks
         LOGGER.info("Clearing spawn data before restart...")
         locks.clear()
@@ -91,6 +99,11 @@ async def shutdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         LOGGER.info("Bot shutdown initiated by owner")
+
+        # Get references to global dictionaries
+        (locks, message_counts, sent_characters, last_characters,
+         first_correct_guesses, last_user, warned_users,
+         spawn_messages, spawn_message_links) = get_main_globals()
 
         # Clear all data
         locks.clear()
