@@ -37,9 +37,9 @@ async def global_callback_router(update: Update, context: CallbackContext):
             # Favorite callbacks 
             await handle_fav_callback(update, context) 
   
-        elif data.startswith('hey_yes_') or data.startswith('hey_no_'): 
-            # Payment callbacks 
-            await pay_callback(update, context) 
+        elif data.startswith('pay_yes_') or data.startswith('pay_no_'):
+    # Payment callbacks 
+    await hey_callback(update, context)
   
         elif data.startswith('gift_confirm:') or data.startswith('gift_cancel:'): 
             # Gift callbacks 
