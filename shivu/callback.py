@@ -1,7 +1,6 @@
-
 """ 
- Global Callback Router 
- Add this file as: shivu/callback_router.py 
+Global Callback Router 
+Add this file as: shivu/callback_router.py 
 """ 
 
 import traceback 
@@ -37,6 +36,8 @@ async def global_callback_router(update: Update, context: CallbackContext):
         if data.startswith('fvc_') or data.startswith('fvx_'): 
             # Favorite callbacks 
             await handle_fav_callback(update, context)
+
+
 
         elif data.startswith(('bal_', 'bank_', 'loan_', 'repay_', 'clr_', 'pok_', 'pno_', 'help_guide_')):
             # Balance module callbacks (bal, bank, loan, repay, clear, poke, etc.)
