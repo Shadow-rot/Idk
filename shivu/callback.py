@@ -10,7 +10,7 @@ from shivu import application, LOGGER
 
 # Import your callback handlers 
 from shivu.modules.fav import handle_fav_callback 
-from shivu.modules.balance import xay_callback, callback_handler
+from shivu.modules.balance import callback_handler
 from shivu.modules.gift import handle_gift_callback 
 from shivu.modules.check import handle_show_owners, handle_back_to_card, handle_char_stats
 from shivu.modules.games import games_callback_query
