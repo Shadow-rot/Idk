@@ -28,7 +28,7 @@ first_correct_guesses = {}
 last_user = {}
 warned_users = {}
 spawn_messages = {}  # Track spawn messages for deletion
-spawn_settings_collection = None
+spawn_message_links = {}  # Track spawn message links for wrong guess button
 
 # Import all modules
 for module_name in ALL_MODULES:
@@ -100,21 +100,25 @@ async def despawn_character(chat_id, message_id, character, context):
     """Handle character despawn after timeout"""
     try:
         await asyncio.sleep(DESPAWN_TIME)
-        
-        # Check if character was grabbed
+
+        # Check if character was grabbed - if yes, don't show despawn message
         if chat_id in first_correct_guesses:
+            # Clean up without showing despawn message
+            last_characters.pop(chat_id, None)
+            spawn_messages.pop(chat_id, None)
+            spawn_message_links.pop(chat_id, None)
             return
-        
+
         # Delete spawn message
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
         except BadRequest:
             pass
-        
+
         # Send missed message
         rarity = character.get('rarity', '🟢 Common')
         rarity_emoji = rarity.split(' ')[0] if isinstance(rarity, str) and ' ' in rarity else '🟢'
-        
+
         missed_msg = await context.bot.send_photo(
             chat_id=chat_id,
             photo=character['img_url'],
@@ -127,18 +131,19 @@ async def despawn_character(chat_id, message_id, character, context):
 💔 ʙᴇᴛᴛᴇʀ ʟᴜᴄᴋ ɴᴇxᴛ ᴛɪᴍᴇ!""",
             parse_mode='HTML'
         )
-        
+
         # Delete missed message after 10 seconds
         await asyncio.sleep(10)
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=missed_msg.message_id)
         except BadRequest:
             pass
-        
+
         # Clean up
         last_characters.pop(chat_id, None)
         spawn_messages.pop(chat_id, None)
-        
+        spawn_message_links.pop(chat_id, None)
+
     except Exception as e:
         LOGGER.error(f"Error in despawn_character: {e}")
 
@@ -244,13 +249,22 @@ async def send_image(update: Update, context):
             caption=f"***{rarity_emoji} ʟᴏᴏᴋ ᴀ ᴡᴀɪғᴜ ʜᴀs sᴘᴀᴡɴᴇᴅ !! ᴍᴀᴋᴇ ʜᴇʀ ʏᴏᴜʀ's ʙʏ ɢɪᴠɪɴɢ\n/grab 𝚆𝚊𝚒𝚏𝚞 𝚗𝚊𝚖𝚎\n\n⏰ ʏᴏᴜ ʜᴀᴠᴇ {DESPAWN_TIME // 60} ᴍɪɴᴜᴛᴇs ᴛᴏ ɢʀᴀʙ!***",
             parse_mode='Markdown'
         )
-        
-        # Store spawn message ID
+
+        # Store spawn message ID and link
         spawn_messages[chat_id] = spawn_msg.message_id
         
+        # Create message link for the button
+        chat_username = update.effective_chat.username
+        if chat_username:
+            spawn_message_links[chat_id] = f"https://t.me/{chat_username}/{spawn_msg.message_id}"
+        else:
+            # For private groups without username, use the chat ID format
+            chat_id_str = str(chat_id).replace('-100', '')
+            spawn_message_links[chat_id] = f"https://t.me/c/{chat_id_str}/{spawn_msg.message_id}"
+
         # Schedule despawn
         asyncio.create_task(despawn_character(chat_id, spawn_msg.message_id, character, context))
-        
+
     except Exception as e:
         LOGGER.error(f"Error in send_image: {e}")
 
@@ -286,7 +300,7 @@ async def guess(update: Update, context):
 
         if is_correct:
             first_correct_guesses[chat_id] = user_id
-            
+
             # Delete spawn message
             if chat_id in spawn_messages:
                 try:
@@ -364,8 +378,20 @@ async def guess(update: Update, context):
                 parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
+            
+            # Clean up spawn message link after successful grab
+            spawn_message_links.pop(chat_id, None)
         else:
-            await update.message.reply_html('<b>ᴘʟᴇᴀsᴇ ᴡʀɪᴛᴇ ᴀ ᴄᴏʀʀᴇᴄᴛ ɴᴀᴍᴇ..❌</b>')
+            # Wrong guess - show button to view spawn message
+            keyboard = []
+            if chat_id in spawn_message_links:
+                keyboard.append([InlineKeyboardButton("📍 ᴠɪᴇᴡ sᴘᴀᴡɴ ᴍᴇssᴀɢᴇ", url=spawn_message_links[chat_id])])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+            await update.message.reply_html(
+                '<b>ᴘʟᴇᴀsᴇ ᴡʀɪᴛᴇ ᴀ ᴄᴏʀʀᴇᴄᴛ ɴᴀᴍᴇ..❌</b>',
+                reply_markup=reply_markup
+            )
     except Exception as e:
         LOGGER.error(f"Error in guess: {e}")
 
