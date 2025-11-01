@@ -10,7 +10,8 @@ from shivu import application, LOGGER
 
 # Import your callback handlers
 from shivu.modules.fav import handle_fav_callback
-from shivu.modules.balance import pay_callback
+from shivu.modules.pay import pay_callback
+from shivu.modules.gift import handle_gift_callback
 
 async def global_callback_router(update: Update, context: CallbackContext):
     """Route callback queries to appropriate handlers"""
@@ -30,6 +31,10 @@ async def global_callback_router(update: Update, context: CallbackContext):
         elif data.startswith('pay_yes_') or data.startswith('pay_no_'):
             # Payment callbacks
             await pay_callback(update, context)
+            
+        elif data.startswith('gift_confirm:') or data.startswith('gift_cancel:'):
+            # Gift callbacks
+            await handle_gift_callback(update, context)
             
         else:
             # Unknown callback - log it
