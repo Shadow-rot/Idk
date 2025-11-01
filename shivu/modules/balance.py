@@ -79,7 +79,7 @@ async def xay(update, context):
         f"sᴇɴᴅ `{amount}` ɢᴏʟᴅ ᴛᴏ **{recipient.first_name}**?\n\n⏱️ ᴇxᴘɪʀᴇs ɪɴ 30 sᴇᴄᴏɴᴅs",
         reply_markup=kb
     )
-    await context.application.job_queue.run_once(lambda c: delete_expired_xay(msg, xay_id), 30)
+    context.application.job_queue.run_once(lambda c: delete_expired_xay(msg, xay_id), 30)
 
 async def delete_expired_xay(msg, xay_id):
     if xay_id in pending_xay:
