@@ -10,7 +10,7 @@ from shivu import application, LOGGER
 
 # Import your callback handlers 
 from shivu.modules.fav import handle_fav_callback 
-from shivu.modules.balance import hey_callback 
+from shivu.modules.balance import xay_callback
 from shivu.modules.gift import handle_gift_callback 
 from shivu.modules.check import handle_show_owners, handle_back_to_card, handle_char_stats
 from shivu.modules.games import games_callback_query
@@ -37,9 +37,9 @@ async def global_callback_router(update: Update, context: CallbackContext):
             # Favorite callbacks 
             await handle_fav_callback(update, context) 
 
-        elif data.startswith('pay_yes_') or data.startswith('pay_no_'):
-            # Payment callbacks 
-            await hey_callback(update, context)
+        elif data.startswith('xay_confirm_') or data.startswith('xay_cancel_'):
+    # Payment callbacks 
+    await xay_callback(update, context)
 
         elif data.startswith('gift_confirm:') or data.startswith('gift_cancel:'): 
             # Gift callbacks 
