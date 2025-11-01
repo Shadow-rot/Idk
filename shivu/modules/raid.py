@@ -43,7 +43,7 @@ RARITY_MAP = {
     20: "👼 ᴛɪɴʏ"
 }
 
-# Default settings
+# Default settings - Updated with critical chance
 DEFAULT_SETTINGS = {
     "start_charge": 500,
     "join_phase_duration": 30,
@@ -54,10 +54,11 @@ DEFAULT_SETTINGS = {
     "coin_max": 2000,
     "coin_loss_min": 200,
     "coin_loss_max": 500,
-    "character_chance": 50,
-    "coin_chance": 10,
-    "loss_chance": 10,
-    "nothing_chance": 10
+    "character_chance": 25,
+    "coin_chance": 35,
+    "loss_chance": 20,
+    "nothing_chance": 15,
+    "critical_chance": 5  # New: Critical hit gives both coins + character
 }
 
 
@@ -292,12 +293,40 @@ async def execute_raid(client, message, raid_id):
     results = []
     total_coins_gained = 0
     total_characters = 0
+    total_critical = 0
     
     for user_id in participants:
         # Weighted random outcome
         rand = random.randint(1, 100)
         
-        if rand <= settings["character_chance"]:
+        # Check for critical hit first (rarest)
+        if rand <= settings.get("critical_chance", 5):
+            # CRITICAL HIT - Both character AND coins!
+            character = await get_random_character(settings["allowed_rarities"])
+            coins = random.randint(settings["coin_min"], settings["coin_max"])
+            
+            if character:
+                await add_character_to_user(user_id, character)
+                await update_user_balance(user_id, coins)
+                rarity_text = RARITY_MAP.get(character["rarity"], "🟢 ᴄᴏᴍᴍᴏɴ")
+                results.append({
+                    "user_id": user_id,
+                    "type": "critical",
+                    "character": character,
+                    "rarity": rarity_text,
+                    "coins": coins
+                })
+                total_characters += 1
+                total_coins_gained += coins
+                total_critical += 1
+            else:
+                # Fallback: double coins if no character
+                coins = coins * 2
+                await update_user_balance(user_id, coins)
+                results.append({"user_id": user_id, "type": "coins", "amount": coins, "doubled": True})
+                total_coins_gained += coins
+        
+        elif rand <= settings.get("critical_chance", 5) + settings["character_chance"]:
             # Character reward
             character = await get_random_character(settings["allowed_rarities"])
             if character:
@@ -317,14 +346,14 @@ async def execute_raid(client, message, raid_id):
                 results.append({"user_id": user_id, "type": "coins", "amount": coins})
                 total_coins_gained += coins
         
-        elif rand <= settings["character_chance"] + settings["coin_chance"]:
+        elif rand <= settings.get("critical_chance", 5) + settings["character_chance"] + settings["coin_chance"]:
             # Coin reward
             coins = random.randint(settings["coin_min"], settings["coin_max"])
             await update_user_balance(user_id, coins)
             results.append({"user_id": user_id, "type": "coins", "amount": coins})
             total_coins_gained += coins
         
-        elif rand <= settings["character_chance"] + settings["coin_chance"] + settings["loss_chance"]:
+        elif rand <= settings.get("critical_chance", 5) + settings["character_chance"] + settings["coin_chance"] + settings["loss_chance"]:
             # Coin loss
             loss = random.randint(settings["coin_loss_min"], settings["coin_loss_max"])
             await update_user_balance(user_id, -loss)
@@ -349,10 +378,25 @@ async def execute_raid(client, message, raid_id):
         except:
             username = "Unknown"
         
-        if result["type"] == "character":
-            result_text += f"• {username} — <code>ᴄᴀᴘᴛᴜʀᴇᴅ</code> 🎴 {result['rarity']}\n"
+        if result["type"] == "critical":
+            # Critical hit - show both character and coins
+            char_id = result["character"].get("id", "???")
+            char_name = result["character"].get("name", "Unknown")
+            result_text += (
+                f"• {username} — <b>💥 ᴄʀɪᴛɪᴄᴀʟ ʜɪᴛ!</b>\n"
+                f"  └ 🎴 {result['rarity']} • <code>{char_id}</code> • {char_name}\n"
+                f"  └ 💰 <code>{result['coins']} ᴄᴏɪɴs</code>\n"
+            )
+        elif result["type"] == "character":
+            char_id = result["character"].get("id", "???")
+            char_name = result["character"].get("name", "Unknown")
+            result_text += (
+                f"• {username} — <code>ᴄᴀᴘᴛᴜʀᴇᴅ</code> 🎴\n"
+                f"  └ {result['rarity']} • <code>{char_id}</code> • {char_name}\n"
+            )
         elif result["type"] == "coins":
-            result_text += f"• {username} — <code>ғᴏᴜɴᴅ {result['amount']} ᴄᴏɪɴs</code> 💰\n"
+            doubled_text = " (ᴅᴏᴜʙʟᴇᴅ!)" if result.get("doubled") else ""
+            result_text += f"• {username} — <code>ғᴏᴜɴᴅ {result['amount']} ᴄᴏɪɴs</code> 💰{doubled_text}\n"
         elif result["type"] == "loss":
             result_text += f"• {username} — <code>ʟᴏsᴛ {result['amount']} ᴄᴏɪɴs</code> 💀\n"
         else:
@@ -361,7 +405,8 @@ async def execute_raid(client, message, raid_id):
     result_text += (
         f"\n━━━━━━━━━━━━━━━\n"
         f"💰 <b>ᴛᴏᴛᴀʟ ʟᴏᴏᴛ ᴠᴀʟᴜᴇ:</b> <code>{total_coins_gained:,} ᴄᴏɪɴs</code>\n"
-        f"🎴 <b>ɴᴇᴡ ʀᴇʟɪᴄs ғᴏᴜɴᴅ:</b> <code>{total_characters}</code>\n\n"
+        f"🎴 <b>ɴᴇᴡ ʀᴇʟɪᴄs ғᴏᴜɴᴅ:</b> <code>{total_characters}</code>\n"
+        f"💥 <b>ᴄʀɪᴛɪᴄᴀʟ ʜɪᴛs:</b> <code>{total_critical}</code>\n\n"
         f"<i>ᴍᴇssᴀɢᴇ ᴘʀᴏᴠɪᴅᴇᴅ ʙʏ</i> <a href='https://t.me/siyaprobot'>sɪʏᴀ</a>"
     )
     
@@ -442,6 +487,135 @@ async def set_raid_rarities(client, message):
         await message.reply_text("❌ ɪɴᴠᴀʟɪᴅ ғᴏʀᴍᴀᴛ!")
 
 
+@shivuu.on_message(filters.command(["setraidchances"]) & filters.user(OWNER_ID))
+async def set_raid_chances(client, message):
+    """Set raid reward chances - NEW COMMAND"""
+    if len(message.command) < 6:
+        await message.reply_text(
+            "ᴜsᴀɢᴇ: `/setraidchances <character%> <coin%> <loss%> <nothing%> <critical%>`\n\n"
+            "ᴇxᴀᴍᴘʟᴇ: `/setraidchances 25 35 20 15 5`\n"
+            "💡 ᴛᴏᴛᴀʟ sʜᴏᴜʟᴅ ᴇǫᴜᴀʟ 100%"
+        )
+        return
+    
+    try:
+        char_chance = int(message.command[1])
+        coin_chance = int(message.command[2])
+        loss_chance = int(message.command[3])
+        nothing_chance = int(message.command[4])
+        critical_chance = int(message.command[5])
+        
+        # Validate total is 100
+        total = char_chance + coin_chance + loss_chance + nothing_chance + critical_chance
+        if total != 100:
+            await message.reply_text(
+                f"❌ ᴛᴏᴛᴀʟ ᴍᴜsᴛ ᴇǫᴜᴀʟ 100%!\n"
+                f"ᴄᴜʀʀᴇɴᴛ ᴛᴏᴛᴀʟ: {total}%"
+            )
+            return
+        
+        chat_id = message.chat.id
+        
+        await raid_settings_collection.update_one(
+            {"chat_id": chat_id},
+            {"$set": {
+                "character_chance": char_chance,
+                "coin_chance": coin_chance,
+                "loss_chance": loss_chance,
+                "nothing_chance": nothing_chance,
+                "critical_chance": critical_chance
+            }},
+            upsert=True
+        )
+        
+        await message.reply_text(
+            f"✅ <b>ʀᴀɪᴅ ᴄʜᴀɴᴄᴇs ᴜᴘᴅᴀᴛᴇᴅ!</b>\n\n"
+            f"🎴 <b>ᴄʜᴀʀᴀᴄᴛᴇʀ:</b> <code>{char_chance}%</code>\n"
+            f"💰 <b>ᴄᴏɪɴs:</b> <code>{coin_chance}%</code>\n"
+            f"💀 <b>ʟᴏss:</b> <code>{loss_chance}%</code>\n"
+            f"❌ <b>ɴᴏᴛʜɪɴɢ:</b> <code>{nothing_chance}%</code>\n"
+            f"💥 <b>ᴄʀɪᴛɪᴄᴀʟ:</b> <code>{critical_chance}%</code>"
+        )
+    except ValueError:
+        await message.reply_text("❌ ɪɴᴠᴀʟɪᴅ ᴠᴀʟᴜᴇs! ᴜsᴇ ɴᴜᴍʙᴇʀs ᴏɴʟʏ.")
+
+
+@shivuu.on_message(filters.command(["setraidcoins"]) & filters.user(OWNER_ID))
+async def set_raid_coins(client, message):
+    """Set raid coin reward range - NEW COMMAND"""
+    if len(message.command) < 3:
+        await message.reply_text(
+            "ᴜsᴀɢᴇ: `/setraidcoins <min> <max>`\n"
+            "ᴇxᴀᴍᴘʟᴇ: `/setraidcoins 500 2000`"
+        )
+        return
+    
+    try:
+        coin_min = int(message.command[1])
+        coin_max = int(message.command[2])
+        
+        if coin_min >= coin_max:
+            await message.reply_text("❌ ᴍɪɴ ᴍᴜsᴛ ʙᴇ ʟᴇss ᴛʜᴀɴ ᴍᴀx!")
+            return
+        
+        chat_id = message.chat.id
+        
+        await raid_settings_collection.update_one(
+            {"chat_id": chat_id},
+            {"$set": {
+                "coin_min": coin_min,
+                "coin_max": coin_max
+            }},
+            upsert=True
+        )
+        
+        await message.reply_text(
+            f"✅ <b>ᴄᴏɪɴ ʀᴇᴡᴀʀᴅ ʀᴀɴɢᴇ ᴜᴘᴅᴀᴛᴇᴅ!</b>\n\n"
+            f"💰 <b>ᴍɪɴ:</b> <code>{coin_min}</code>\n"
+            f"💰 <b>ᴍᴀx:</b> <code>{coin_max}</code>"
+        )
+    except ValueError:
+        await message.reply_text("❌ ɪɴᴠᴀʟɪᴅ ᴠᴀʟᴜᴇs!")
+
+
+@shivuu.on_message(filters.command(["setraidloss"]) & filters.user(OWNER_ID))
+async def set_raid_loss(client, message):
+    """Set raid coin loss range - NEW COMMAND"""
+    if len(message.command) < 3:
+        await message.reply_text(
+            "ᴜsᴀɢᴇ: `/setraidloss <min> <max>`\n"
+            "ᴇxᴀᴍᴘʟᴇ: `/setraidloss 200 500`"
+        )
+        return
+    
+    try:
+        loss_min = int(message.command[1])
+        loss_max = int(message.command[2])
+        
+        if loss_min >= loss_max:
+            await message.reply_text("❌ ᴍɪɴ ᴍᴜsᴛ ʙᴇ ʟᴇss ᴛʜᴀɴ ᴍᴀx!")
+            return
+        
+        chat_id = message.chat.id
+        
+        await raid_settings_collection.update_one(
+            {"chat_id": chat_id},
+            {"$set": {
+                "coin_loss_min": loss_min,
+                "coin_loss_max": loss_max
+            }},
+            upsert=True
+        )
+        
+        await message.reply_text(
+            f"✅ <b>ᴄᴏɪɴ ʟᴏss ʀᴀɴɢᴇ ᴜᴘᴅᴀᴛᴇᴅ!</b>\n\n"
+            f"💀 <b>ᴍɪɴ:</b> <code>{loss_min}</code>\n"
+            f"💀 <b>ᴍᴀx:</b> <code>{loss_max}</code>"
+        )
+    except ValueError:
+        await message.reply_text("❌ ɪɴᴠᴀʟɪᴅ ᴠᴀʟᴜᴇs!")
+
+
 @shivuu.on_message(filters.command(["raidsettings"]) & filters.user(OWNER_ID))
 async def show_raid_settings(client, message):
     """Show current raid settings"""
@@ -452,24 +626,32 @@ async def show_raid_settings(client, message):
     
     settings_text = (
         f"<blockquote><b>⚙️ ʀᴀɪᴅ sᴇᴛᴛɪɴɢs</b></blockquote>\n\n"
-        f"💰 <b>sᴛᴀʀᴛ ᴄʜᴀʀɢᴇ:</b> `{settings['start_charge']}` ᴄᴏɪɴs\n"
-        f"⏱ <b>ᴊᴏɪɴ ᴘʜᴀsᴇ:</b> `{settings['join_phase_duration']}s`\n"
-        f"⏳ <b>ᴄᴏᴏʟᴅᴏᴡɴ:</b> `{settings['cooldown_minutes']}` ᴍɪɴᴜᴛᴇs\n"
-        f"💵 <b>ᴍɪɴ ʙᴀʟᴀɴᴄᴇ:</b> `{settings['min_balance']}` ᴄᴏɪɴs\n\n"
+        f"💰 <b>sᴛᴀʀᴛ ᴄʜᴀʀɢᴇ:</b> <code>{settings['start_charge']}</code> ᴄᴏɪɴs\n"
+        f"⏱ <b>ᴊᴏɪɴ ᴘʜᴀsᴇ:</b> <code>{settings['join_phase_duration']}s</code>\n"
+        f"⏳ <b>ᴄᴏᴏʟᴅᴏᴡɴ:</b> <code>{settings['cooldown_minutes']}</code> ᴍɪɴᴜᴛᴇs\n"
+        f"💵 <b>ᴍɪɴ ʙᴀʟᴀɴᴄᴇ:</b> <code>{settings['min_balance']}</code> ᴄᴏɪɴs\n\n"
         f"<b>💰 ʀᴇᴡᴀʀᴅ ʀᴀɴɢᴇs:</b>\n"
-        f"├ ᴄᴏɪɴs: `{settings['coin_min']}-{settings['coin_max']}`\n"
-        f"└ ʟᴏss: `{settings['coin_loss_min']}-{settings['coin_loss_max']}`\n\n"
+        f"├ ᴄᴏɪɴs: <code>{settings['coin_min']}-{settings['coin_max']}</code>\n"
+        f"└ ʟᴏss: <code>{settings['coin_loss_min']}-{settings['coin_loss_max']}</code>\n\n"
         f"<b>🎲 ᴄʜᴀɴᴄᴇs:</b>\n"
-        f"├ 🎴 ᴄʜᴀʀᴀᴄᴛᴇʀ: `{settings['character_chance']}%`\n"
-        f"├ 💰 ᴄᴏɪɴs: `{settings['coin_chance']}%`\n"
-        f"├ 💀 ʟᴏss: `{settings['loss_chance']}%`\n"
-        f"└ ❌ ɴᴏᴛʜɪɴɢ: `{settings['nothing_chance']}%`\n\n"
+        f"├ 🎴 ᴄʜᴀʀᴀᴄᴛᴇʀ: <code>{settings['character_chance']}%</code>\n"
+        f"├ 💰 ᴄᴏɪɴs: <code>{settings['coin_chance']}%</code>\n"
+        f"├ 💀 ʟᴏss: <code>{settings['loss_chance']}%</code>\n"
+        f"├ ❌ ɴᴏᴛʜɪɴɢ: <code>{settings['nothing_chance']}%</code>\n"
+        f"└ 💥 ᴄʀɪᴛɪᴄᴀʟ: <code>{settings.get('critical_chance', 5)}%</code>\n\n"
         f"<b>🎴 ᴀʟʟᴏᴡᴇᴅ ʀᴀʀɪᴛɪᴇs:</b>\n" + 
         "\n".join([f"├ {r}" for r in rarity_names[:-1]]) +
-        f"\n└ {rarity_names[-1]}"
+        f"\n└ {rarity_names[-1]}\n\n"
+        f"<b>📋 ᴀᴅᴍɪɴ ᴄᴏᴍᴍᴀɴᴅs:</b>\n"
+        f"• <code>/setraidcharge &lt;amount&gt;</code>\n"
+        f"• <code>/setraidcooldown &lt;minutes&gt;</code>\n"
+        f"• <code>/setraidchances &lt;char% coin% loss% nothing% critical%&gt;</code>\n"
+        f"• <code>/setraidcoins &lt;min max&gt;</code>\n"
+        f"• <code>/setraidloss &lt;min max&gt;</code>\n"
+        f"• <code>/setraidrarities &lt;1,2,3...&gt;</code>"
     )
     
     await message.reply_text(settings_text)
 
 
-LOGGER.info("Shadow Raid module loaded successfully!")
+LOGGER.info("Enhanced Shadow Raid module loaded successfully!")
