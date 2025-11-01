@@ -121,7 +121,7 @@ async def update_user_balance(user_id, amount):
 
 
 async def get_random_character(allowed_rarities):
-    """Get a random character from allowed rarities"""
+    """Get a random character from allowed rarities - FIXED for proper matching"""
     try:
         # First, try matching with integer rarities
         characters = await collection.find({"rarity": {"$in": allowed_rarities}}).to_list(length=None)
@@ -145,7 +145,7 @@ async def get_random_character(allowed_rarities):
 
 
 async def add_character_to_user(user_id, character):
-    """Add character to user's collection"""
+    """Add character to user's collection - matches harem format"""
     try:
         # Get the rarity value
         char_rarity = character.get("rarity")
@@ -181,6 +181,401 @@ async def start_raid(client, message):
     # Check if raid is already active
     active_raid = await active_raids_collection.find_one({"chat_id": chat_id})
     if active_raid:
+        await message.reply_text("⚠️ ᴀ ʀᴀɪᴅ ɪs ᴀʟʀᴇᴀᴅʏ ᴀᴄᴛɪᴠᴇ ɪɴ ᴛʜɪs ɢʀᴏᴜᴘ!")
+        return
+    
+    # Get settings
+    settings = await get_raid_settings(chat_id)
+    
+    # Check cooldown
+    can_raid, remaining = await check_user_cooldown(user_id, chat_id)
+    if not can_raid:
+        mins = remaining // 60
+        secs = remaining % 60
+        await message.reply_text(
+            f"⏳ ʏᴏᴜ'ʀᴇ ᴏɴ ᴄᴏᴏʟᴅᴏᴡɴ!\n"
+            f"ᴛɪᴍᴇ ʟᴇғᴛ: `{mins}m {secs}s`"
+        )
+        return
+    
+    # Check balance
+    user_data = await get_user_data(user_id)
+    if user_data.get("balance", 0) < settings["start_charge"]:
+        await message.reply_text(
+            f"💰 ɪɴsᴜғғɪᴄɪᴇɴᴛ ʙᴀʟᴀɴᴄᴇ!\n"
+            f"ʏᴏᴜ ɴᴇᴇᴅ `{settings['start_charge']}` ᴄᴏɪɴs ᴛᴏ sᴛᴀʀᴛ ᴀ ʀᴀɪᴅ."
+        )
+        return
+    
+    # Deduct start charge
+    await update_user_balance(user_id, -settings["start_charge"])
+    
+    # Create raid
+    raid_id = f"{chat_id}_{datetime.utcnow().timestamp()}"
+    raid_data = {
+        "raid_id": raid_id,
+        "chat_id": chat_id,
+        "starter_id": user_id,
+        "participants": [user_id],
+        "started_at": datetime.utcnow(),
+        "settings": settings
+    }
+    await active_raids_collection.insert_one(raid_data)
+    
+    # Set cooldown for starter
+    await set_user_cooldown(user_id, chat_id, settings["cooldown_minutes"])
+    
+    # Send announcement
+    join_button = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⚔️ ᴊᴏɪɴ ʀᴀɪᴅ ⚔️", callback_data=f"join_raid:{raid_id}")]
+    ])
+    
+    announcement = (
+        f"<blockquote>⚔️ <b>sʜᴀᴅᴏᴡ ʀᴀɪᴅ ʜᴀs ʙᴇɢᴜɴ!</b> ⚔️</blockquote>\n\n"
+        f"<code>ᴊᴏɪɴ ɴᴏᴡ ᴀɴᴅ ʜᴇʟᴘ ᴜɴᴄᴏᴠᴇʀ ᴀɴᴄɪᴇɴᴛ ᴛʀᴇᴀsᴜʀᴇs!</code>\n"
+        f"<code>ʙᴇғᴏʀᴇ ᴛʜᴇ sʜᴀᴅᴏᴡs ᴄʟᴏsᴇ ɪɴ...</code>\n\n"
+        f"⏱ <b>ᴛɪᴍᴇ ʟᴇғᴛ:</b> <code>{settings['join_phase_duration']}s</code>\n"
+        f"💰 <b>ᴇɴᴛʀʏ ғᴇᴇ:</b> <code>{settings['start_charge']} ᴄᴏɪɴs</code>\n"
+        f"👥 <b>ᴘᴀʀᴛɪᴄɪᴘᴀɴᴛs:</b> <code>1</code>\n\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"<i>sᴛᴀʀᴛᴇᴅ ʙʏ</i> {message.from_user.mention}"
+    )
+    
+    raid_msg = await message.reply_text(announcement, reply_markup=join_button)
+    
+    # Wait for join phase
+    await asyncio.sleep(settings["join_phase_duration"])
+    
+    # Execute raid
+    await execute_raid(client, raid_msg, raid_id)
+
+
+@shivuu.on_callback_query(filters.regex(r"^join_raid:"))
+async def join_raid_callback(client, callback_query: CallbackQuery):
+    """Handle join raid button"""
+    user_id = callback_query.from_user.id
+    raid_id = callback_query.data.split(":")[1]
+    
+    # Get raid data
+    raid = await active_raids_collection.find_one({"raid_id": raid_id})
+    if not raid:
+        await callback_query.answer("⚠️ ᴛʜɪs ʀᴀɪᴅ ʜᴀs ᴇɴᴅᴇᴅ!", show_alert=True)
+        return
+    
+    # Check if already joined
+    if user_id in raid["participants"]:
+        await callback_query.answer("✅ ʏᴏᴜ'ᴠᴇ ᴀʟʀᴇᴀᴅʏ ᴊᴏɪɴᴇᴅ!", show_alert=False)
+        return
+    
+    settings = raid["settings"]
+    
+    # Check cooldown
+    can_raid, remaining = await check_user_cooldown(user_id, raid["chat_id"])
+    if not can_raid:
+        mins = remaining // 60
+        secs = remaining % 60
+        await callback_query.answer(
+            f"⏳ ʏᴏᴜ'ʀᴇ ᴏɴ ᴄᴏᴏʟᴅᴏᴡɴ! {mins}m {secs}s ʟᴇғᴛ",
+            show_alert=True
+        )
+        return
+    
+    # Check balance
+    user_data = await get_user_data(user_id)
+    if user_data.get("balance", 0) < settings["start_charge"]:
+        await callback_query.answer(
+            f"💰 ɪɴsᴜғғɪᴄɪᴇɴᴛ ʙᴀʟᴀɴᴄᴇ! ɴᴇᴇᴅ {settings['start_charge']} ᴄᴏɪɴs",
+            show_alert=True
+        )
+        return
+    
+    # Deduct entry fee
+    await update_user_balance(user_id, -settings["start_charge"])
+    
+    # Add to participants
+    await active_raids_collection.update_one(
+        {"raid_id": raid_id},
+        {"$push": {"participants": user_id}}
+    )
+    
+    # Set cooldown
+    await set_user_cooldown(user_id, raid["chat_id"], settings["cooldown_minutes"])
+    
+    await callback_query.answer("⚔️ ʏᴏᴜ'ᴠᴇ ᴊᴏɪɴᴇᴅ ᴛʜᴇ ʀᴀɪᴅ!", show_alert=False)
+    
+    # Update the raid message with new participant count
+    try:
+        # Get updated raid data
+        updated_raid = await active_raids_collection.find_one({"raid_id": raid_id})
+        participant_count = len(updated_raid["participants"])
+        
+        # Calculate remaining time
+        elapsed = (datetime.utcnow() - raid["started_at"]).total_seconds()
+        remaining_time = max(0, int(settings["join_phase_duration"] - elapsed))
+        
+        # Get starter info
+        try:
+            starter = await client.get_users(raid["starter_id"])
+            starter_mention = starter.mention
+        except:
+            starter_mention = "Unknown"
+        
+        # Update message text
+        updated_text = (
+            f"<blockquote>⚔️ <b>sʜᴀᴅᴏᴡ ʀᴀɪᴅ ʜᴀs ʙᴇɢᴜɴ!</b> ⚔️</blockquote>\n\n"
+            f"<code>ᴊᴏɪɴ ɴᴏᴡ ᴀɴᴅ ʜᴇʟᴘ ᴜɴᴄᴏᴠᴇʀ ᴀɴᴄɪᴇɴᴛ ᴛʀᴇᴀsᴜʀᴇs!</code>\n"
+            f"<code>ʙᴇғᴏʀᴇ ᴛʜᴇ sʜᴀᴅᴏᴡs ᴄʟᴏsᴇ ɪɴ...</code>\n\n"
+            f"⏱ <b>ᴛɪᴍᴇ ʟᴇғᴛ:</b> <code>{remaining_time}s</code>\n"
+            f"💰 <b>ᴇɴᴛʀʏ ғᴇᴇ:</b> <code>{settings['start_charge']} ᴄᴏɪɴs</code>\n"
+            f"👥 <b>ᴘᴀʀᴛɪᴄɪᴘᴀɴᴛs:</b> <code>{participant_count}</code>\n\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"<i>sᴛᴀʀᴛᴇᴅ ʙʏ</i> {starter_mention}"
+        )
+        
+        # Update the message
+        join_button = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⚔️ ᴊᴏɪɴ ʀᴀɪᴅ ⚔️", callback_data=f"join_raid:{raid_id}")]
+        ])
+        
+        await callback_query.message.edit_text(updated_text, reply_markup=join_button)
+    except Exception as e:
+        LOGGER.error(f"Error updating raid message: {e}")
+         return
+    
+    # Check balance
+    user_data = await get_user_data(user_id)
+    if user_data.get("balance", 0) < settings["start_charge"]:
+        await callback_query.answer(
+            f"💰 ɪɴsᴜғғɪᴄɪᴇɴᴛ ʙᴀʟᴀɴᴄᴇ! ɴᴇᴇᴅ {settings['start_charge']} ᴄᴏɪɴs",
+            show_alert=True
+        )
+        return
+    
+    # Deduct entry fee
+    await update_user_balance(user_id, -settings["start_charge"])
+    
+    # Add to participants
+    await active_raids_collection.update_one(
+        {"raid_id": raid_id},
+        {"$push": {"participants": user_id}}
+    )
+    
+    # Set cooldown
+    await set_user_cooldown(user_id, raid["chat_id"], settings["cooldown_minutes"])
+    
+    await callback_query.answer("⚔️ ʏᴏᴜ'ᴠᴇ ᴊᴏɪɴᴇᴅ ᴛʜᴇ ʀᴀɪᴅ!", show_alert=False)
+
+
+async def execute_raid(client, message, raid_id):
+    """Execute the raid and distribute rewards with character images"""
+    raid = await active_raids_collection.find_one({"raid_id": raid_id})
+    if not raid:
+        return
+    
+    participants = raid["participants"]
+    settings = raid["settings"]
+    
+    if len(participants) == 0:
+        await message.edit_text("❌ ɴᴏ ᴏɴᴇ ᴊᴏɪɴᴇᴅ ᴛʜᴇ ʀᴀɪᴅ!")
+        await active_raids_collection.delete_one({"raid_id": raid_id})
+        return
+    
+    # Calculate outcomes
+    results = []
+    total_coins_gained = 0
+    total_characters = 0
+    total_critical = 0
+    character_images = []  # Store character images to show
+    
+    for user_id in participants:
+        # Weighted random outcome - FIXED probability calculation
+        rand = random.randint(1, 100)
+        
+        critical_threshold = settings.get("critical_chance", 5)
+        char_threshold = critical_threshold + settings["character_chance"]
+        coin_threshold = char_threshold + settings["coin_chance"]
+        loss_threshold = coin_threshold + settings["loss_chance"]
+        
+        LOGGER.info(f"User {user_id} rolled {rand} (Critical<={critical_threshold}, Char<={char_threshold}, Coin<={coin_threshold}, Loss<={loss_threshold})")
+        
+        if rand <= critical_threshold:
+            # CRITICAL HIT - Both character AND coins!
+            character = await get_random_character(settings["allowed_rarities"])
+            coins = random.randint(settings["coin_min"], settings["coin_max"])
+            
+            if character:
+                await add_character_to_user(user_id, character)
+                await update_user_balance(user_id, coins)
+                
+                # Get rarity display
+                char_rarity = character.get("rarity")
+                if isinstance(char_rarity, int):
+                    rarity_text = RARITY_MAP.get(char_rarity, "🟢 Common")
+                else:
+                    rarity_text = char_rarity
+                
+                results.append({
+                    "user_id": user_id,
+                    "type": "critical",
+                    "character": character,
+                    "rarity": rarity_text,
+                    "coins": coins
+                })
+                
+                # Add image for display
+                if character.get("img_url"):
+                    character_images.append(character.get("img_url"))
+                
+                total_characters += 1
+                total_coins_gained += coins
+                total_critical += 1
+                LOGGER.info(f"User {user_id} got CRITICAL: {character.get('name')}")
+            else:
+                # Fallback: double coins if no character
+                coins = coins * 2
+                await update_user_balance(user_id, coins)
+                results.append({"user_id": user_id, "type": "coins", "amount": coins, "doubled": True})
+                total_coins_gained += coins
+        
+        elif rand <= char_threshold:
+            # Character reward
+            character = await get_random_character(settings["allowed_rarities"])
+            if character:
+                await add_character_to_user(user_id, character)
+                
+                # Get rarity display
+                char_rarity = character.get("rarity")
+                if isinstance(char_rarity, int):
+                    rarity_text = RARITY_MAP.get(char_rarity, "🟢 Common")
+                else:
+                    rarity_text = char_rarity
+                
+                results.append({
+                    "user_id": user_id,
+                    "type": "character",
+                    "character": character,
+                    "rarity": rarity_text
+                })
+                
+                # Add image for display
+                if character.get("img_url"):
+                    character_images.append(character.get("img_url"))
+                
+                total_characters += 1
+                LOGGER.info(f"User {user_id} got character: {character.get('name')}")
+            else:
+                # Fallback to coins if no character found
+                coins = random.randint(settings["coin_min"], settings["coin_max"])
+                await update_user_balance(user_id, coins)
+                results.append({"user_id": user_id, "type": "coins", "amount": coins})
+                total_coins_gained += coins
+        
+        elif rand <= coin_threshold:
+            # Coin reward
+            coins = random.randint(settings["coin_min"], settings["coin_max"])
+            await update_user_balance(user_id, coins)
+            results.append({"user_id": user_id, "type": "coins", "amount": coins})
+            total_coins_gained += coins
+            LOGGER.info(f"User {user_id} got coins: {coins}")
+        
+        elif rand <= loss_threshold:
+            # Coin loss
+            loss = random.randint(settings["coin_loss_min"], settings["coin_loss_max"])
+            await update_user_balance(user_id, -loss)
+            results.append({"user_id": user_id, "type": "loss", "amount": loss})
+            LOGGER.info(f"User {user_id} lost coins: {loss}")
+        
+        else:
+            # Nothing
+            results.append({"user_id": user_id, "type": "nothing"})
+            LOGGER.info(f"User {user_id} got nothing")
+    
+    # Build result message
+    result_text = (
+        f"<blockquote>⚔️ <b>ʀᴀɪᴅ ᴄᴏᴍᴘʟᴇᴛᴇ</b> ⚔️</blockquote>\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"👥 <b>ᴘᴀʀᴛɪᴄɪᴘᴀɴᴛs:</b> <code>{len(participants)}</code>\n\n"
+        f"<b>🏆 ʟᴏᴏᴛ ʀᴇᴘᴏʀᴛ:</b>\n"
+    )
+    
+    for result in results:
+        try:
+            user = await client.get_users(result["user_id"])
+            username = f"@{user.username}" if user.username else user.first_name
+        except:
+            username = "Unknown"
+        
+        if result["type"] == "critical":
+            # Critical hit - show both character and coins
+            char_id = result["character"].get("id", "???")
+            char_name = result["character"].get("name", "Unknown")
+            result_text += (
+                f"• {username} — <b>💥 ᴄʀɪᴛɪᴄᴀʟ ʜɪᴛ!</b>\n"
+                f"  └ 🎴 {result['rarity']} • <code>{char_id}</code> • {char_name}\n"
+                f"  └ 💰 <code>{result['coins']} ᴄᴏɪɴs</code>\n"
+            )
+        elif result["type"] == "character":
+            char_id = result["character"].get("id", "???")
+            char_name = result["character"].get("name", "Unknown")
+            result_text += (
+                f"• {username} — <code>ᴄᴀᴘᴛᴜʀᴇᴅ</code> 🎴\n"
+                f"  └ {result['rarity']} • <code>{char_id}</code> • {char_name}\n"
+            )
+        elif result["type"] == "coins":
+            doubled_text = " (ᴅᴏᴜʙʟᴇᴅ!)" if result.get("doubled") else ""
+            result_text += f"• {username} — <code>ғᴏᴜɴᴅ {result['amount']} ᴄᴏɪɴs</code> 💰{doubled_text}\n"
+        elif result["type"] == "loss":
+            result_text += f"• {username} — <code>ʟᴏsᴛ {result['amount']} ᴄᴏɪɴs</code> 💀\n"
+        else:
+            result_text += f"• {username} — <code>ғᴏᴜɴᴅ ɴᴏᴛʜɪɴɢ...</code> ❌\n"
+    
+    result_text += (
+        f"\n━━━━━━━━━━━━━━━\n"
+        f"💰 <b>ᴛᴏᴛᴀʟ ʟᴏᴏᴛ ᴠᴀʟᴜᴇ:</b> <code>{total_coins_gained:,} ᴄᴏɪɴs</code>\n"
+        f"🎴 <b>ɴᴇᴡ ʀᴇʟɪᴄs ғᴏᴜɴᴅ:</b> <code>{total_characters}</code>\n"
+        f"💥 <b>ᴄʀɪᴛɪᴄᴀʟ ʜɪᴛs:</b> <code>{total_critical}</code>\n\n"
+        f"<i>ᴍᴇssᴀɢᴇ ᴘʀᴏᴠɪᴅᴇᴅ ʙʏ</i> <a href='https://t.me/siyaprobot'>sɪʏᴀ</a>"
+    )
+    
+    # Send with character image if any characters were found
+    try:
+        if character_images:
+            # Show the first character image found
+            await message.delete()
+            await client.send_photo(
+                chat_id=raid["chat_id"],
+                photo=character_images[0],
+                caption=result_text
+            )
+        else:
+            # No characters found, just edit text
+            await message.edit_text(result_text)
+    except Exception as e:
+        LOGGER.error(f"Error sending raid results: {e}")
+        # Fallback to text only
+        await message.edit_text(result_text)
+    
+    await active_raids_collection.delete_one({"raid_id": raid_id})
+
+
+# Admin commands
+@shivuu.on_message(filters.command(["setraidcharge"]) & filters.user(OWNER_ID))
+async def set_raid_charge(client, message):
+    """Set raid start charge"""
+    if len(message.command) < 2:
+        await message.reply_text("ᴜsᴀɢᴇ: `/setraidcharge <amount>`")
+        return
+    
+    try:
+        amount = int(message.command[1])
+        chat_id = message.chat.id
+        
+        await raid_settings_collection.update_one(
+            {"chat_id": chat_id},
+            {"$set": {"start_charge": amount}},
+            upsert=True
+        )
+        
         await message.reply_text(f"✅ ʀᴀɪᴅ sᴛᴀʀᴛ ᴄʜᴀʀɢᴇ sᴇᴛ ᴛᴏ `{amount}` ᴄᴏɪɴs")
     except ValueError:
         await message.reply_text("❌ ɪɴᴠᴀʟɪᴅ ᴀᴍᴏᴜɴᴛ!")
@@ -403,378 +798,4 @@ async def show_raid_settings(client, message):
     await message.reply_text(settings_text)
 
 
-LOGGER.info("Enhanced Shadow Raid module loaded successfully!")"⚠️ ᴀ ʀᴀɪᴅ ɪs ᴀʟʀᴇᴀᴅʏ ᴀᴄᴛɪᴠᴇ ɪɴ ᴛʜɪs ɢʀᴏᴜᴘ!")
-        return
-    
-    # Get settings
-    settings = await get_raid_settings(chat_id)
-    
-    # Check cooldown
-    can_raid, remaining = await check_user_cooldown(user_id, chat_id)
-    if not can_raid:
-        mins = remaining // 60
-        secs = remaining % 60
-        await message.reply_text(
-            f"⏳ ʏᴏᴜ'ʀᴇ ᴏɴ ᴄᴏᴏʟᴅᴏᴡɴ!\n"
-            f"ᴛɪᴍᴇ ʟᴇғᴛ: `{mins}m {secs}s`"
-        )
-        return
-    
-    # Check balance
-    user_data = await get_user_data(user_id)
-    if user_data.get("balance", 0) < settings["start_charge"]:
-        await message.reply_text(
-            f"💰 ɪɴsᴜғғɪᴄɪᴇɴᴛ ʙᴀʟᴀɴᴄᴇ!\n"
-            f"ʏᴏᴜ ɴᴇᴇᴅ `{settings['start_charge']}` ᴄᴏɪɴs ᴛᴏ sᴛᴀʀᴛ ᴀ ʀᴀɪᴅ."
-        )
-        return
-    
-    # Deduct start charge
-    await update_user_balance(user_id, -settings["start_charge"])
-    
-    # Create raid
-    raid_id = f"{chat_id}_{datetime.utcnow().timestamp()}"
-    raid_data = {
-        "raid_id": raid_id,
-        "chat_id": chat_id,
-        "starter_id": user_id,
-        "participants": [user_id],
-        "started_at": datetime.utcnow(),
-        "settings": settings
-    }
-    await active_raids_collection.insert_one(raid_data)
-    
-    # Set cooldown for starter
-    await set_user_cooldown(user_id, chat_id, settings["cooldown_minutes"])
-    
-    # Send announcement
-    join_button = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⚔️ ᴊᴏɪɴ ʀᴀɪᴅ ⚔️", callback_data=f"join_raid:{raid_id}")]
-    ])
-    
-    announcement = (
-        f"<blockquote>⚔️ <b>sʜᴀᴅᴏᴡ ʀᴀɪᴅ ʜᴀs ʙᴇɢᴜɴ!</b> ⚔️</blockquote>\n\n"
-        f"<code>ᴊᴏɪɴ ɴᴏᴡ ᴀɴᴅ ʜᴇʟᴘ ᴜɴᴄᴏᴠᴇʀ ᴀɴᴄɪᴇɴᴛ ᴛʀᴇᴀsᴜʀᴇs!</code>\n"
-        f"<code>ʙᴇғᴏʀᴇ ᴛʜᴇ sʜᴀᴅᴏᴡs ᴄʟᴏsᴇ ɪɴ...</code>\n\n"
-        f"⏱ <b>ᴛɪᴍᴇ ʟᴇғᴛ:</b> <code>{settings['join_phase_duration']}s</code>\n"
-        f"💰 <b>ᴇɴᴛʀʏ ғᴇᴇ:</b> <code>{settings['start_charge']} ᴄᴏɪɴs</code>\n"
-        f"👥 <b>ᴘᴀʀᴛɪᴄɪᴘᴀɴᴛs:</b> <code>1</code>\n\n"
-        f"<b>⚔️ ʀᴀɪᴅᴇʀs:</b>\n"
-        f"  1. {message.from_user.mention}\n\n"
-        f"━━━━━━━━━━━━━━━\n"
-        f"<i>sᴛᴀʀᴛᴇᴅ ʙʏ</i> {message.from_user.mention}"
-    )
-    
-    raid_msg = await message.reply_text(announcement, reply_markup=join_button)
-    
-    # Store message ID for updates
-    await active_raids_collection.update_one(
-        {"raid_id": raid_id},
-        {"$set": {"message_id": raid_msg.id}}
-    )
-    
-    # Wait for join phase
-    await asyncio.sleep(settings["join_phase_duration"])
-    
-    # Execute raid
-    await execute_raid(client, raid_msg, raid_id)
-
-
-@shivuu.on_callback_query(filters.regex(r"^join_raid:"))
-async def join_raid_callback(client, callback_query: CallbackQuery):
-    """Handle join raid button"""
-    user_id = callback_query.from_user.id
-    raid_id = callback_query.data.split(":")[1]
-    
-    # Get raid data
-    raid = await active_raids_collection.find_one({"raid_id": raid_id})
-    if not raid:
-        await callback_query.answer("⚠️ ᴛʜɪs ʀᴀɪᴅ ʜᴀs ᴇɴᴅᴇᴅ!", show_alert=True)
-        return
-    
-    # Check if already joined
-    if user_id in raid["participants"]:
-        await callback_query.answer("✅ ʏᴏᴜ'ᴠᴇ ᴀʟʀᴇᴀᴅʏ ᴊᴏɪɴᴇᴅ!", show_alert=False)
-        return
-    
-    settings = raid["settings"]
-    
-    # Check cooldown
-    can_raid, remaining = await check_user_cooldown(user_id, raid["chat_id"])
-    if not can_raid:
-        mins = remaining // 60
-        secs = remaining % 60
-        await callback_query.answer(
-            f"⏳ ʏᴏᴜ'ʀᴇ ᴏɴ ᴄᴏᴏʟᴅᴏᴡɴ! {mins}m {secs}s ʟᴇғᴛ",
-            show_alert=True
-        )
-        return
-    
-    # Check balance
-    user_data = await get_user_data(user_id)
-    if user_data.get("balance", 0) < settings["start_charge"]:
-        await callback_query.answer(
-            f"💰 ɪɴsᴜғғɪᴄɪᴇɴᴛ ʙᴀʟᴀɴᴄᴇ! ɴᴇᴇᴅ {settings['start_charge']} ᴄᴏɪɴs",
-            show_alert=True
-        )
-        return
-    
-    # Deduct entry fee
-    await update_user_balance(user_id, -settings["start_charge"])
-    
-    # Add to participants
-    await active_raids_collection.update_one(
-        {"raid_id": raid_id},
-        {"$push": {"participants": user_id}}
-    )
-    
-    # Set cooldown
-    await set_user_cooldown(user_id, raid["chat_id"], settings["cooldown_minutes"])
-    
-    await callback_query.answer("⚔️ ʏᴏᴜ'ᴠᴇ ᴊᴏɪɴᴇᴅ ᴛʜᴇ ʀᴀɪᴅ!", show_alert=False)
-    
-    # Update the raid message with new participant count and list
-    try:
-        # Get updated raid data
-        updated_raid = await active_raids_collection.find_one({"raid_id": raid_id})
-        participants = updated_raid["participants"]
-        
-        # Get participant mentions
-        participant_mentions = []
-        for p_id in participants:
-            try:
-                user = await client.get_users(p_id)
-                participant_mentions.append(user.mention)
-            except:
-                participant_mentions.append(f"User {p_id}")
-        
-        # Get starter info
-        try:
-            starter = await client.get_users(raid["starter_id"])
-            starter_mention = starter.mention
-        except:
-            starter_mention = "Unknown"
-        
-        # Calculate remaining time
-        elapsed = (datetime.utcnow() - raid["started_at"]).total_seconds()
-        remaining_time = max(0, int(settings["join_phase_duration"] - elapsed))
-        
-        # Build participant list (show all participants)
-        participant_list = "\n".join([f"  {i+1}. {mention}" for i, mention in enumerate(participant_mentions)])
-        
-        # Update message
-        updated_announcement = (
-            f"<blockquote>⚔️ <b>sʜᴀᴅᴏᴡ ʀᴀɪᴅ ʜᴀs ʙᴇɢᴜɴ!</b> ⚔️</blockquote>\n\n"
-            f"<code>ᴊᴏɪɴ ɴᴏᴡ ᴀɴᴅ ʜᴇʟᴘ ᴜɴᴄᴏᴠᴇʀ ᴀɴᴄɪᴇɴᴛ ᴛʀᴇᴀsᴜʀᴇs!</code>\n"
-            f"<code>ʙᴇғᴏʀᴇ ᴛʜᴇ sʜᴀᴅᴏᴡs ᴄʟᴏsᴇ ɪɴ...</code>\n\n"
-            f"⏱ <b>ᴛɪᴍᴇ ʟᴇғᴛ:</b> <code>{remaining_time}s</code>\n"
-            f"💰 <b>ᴇɴᴛʀʏ ғᴇᴇ:</b> <code>{settings['start_charge']} ᴄᴏɪɴs</code>\n"
-            f"👥 <b>ᴘᴀʀᴛɪᴄɪᴘᴀɴᴛs:</b> <code>{len(participants)}</code>\n\n"
-            f"<b>⚔️ ʀᴀɪᴅᴇʀs:</b>\n{participant_list}\n\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"<i>sᴛᴀʀᴛᴇᴅ ʙʏ</i> {starter_mention}"
-        )
-        
-        join_button = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⚔️ ᴊᴏɪɴ ʀᴀɪᴅ ⚔️", callback_data=f"join_raid:{raid_id}")]
-        ])
-        
-        # Edit the message
-        await callback_query.message.edit_text(
-            updated_announcement,
-            reply_markup=join_button
-        )
-    except Exception as e:
-        LOGGER.error(f"Error updating raid message: {e}")
-
-
-async def execute_raid(client, message, raid_id):
-    """Execute the raid and distribute rewards with character images"""
-    raid = await active_raids_collection.find_one({"raid_id": raid_id})
-    if not raid:
-        return
-    
-    participants = raid["participants"]
-    settings = raid["settings"]
-    
-    if len(participants) == 0:
-        await message.edit_text("❌ ɴᴏ ᴏɴᴇ ᴊᴏɪɴᴇᴅ ᴛʜᴇ ʀᴀɪᴅ!")
-        await active_raids_collection.delete_one({"raid_id": raid_id})
-        return
-    
-    # Calculate outcomes
-    results = []
-    total_coins_gained = 0
-    total_characters = 0
-    total_critical = 0
-    character_images = []  # Store character images to show
-    
-    for user_id in participants:
-        # Weighted random outcome
-        rand = random.randint(1, 100)
-        
-        critical_threshold = settings.get("critical_chance", 5)
-        char_threshold = critical_threshold + settings["character_chance"]
-        coin_threshold = char_threshold + settings["coin_chance"]
-        loss_threshold = coin_threshold + settings["loss_chance"]
-        
-        LOGGER.info(f"User {user_id} rolled {rand} (Critical<={critical_threshold}, Char<={char_threshold}, Coin<={coin_threshold}, Loss<={loss_threshold})")
-        
-        if rand <= critical_threshold:
-            # CRITICAL HIT - Both character AND coins!
-            character = await get_random_character(settings["allowed_rarities"])
-            coins = random.randint(settings["coin_min"], settings["coin_max"])
-            
-            if character:
-                await add_character_to_user(user_id, character)
-                await update_user_balance(user_id, coins)
-                
-                # Get rarity display
-                char_rarity = character.get("rarity")
-                if isinstance(char_rarity, int):
-                    rarity_text = RARITY_MAP.get(char_rarity, "🟢 Common")
-                else:
-                    rarity_text = char_rarity
-                
-                results.append({
-                    "user_id": user_id,
-                    "type": "critical",
-                    "character": character,
-                    "rarity": rarity_text,
-                    "coins": coins
-                })
-                
-                # Add image for display
-                if character.get("img_url"):
-                    character_images.append(character.get("img_url"))
-                
-                total_characters += 1
-                total_coins_gained += coins
-                total_critical += 1
-                LOGGER.info(f"User {user_id} got CRITICAL: {character.get('name')}")
-            else:
-                # Fallback: double coins if no character
-                coins = coins * 2
-                await update_user_balance(user_id, coins)
-                results.append({"user_id": user_id, "type": "coins", "amount": coins, "doubled": True})
-                total_coins_gained += coins
-        
-        elif rand <= char_threshold:
-            # Character reward
-            character = await get_random_character(settings["allowed_rarities"])
-            if character:
-                await add_character_to_user(user_id, character)
-                
-                # Get rarity display
-                char_rarity = character.get("rarity")
-                if isinstance(char_rarity, int):
-                    rarity_text = RARITY_MAP.get(char_rarity, "🟢 Common")
-                else:
-                    rarity_text = char_rarity
-                
-                results.append({
-                    "user_id": user_id,
-                    "type": "character",
-                    "character": character,
-                    "rarity": rarity_text
-                })
-                
-                # Add image for display
-                if character.get("img_url"):
-                    character_images.append(character.get("img_url"))
-                
-                total_characters += 1
-                LOGGER.info(f"User {user_id} got character: {character.get('name')}")
-            else:
-                # Fallback to coins if no character found
-                coins = random.randint(settings["coin_min"], settings["coin_max"])
-                await update_user_balance(user_id, coins)
-                results.append({"user_id": user_id, "type": "coins", "amount": coins})
-                total_coins_gained += coins
-        
-        elif rand <= coin_threshold:
-            # Coin reward
-            coins = random.randint(settings["coin_min"], settings["coin_max"])
-            await update_user_balance(user_id, coins)
-            results.append({"user_id": user_id, "type": "coins", "amount": coins})
-            total_coins_gained += coins
-            LOGGER.info(f"User {user_id} got coins: {coins}")
-        
-        elif rand <= loss_threshold:
-            # Coin loss
-            loss = random.randint(settings["coin_loss_min"], settings["coin_loss_max"])
-            await update_user_balance(user_id, -loss)
-            results.append({"user_id": user_id, "type": "loss", "amount": loss})
-            LOGGER.info(f"User {user_id} lost coins: {loss}")
-        
-        else:
-            # Nothing
-            results.append({"user_id": user_id, "type": "nothing"})
-            LOGGER.info(f"User {user_id} got nothing")
-    
-    # Build result message
-    result_text = (
-        f"<blockquote>⚔️ <b>ʀᴀɪᴅ ᴄᴏᴍᴘʟᴇᴛᴇ</b> ⚔️</blockquote>\n"
-        f"━━━━━━━━━━━━━━━\n"
-        f"👥 <b>ᴘᴀʀᴛɪᴄɪᴘᴀɴᴛs:</b> <code>{len(participants)}</code>\n\n"
-        f"<b>🏆 ʟᴏᴏᴛ ʀᴇᴘᴏʀᴛ:</b>\n"
-    )
-    
-    for result in results:
-        try:
-            user = await client.get_users(result["user_id"])
-            username = f"@{user.username}" if user.username else user.first_name
-        except:
-            username = "Unknown"
-        
-        if result["type"] == "critical":
-            # Critical hit - show both character and coins
-            char_id = result["character"].get("id", "???")
-            char_name = result["character"].get("name", "Unknown")
-            result_text += (
-                f"• {username} — <b>💥 ᴄʀɪᴛɪᴄᴀʟ ʜɪᴛ!</b>\n"
-                f"  └ 🎴 {result['rarity']} • <code>{char_id}</code> • {char_name}\n"
-                f"  └ 💰 <code>{result['coins']} ᴄᴏɪɴs</code>\n"
-            )
-        elif result["type"] == "character":
-            char_id = result["character"].get("id", "???")
-            char_name = result["character"].get("name", "Unknown")
-            result_text += (
-                f"• {username} — <code>ᴄᴀᴘᴛᴜʀᴇᴅ</code> 🎴\n"
-                f"  └ {result['rarity']} • <code>{char_id}</code> • {char_name}\n"
-            )
-        elif result["type"] == "coins":
-            doubled_text = " (ᴅᴏᴜʙʟᴇᴅ!)" if result.get("doubled") else ""
-            result_text += f"• {username} — <code>ғᴏᴜɴᴅ {result['amount']} ᴄᴏɪɴs</code> 💰{doubled_text}\n"
-        elif result["type"] == "loss":
-            result_text += f"• {username} — <code>ʟᴏsᴛ {result['amount']} ᴄᴏɪɴs</code> 💀\n"
-        else:
-            result_text += f"• {username} — <code>ғᴏᴜɴᴅ ɴᴏᴛʜɪɴɢ...</code> ❌\n"
-    
-    result_text += (
-        f"\n━━━━━━━━━━━━━━━\n"
-        f"💰 <b>ᴛᴏᴛᴀʟ ʟᴏᴏᴛ ᴠᴀʟᴜᴇ:</b> <code>{total_coins_gained:,} ᴄᴏɪɴs</code>\n"
-        f"🎴 <b>ɴᴇᴡ ʀᴇʟɪᴄs ғᴏᴜɴᴅ:</b> <code>{total_characters}</code>\n"
-        f"💥 <b>ᴄʀɪᴛɪᴄᴀʟ ʜɪᴛs:</b> <code>{total_critical}</code>\n\n"
-        f"<i>ᴍᴇssᴀɢᴇ ᴘʀᴏᴠɪᴅᴇᴅ ʙʏ</i> <a href='https://t.me/siyaprobot'>sɪʏᴀ</a>"
-    )
-    
-    # Send with character image if any characters were found
-    try:
-        if character_images:
-            # Show the first character image found
-            await message.delete()
-            await client.send_photo(
-                chat_id=raid["chat_id"],
-                photo=character_images[0],
-                caption=result_text
-            )
-        else:
-            # No characters found, just edit text
-            await message.edit_text(result_text)
-    except Exception as e:
-        LOGGER.error(f"Error sending raid results: {e}")
-        # Fallback to text only
-        await message.edit_text(result_text)
-    
-    await active_raids_collection.delete_one({"raid_id": raid_id})
+LOGGER.info("Enhanced Shadow Raid module loaded successfully!")
