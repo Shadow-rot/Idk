@@ -89,7 +89,7 @@ async def global_callback_router(update: Update, context: CallbackContext):
             # Pass system callback
             await pass_callback(update, context)
         
-        elif data.startswith('pss_'):
+        elif data.startswith('luv_'):
             # PS module callback
             await ps_callback(update, context)
         
