@@ -7,7 +7,6 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from telegram.error import BadRequest
 from shivu import callback
-from shivu.modules.restart import setup_restart_handlers
 
 from shivu import db, shivuu, application, LOGGER
 from shivu.modules import ALL_MODULES
@@ -401,9 +400,6 @@ def main():
     # Register handlers
     application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
     application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
-    
-    # Setup restart and shutdown handlers
-    setup_restart_handlers(application)
 
     LOGGER.info("Starting bot...")
     application.run_polling(drop_pending_updates=True)
