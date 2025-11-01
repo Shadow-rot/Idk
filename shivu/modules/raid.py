@@ -54,10 +54,10 @@ DEFAULT_SETTINGS = {
     "coin_max": 2000,
     "coin_loss_min": 200,
     "coin_loss_max": 500,
-    "character_chance": 20,
-    "coin_chance": 40,
-    "loss_chance": 20,
-    "nothing_chance": 20
+    "character_chance": 50,
+    "coin_chance": 10,
+    "loss_chance": 10,
+    "nothing_chance": 10
 }
 
 
