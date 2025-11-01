@@ -264,7 +264,6 @@ async def xp(update, context):
 
 application.add_handler(CommandHandler("bal", balance, block=False))
 application.add_handler(CommandHandler("pay", pay, block=False))
-application.add_handler(CallbackQueryHandler(pay_callback, pattern="^pay_(yes|no)_", block=False))
 application.add_handler(CommandHandler("Tophunters", mtop, block=False))
 application.add_handler(CommandHandler("cclaim", daily_reward, block=False))
 application.add_handler(CommandHandler("roll", roll, block=False))
