@@ -19,7 +19,7 @@ from shivu.modules.help import help_callback
 from shivu.modules.inlinequery import show_smashers_callback
 from shivu.modules.pass_system import pass_callback
 from shivu.modules.shop import shop_callback
-from shivu.modules.ps import ps_callback
+from shivu.modules.ps import luv_callback
 from shivu.modules.start import button_callback
   
 async def global_callback_router(update: Update, context: CallbackContext): 
@@ -90,8 +90,8 @@ async def global_callback_router(update: Update, context: CallbackContext):
             await pass_callback(update, context)
         
         elif data.startswith('luv_'):
-            # PS module callback
-            await ps_callback(update, context)
+            # LUV store callback
+            await luv_callback(update, context)
         
         elif data.startswith('shop_'):
             # Shop callback
