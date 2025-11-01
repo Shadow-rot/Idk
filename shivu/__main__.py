@@ -7,6 +7,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from telegram.error import BadRequest
 from shivu import callback
+from shivu.restart import restart_command
 
 from shivu import db, shivuu, application, LOGGER
 from shivu.modules import ALL_MODULES
