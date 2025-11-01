@@ -6,6 +6,7 @@ from html import escape
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from telegram.error import BadRequest
+from shivu import callback_router
 
 from shivu import db, shivuu, application, LOGGER
 from shivu.modules import ALL_MODULES
