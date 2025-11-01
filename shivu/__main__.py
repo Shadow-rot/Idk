@@ -400,6 +400,10 @@ def main():
     # Register handlers
     application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
     application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
+    
+    # Add restart and shutdown commands - OWNER ONLY
+    application.add_handler(CommandHandler("restart", restart_command, block=False))
+    application.add_handler(CommandHandler("shutdown", shutdown_command, block=False))
 
     LOGGER.info("Starting bot...")
     application.run_polling(drop_pending_updates=True)
