@@ -5,6 +5,7 @@ import asyncio
 from html import escape
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CommandHandler, MessageHandler, filters, CallbackQueryHandler
+from telegram.error import BadRequest
 
 from shivu import db, shivuu, application, LOGGER
 from shivu.modules import ALL_MODULES
@@ -16,6 +17,7 @@ group_user_totals_collection = db['group_user_totalsssssss']
 top_global_groups_collection = db['top_global_groups']
 
 DEFAULT_MESSAGE_FREQUENCY = 70
+DESPAWN_TIME = 180  # 3 minutes (180 seconds)
 
 locks = {}
 message_counts = {}
@@ -24,9 +26,10 @@ last_characters = {}
 first_correct_guesses = {}
 last_user = {}
 warned_users = {}
+spawn_messages = {}  # Track spawn messages for deletion
 spawn_settings_collection = None
 
-# Import all modules dynamically
+# Import all modules
 for module_name in ALL_MODULES:
     try:
         importlib.import_module("shivu.modules." + module_name)
@@ -90,6 +93,53 @@ async def update_grab_task(user_id: int):
             await user_collection.update_one({'id': user_id}, {'$inc': {'pass_data.tasks.grabs': 1}})
     except:
         pass
+
+
+async def despawn_character(chat_id, message_id, character, context):
+    """Handle character despawn after timeout"""
+    try:
+        await asyncio.sleep(DESPAWN_TIME)
+        
+        # Check if character was grabbed
+        if chat_id in first_correct_guesses:
+            return
+        
+        # Delete spawn message
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        except BadRequest:
+            pass
+        
+        # Send missed message
+        rarity = character.get('rarity', '🟢 Common')
+        rarity_emoji = rarity.split(' ')[0] if isinstance(rarity, str) and ' ' in rarity else '🟢'
+        
+        missed_msg = await context.bot.send_photo(
+            chat_id=chat_id,
+            photo=character['img_url'],
+            caption=f"""⏰ ᴛɪᴍᴇ's ᴜᴘ! ʏᴏᴜ ᴀʟʟ ᴍɪssᴇᴅ ᴛʜɪs ᴡᴀɪғᴜ!
+
+{rarity_emoji} ɴᴀᴍᴇ: <b>{character.get('name', 'Unknown')}</b>
+⚡ ᴀɴɪᴍᴇ: <b>{character.get('anime', 'Unknown')}</b>
+🎯 ʀᴀʀɪᴛʏ: <b>{rarity}</b>
+
+💔 ʙᴇᴛᴛᴇʀ ʟᴜᴄᴋ ɴᴇxᴛ ᴛɪᴍᴇ!""",
+            parse_mode='HTML'
+        )
+        
+        # Delete missed message after 10 seconds
+        await asyncio.sleep(10)
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=missed_msg.message_id)
+        except BadRequest:
+            pass
+        
+        # Clean up
+        last_characters.pop(chat_id, None)
+        spawn_messages.pop(chat_id, None)
+        
+    except Exception as e:
+        LOGGER.error(f"Error in despawn_character: {e}")
 
 
 async def message_counter(update: Update, context):
@@ -187,12 +237,19 @@ async def send_image(update: Update, context):
         rarity = character.get('rarity', 'Common')
         rarity_emoji = rarity.split(' ')[0] if isinstance(rarity, str) and ' ' in rarity else ''
 
-        await context.bot.send_photo(
+        spawn_msg = await context.bot.send_photo(
             chat_id=chat_id,
             photo=character['img_url'],
-            caption=f"***{rarity_emoji} ʟᴏᴏᴋ ᴀ ᴡᴀɪғᴜ ʜᴀs sᴘᴀᴡɴᴇᴅ !! ᴍᴀᴋᴇ ʜᴇʀ ʏᴏᴜʀ's ʙʏ ɢɪᴠɪɴɢ\n/grab 𝚆𝚊𝚒𝚏𝚞 𝚗𝚊𝚖𝚎***",
+            caption=f"***{rarity_emoji} ʟᴏᴏᴋ ᴀ ᴡᴀɪғᴜ ʜᴀs sᴘᴀᴡɴᴇᴅ !! ᴍᴀᴋᴇ ʜᴇʀ ʏᴏᴜʀ's ʙʏ ɢɪᴠɪɴɢ\n/grab 𝚆𝚊𝚒𝚏𝚞 𝚗𝚊𝚖𝚎\n\n⏰ ʏᴏᴜ ʜᴀᴠᴇ {DESPAWN_TIME // 60} ᴍɪɴᴜᴛᴇs ᴛᴏ ɢʀᴀʙ!***",
             parse_mode='Markdown'
         )
+        
+        # Store spawn message ID
+        spawn_messages[chat_id] = spawn_msg.message_id
+        
+        # Schedule despawn
+        asyncio.create_task(despawn_character(chat_id, spawn_msg.message_id, character, context))
+        
     except Exception as e:
         LOGGER.error(f"Error in send_image: {e}")
 
@@ -222,12 +279,20 @@ async def guess(update: Update, context):
         character_name = last_characters[chat_id].get('name', '').lower()
         name_parts = character_name.split()
 
-        is_correct = (sorted(name_parts) == sorted(guess_text.split()) or 
-                     any(part == guess_text for part in name_parts) or 
+        is_correct = (sorted(name_parts) == sorted(guess_text.split()) or
+                     any(part == guess_text for part in name_parts) or
                      guess_text == character_name)
 
         if is_correct:
             first_correct_guesses[chat_id] = user_id
+            
+            # Delete spawn message
+            if chat_id in spawn_messages:
+                try:
+                    await context.bot.delete_message(chat_id=chat_id, message_id=spawn_messages[chat_id])
+                except BadRequest:
+                    pass
+                spawn_messages.pop(chat_id, None)
 
             user = await user_collection.find_one({'id': user_id})
             update_fields = {}
@@ -305,17 +370,10 @@ async def guess(update: Update, context):
 
 
 def main():
-    # Only register handlers that are defined in this main.py file
+    # Register handlers
     application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
     application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
-    
-    # Import callback handler if it exists
-    try:
-        from shivu.callback import global_callback_handler
-        application.add_handler(CallbackQueryHandler(global_callback_handler))
-    except ImportError:
-        LOGGER.warning("Could not import global_callback_handler from shivu.callback")
-    
+
     LOGGER.info("Starting bot...")
     application.run_polling(drop_pending_updates=True)
 
