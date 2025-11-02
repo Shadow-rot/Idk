@@ -21,7 +21,6 @@ from shivu.modules.pass_system import pass_callback
 from shivu.modules.shop import shop_callback
 from shivu.modules.ps import luv_callback
 from shivu.modules.start import button_callback
-from shivu.modules.find import rarity_callback  # Add rarity callback import
 
 async def global_callback_router(update: Update, context: CallbackContext): 
     """Route callback queries to appropriate handlers""" 
@@ -57,10 +56,6 @@ async def global_callback_router(update: Update, context: CallbackContext):
         elif data.startswith('char_stats_'):
             # Character stats callback
             await handle_char_stats(update, context)
-
-        elif data.startswith('rarity_') or data == 'close':
-            # Rarity callbacks (rarity_1, rarity_all, close)
-            await rarity_callback(update, context)
 
         elif data.startswith('games:repeat:'):
             # Games repeat callback
