@@ -195,7 +195,5 @@ async def rarity_callback(update: Update, context: CallbackContext) -> None:
     except Exception as e:
         await query.answer(f"Error: {str(e)}", show_alert=True)
 
-# Register handlers
+# Register command handler only (callback is handled by global router)
 application.add_handler(CommandHandler('r', rarity_count, block=False))
-application.add_handler(CallbackQueryHandler(rarity_callback, pattern=r'^rarity_', block=False))
-application.add_handler(CallbackQueryHandler(rarity_callback, pattern=r'^close$', block=False))
