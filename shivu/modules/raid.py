@@ -14,6 +14,7 @@ active_raids_collection = db['active_raids']
 
 LOGGER = logging.getLogger(__name__)
 OWNER_ID = 5147822244
+GLOBAL_SETTINGS_ID = "global_raid_settings"
 
 RARITY_MAP = {
     1: "🟢 Common", 2: "🟣 Rare", 3: "🟡 Legendary", 4: "💮 Special Edition",
@@ -31,13 +32,31 @@ DEFAULT_SETTINGS = {
     "nothing_chance": 15, "critical_chance": 5
 }
 
-async def get_raid_settings(chat_id):
-    settings = await raid_settings_collection.find_one({"chat_id": chat_id})
+async def get_global_settings():
+    """Get global raid settings that apply to all groups"""
+    settings = await raid_settings_collection.find_one({"chat_id": GLOBAL_SETTINGS_ID})
     if not settings:
         settings = DEFAULT_SETTINGS.copy()
-        settings["chat_id"] = chat_id
+        settings["chat_id"] = GLOBAL_SETTINGS_ID
         await raid_settings_collection.insert_one(settings)
     return settings
+
+async def get_raid_settings(chat_id):
+    """Get raid settings - now returns global settings for all groups"""
+    return await get_global_settings()
+
+async def update_global_settings(update_dict):
+    """Update global settings and apply to all groups"""
+    await raid_settings_collection.update_one(
+        {"chat_id": GLOBAL_SETTINGS_ID},
+        {"$set": update_dict},
+        upsert=True
+    )
+    # Optionally update all existing group settings
+    await raid_settings_collection.update_many(
+        {"chat_id": {"$ne": GLOBAL_SETTINGS_ID}},
+        {"$set": update_dict}
+    )
 
 async def check_user_cooldown(user_id, chat_id):
     cooldown_data = await raid_cooldown_collection.find_one({"user_id": user_id, "chat_id": chat_id})
@@ -97,20 +116,20 @@ async def add_character_to_user(user_id, character):
 async def start_raid(client, message):
     chat_id = message.chat.id
     user_id = message.from_user.id
-    
+
     active_raid = await active_raids_collection.find_one({"chat_id": chat_id})
     if active_raid:
         await message.reply_text("⚠️ ᴀ ʀᴀɪᴅ ɪs ᴀʟʀᴇᴀᴅʏ ᴀᴄᴛɪᴠᴇ ɪɴ ᴛʜɪs ɢʀᴏᴜᴘ!")
         return
-    
+
     settings = await get_raid_settings(chat_id)
-    
+
     can_raid, remaining = await check_user_cooldown(user_id, chat_id)
     if not can_raid:
         mins, secs = remaining // 60, remaining % 60
         await message.reply_text(f"⏳ ʏᴏᴜ'ʀᴇ ᴏɴ ᴄᴏᴏʟᴅᴏᴡɴ!\nᴛɪᴍᴇ ʟᴇғᴛ: `{mins}m {secs}s`")
         return
-    
+
     user_data = await get_user_data(user_id)
     if user_data.get("balance", 0) < settings["start_charge"]:
         await message.reply_text(
@@ -118,9 +137,9 @@ async def start_raid(client, message):
             f"ʏᴏᴜ ɴᴇᴇᴅ `{settings['start_charge']}` ᴄᴏɪɴs ᴛᴏ sᴛᴀʀᴛ ᴀ ʀᴀɪᴅ."
         )
         return
-    
+
     await update_user_balance(user_id, -settings["start_charge"])
-    
+
     raid_id = f"{chat_id}_{datetime.utcnow().timestamp()}"
     raid_data = {
         "raid_id": raid_id, "chat_id": chat_id, "starter_id": user_id,
@@ -128,9 +147,9 @@ async def start_raid(client, message):
     }
     await active_raids_collection.insert_one(raid_data)
     await set_user_cooldown(user_id, chat_id, settings["cooldown_minutes"])
-    
+
     join_button = InlineKeyboardMarkup([[InlineKeyboardButton("⚔️ ᴊᴏɪɴ ʀᴀɪᴅ ⚔️", callback_data=f"join_raid:{raid_id}")]])
-    
+
     announcement = (
         f"<blockquote>⚔️ <b>sʜᴀᴅᴏᴡ ʀᴀɪᴅ ʜᴀs ʙᴇɢᴜɴ!</b> ⚔️</blockquote>\n\n"
         f"<code>ᴊᴏɪɴ ɴᴏᴡ ᴀɴᴅ ʜᴇʟᴘ ᴜɴᴄᴏᴠᴇʀ ᴀɴᴄɪᴇɴᴛ ᴛʀᴇᴀsᴜʀᴇs!</code>\n"
@@ -140,7 +159,7 @@ async def start_raid(client, message):
         f"👥 <b>ᴘᴀʀᴛɪᴄɪᴘᴀɴᴛs:</b> <code>1</code>\n\n"
         f"━━━━━━━━━━━━━━━\n<i>sᴛᴀʀᴛᴇᴅ ʙʏ</i> {message.from_user.mention}"
     )
-    
+
     raid_msg = await message.reply_text(announcement, reply_markup=join_button)
     await asyncio.sleep(settings["join_phase_duration"])
     await execute_raid(client, raid_msg, raid_id)
@@ -149,46 +168,46 @@ async def start_raid(client, message):
 async def join_raid_callback(client, callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
     raid_id = callback_query.data.split(":")[1]
-    
+
     raid = await active_raids_collection.find_one({"raid_id": raid_id})
     if not raid:
         await callback_query.answer("⚠️ ᴛʜɪs ʀᴀɪᴅ ʜᴀs ᴇɴᴅᴇᴅ!", show_alert=True)
         return
-    
+
     if user_id in raid["participants"]:
         await callback_query.answer("✅ ʏᴏᴜ'ᴠᴇ ᴀʟʀᴇᴀᴅʏ ᴊᴏɪɴᴇᴅ!", show_alert=False)
         return
-    
+
     settings = raid["settings"]
-    
+
     can_raid, remaining = await check_user_cooldown(user_id, raid["chat_id"])
     if not can_raid:
         mins, secs = remaining // 60, remaining % 60
         await callback_query.answer(f"⏳ ʏᴏᴜ'ʀᴇ ᴏɴ ᴄᴏᴏʟᴅᴏᴡɴ! {mins}m {secs}s ʟᴇғᴛ", show_alert=True)
         return
-    
+
     user_data = await get_user_data(user_id)
     if user_data.get("balance", 0) < settings["start_charge"]:
         await callback_query.answer(f"💰 ɪɴsᴜғғɪᴄɪᴇɴᴛ ʙᴀʟᴀɴᴄᴇ! ɴᴇᴇᴅ {settings['start_charge']} ᴄᴏɪɴs", show_alert=True)
         return
-    
+
     await update_user_balance(user_id, -settings["start_charge"])
     await active_raids_collection.update_one({"raid_id": raid_id}, {"$push": {"participants": user_id}})
     await set_user_cooldown(user_id, raid["chat_id"], settings["cooldown_minutes"])
     await callback_query.answer("⚔️ ʏᴏᴜ'ᴠᴇ ᴊᴏɪɴᴇᴅ ᴛʜᴇ ʀᴀɪᴅ!", show_alert=False)
-    
+
     try:
         updated_raid = await active_raids_collection.find_one({"raid_id": raid_id})
         participant_count = len(updated_raid["participants"])
         elapsed = (datetime.utcnow() - raid["started_at"]).total_seconds()
         remaining_time = max(0, int(settings["join_phase_duration"] - elapsed))
-        
+
         try:
             starter = await client.get_users(raid["starter_id"])
             starter_mention = starter.mention
         except:
             starter_mention = "Unknown"
-        
+
         updated_text = (
             f"<blockquote>⚔️ <b>sʜᴀᴅᴏᴡ ʀᴀɪᴅ ʜᴀs ʙᴇɢᴜɴ!</b> ⚔️</blockquote>\n\n"
             f"<code>ᴊᴏɪɴ ɴᴏᴡ ᴀɴᴅ ʜᴇʟᴘ ᴜɴᴄᴏᴠᴇʀ ᴀɴᴄɪᴇɴᴛ ᴛʀᴇᴀsᴜʀᴇs!</code>\n"
@@ -198,7 +217,7 @@ async def join_raid_callback(client, callback_query: CallbackQuery):
             f"👥 <b>ᴘᴀʀᴛɪᴄɪᴘᴀɴᴛs:</b> <code>{participant_count}</code>\n\n"
             f"━━━━━━━━━━━━━━━\n<i>sᴛᴀʀᴛᴇᴅ ʙʏ</i> {starter_mention}"
         )
-        
+
         join_button = InlineKeyboardMarkup([[InlineKeyboardButton("⚔️ ᴊᴏɪɴ ʀᴀɪᴅ ⚔️", callback_data=f"join_raid:{raid_id}")]])
         await callback_query.message.edit_text(updated_text, reply_markup=join_button)
     except Exception as e:
@@ -208,32 +227,32 @@ async def execute_raid(client, message, raid_id):
     raid = await active_raids_collection.find_one({"raid_id": raid_id})
     if not raid:
         return
-    
+
     participants = raid["participants"]
     settings = raid["settings"]
-    
+
     if len(participants) == 0:
         await message.edit_text("❌ ɴᴏ ᴏɴᴇ ᴊᴏɪɴᴇᴅ ᴛʜᴇ ʀᴀɪᴅ!")
         await active_raids_collection.delete_one({"raid_id": raid_id})
         return
-    
+
     results = []
     total_coins_gained = 0
     total_characters = 0
     total_critical = 0
     character_images = []
-    
+
     for user_id in participants:
         rand = random.randint(1, 100)
         critical_threshold = settings.get("critical_chance", 5)
         char_threshold = critical_threshold + settings["character_chance"]
         coin_threshold = char_threshold + settings["coin_chance"]
         loss_threshold = coin_threshold + settings["loss_chance"]
-        
+
         if rand <= critical_threshold:
             character = await get_random_character(settings["allowed_rarities"])
             coins = random.randint(settings["coin_min"], settings["coin_max"])
-            
+
             if character:
                 await add_character_to_user(user_id, character)
                 await update_user_balance(user_id, coins)
@@ -242,7 +261,7 @@ async def execute_raid(client, message, raid_id):
                     rarity_text = RARITY_MAP.get(char_rarity, "🟢 Common")
                 else:
                     rarity_text = char_rarity
-                
+
                 results.append({"user_id": user_id, "type": "critical", "character": character, "rarity": rarity_text, "coins": coins})
                 if character.get("img_url"):
                     character_images.append(character.get("img_url"))
@@ -254,7 +273,7 @@ async def execute_raid(client, message, raid_id):
                 await update_user_balance(user_id, coins)
                 results.append({"user_id": user_id, "type": "coins", "amount": coins, "doubled": True})
                 total_coins_gained += coins
-        
+
         elif rand <= char_threshold:
             character = await get_random_character(settings["allowed_rarities"])
             if character:
@@ -273,35 +292,35 @@ async def execute_raid(client, message, raid_id):
                 await update_user_balance(user_id, coins)
                 results.append({"user_id": user_id, "type": "coins", "amount": coins})
                 total_coins_gained += coins
-        
+
         elif rand <= coin_threshold:
             coins = random.randint(settings["coin_min"], settings["coin_max"])
             await update_user_balance(user_id, coins)
             results.append({"user_id": user_id, "type": "coins", "amount": coins})
             total_coins_gained += coins
-        
+
         elif rand <= loss_threshold:
             loss = random.randint(settings["coin_loss_min"], settings["coin_loss_max"])
             await update_user_balance(user_id, -loss)
             results.append({"user_id": user_id, "type": "loss", "amount": loss})
-        
+
         else:
             results.append({"user_id": user_id, "type": "nothing"})
-    
+
     result_text = (
         f"<blockquote>⚔️ <b>ʀᴀɪᴅ ᴄᴏᴍᴘʟᴇᴛᴇ</b> ⚔️</blockquote>\n"
         f"━━━━━━━━━━━━━━━\n"
         f"👥 <b>ᴘᴀʀᴛɪᴄɪᴘᴀɴᴛs:</b> <code>{len(participants)}</code>\n\n"
         f"<b>🏆 ʟᴏᴏᴛ ʀᴇᴘᴏʀᴛ:</b>\n"
     )
-    
+
     for result in results:
         try:
             user = await client.get_users(result["user_id"])
             username = f"@{user.username}" if user.username else user.first_name
         except:
             username = "Unknown"
-        
+
         if result["type"] == "critical":
             char_id = result["character"].get("id", "???")
             char_name = result["character"].get("name", "Unknown")
@@ -321,7 +340,7 @@ async def execute_raid(client, message, raid_id):
             result_text += f"• {username} — <code>ʟᴏsᴛ {result['amount']} ᴄᴏɪɴs</code> 💀\n"
         else:
             result_text += f"• {username} — <code>ғᴏᴜɴᴅ ɴᴏᴛʜɪɴɢ...</code> ❌\n"
-    
+
     result_text += (
         f"\n━━━━━━━━━━━━━━━\n"
         f"💰 <b>ᴛᴏᴛᴀʟ ʟᴏᴏᴛ ᴠᴀʟᴜᴇ:</b> <code>{total_coins_gained:,} ᴄᴏɪɴs</code>\n"
@@ -329,7 +348,7 @@ async def execute_raid(client, message, raid_id):
         f"💥 <b>ᴄʀɪᴛɪᴄᴀʟ ʜɪᴛs:</b> <code>{total_critical}</code>\n\n"
         f"<i>ᴍᴇssᴀɢᴇ ᴘʀᴏᴠɪᴅᴇᴅ ʙʏ</i> <a href='https://t.me/siyaprobot'>sɪʏᴀ</a>"
     )
-    
+
     try:
         if character_images:
             await message.delete()
@@ -339,18 +358,18 @@ async def execute_raid(client, message, raid_id):
     except Exception as e:
         LOGGER.error(f"Error sending raid results: {e}")
         await message.edit_text(result_text)
-    
+
     await active_raids_collection.delete_one({"raid_id": raid_id})
 
-# COMPACT ADMIN COMMANDS
+# GLOBAL ADMIN COMMANDS - Settings apply to ALL groups instantly
 @shivuu.on_message(filters.command(["setraidcharge"]) & filters.user(OWNER_ID))
 async def set_raid_charge(c, m):
     if len(m.command) < 2:
         return await m.reply_text("Usage: /setraidcharge amount")
     try:
         amt = int(m.command[1])
-        await raid_settings_collection.update_one({"chat_id": m.chat.id}, {"$set": {"start_charge": amt}}, upsert=True)
-        await m.reply_text(f"Raid charge set to {amt} coins")
+        await update_global_settings({"start_charge": amt})
+        await m.reply_text(f"✅ Raid charge set to {amt} coins globally for all groups!")
     except:
         await m.reply_text("Invalid amount")
 
@@ -360,8 +379,8 @@ async def set_raid_cooldown(c, m):
         return await m.reply_text("Usage: /setraidcooldown minutes")
     try:
         mins = int(m.command[1])
-        await raid_settings_collection.update_one({"chat_id": m.chat.id}, {"$set": {"cooldown_minutes": mins}}, upsert=True)
-        await m.reply_text(f"Cooldown set to {mins} minutes")
+        await update_global_settings({"cooldown_minutes": mins})
+        await m.reply_text(f"✅ Cooldown set to {mins} minutes globally for all groups!")
     except:
         await m.reply_text("Invalid value")
 
@@ -371,9 +390,9 @@ async def set_raid_rarities(c, m):
         return await m.reply_text("Usage: /setraidrarities 1,2,3,4,5")
     try:
         rarities = [int(r.strip()) for r in m.command[1].split(",")]
-        await raid_settings_collection.update_one({"chat_id": m.chat.id}, {"$set": {"allowed_rarities": rarities}}, upsert=True)
+        await update_global_settings({"allowed_rarities": rarities})
         rarity_names = [RARITY_MAP.get(r, f"Rarity {r}") for r in rarities]
-        await m.reply_text(f"Allowed rarities:\n" + "\n".join(rarity_names))
+        await m.reply_text(f"✅ Allowed rarities set globally for all groups:\n" + "\n".join(rarity_names))
     except:
         await m.reply_text("Invalid format")
 
@@ -385,12 +404,15 @@ async def set_raid_chances(c, m):
         char_c, coin_c, loss_c, nothing_c, crit_c = [int(m.command[i]) for i in range(1, 6)]
         if char_c + coin_c + loss_c + nothing_c + crit_c != 100:
             return await m.reply_text(f"Total must equal 100. Current: {char_c + coin_c + loss_c + nothing_c + crit_c}")
-        await raid_settings_collection.update_one(
-            {"chat_id": m.chat.id},
-            {"$set": {"character_chance": char_c, "coin_chance": coin_c, "loss_chance": loss_c, "nothing_chance": nothing_c, "critical_chance": crit_c}},
-            upsert=True
+        await update_global_settings({
+            "character_chance": char_c, "coin_chance": coin_c, 
+            "loss_chance": loss_c, "nothing_chance": nothing_c, 
+            "critical_chance": crit_c
+        })
+        await m.reply_text(
+            f"✅ Chances updated globally for all groups:\n"
+            f"Char: {char_c}% | Coin: {coin_c}% | Loss: {loss_c}% | Nothing: {nothing_c}% | Critical: {crit_c}%"
         )
-        await m.reply_text(f"Chances updated:\nChar: {char_c}% | Coin: {coin_c}% | Loss: {loss_c}% | Nothing: {nothing_c}% | Critical: {crit_c}%")
     except:
         await m.reply_text("Invalid values")
 
@@ -402,8 +424,8 @@ async def set_raid_coins(c, m):
         coin_min, coin_max = int(m.command[1]), int(m.command[2])
         if coin_min >= coin_max:
             return await m.reply_text("Min must be less than max")
-        await raid_settings_collection.update_one({"chat_id": m.chat.id}, {"$set": {"coin_min": coin_min, "coin_max": coin_max}}, upsert=True)
-        await m.reply_text(f"Coin range: {coin_min}-{coin_max}")
+        await update_global_settings({"coin_min": coin_min, "coin_max": coin_max})
+        await m.reply_text(f"✅ Coin range set to {coin_min}-{coin_max} globally for all groups!")
     except:
         await m.reply_text("Invalid values")
 
@@ -415,17 +437,17 @@ async def set_raid_loss(c, m):
         loss_min, loss_max = int(m.command[1]), int(m.command[2])
         if loss_min >= loss_max:
             return await m.reply_text("Min must be less than max")
-        await raid_settings_collection.update_one({"chat_id": m.chat.id}, {"$set": {"coin_loss_min": loss_min, "coin_loss_max": loss_max}}, upsert=True)
-        await m.reply_text(f"Loss range: {loss_min}-{loss_max}")
+        await update_global_settings({"coin_loss_min": loss_min, "coin_loss_max": loss_max})
+        await m.reply_text(f"✅ Loss range set to {loss_min}-{loss_max} globally for all groups!")
     except:
         await m.reply_text("Invalid values")
 
 @shivuu.on_message(filters.command(["raidsettings"]) & filters.user(OWNER_ID))
 async def show_raid_settings(c, m):
-    s = await get_raid_settings(m.chat.id)
+    s = await get_global_settings()
     rn = [RARITY_MAP.get(r, f"Rarity {r}") for r in s["allowed_rarities"]]
     await m.reply_text(
-        f"<b>Raid Settings</b>\n\n"
+        f"<b>🌐 Global Raid Settings (All Groups)</b>\n\n"
         f"Charge: {s['start_charge']} coins\n"
         f"Join Phase: {s['join_phase_duration']}s\n"
         f"Cooldown: {s['cooldown_minutes']}m\n"
@@ -438,13 +460,14 @@ async def show_raid_settings(c, m):
         f"Loss: {s['loss_chance']}% | Nothing: {s['nothing_chance']}%\n"
         f"Critical: {s.get('critical_chance', 5)}%\n\n"
         f"<b>Rarities:</b> {len(rn)}\n" + ", ".join(rn[:5]) + ("..." if len(rn) > 5 else "") +
-        f"\n\n<b>Commands:</b>\n"
+        f"\n\n<b>Global Commands (applies to ALL groups):</b>\n"
         f"/setraidcharge amount\n"
         f"/setraidcooldown minutes\n"
         f"/setraidchances c co l n cr\n"
         f"/setraidcoins min max\n"
         f"/setraidloss min max\n"
-        f"/setraidrarities 1,2,3..."
+        f"/setraidrarities 1,2,3...\n\n"
+        f"✨ All settings apply globally to every group!"
     )
 
-LOGGER.info("Enhanced Shadow Raid module loaded!")
+LOGGER.info("Enhanced Shadow Raid module loaded with GLOBAL settings!")
