@@ -58,19 +58,32 @@ async def is_character_allowed(character, chat_id=None):
         char_rarity = character.get('rarity', '🟢 Common')
         rarity_emoji = char_rarity.split(' ')[0] if isinstance(char_rarity, str) and ' ' in char_rarity else char_rarity
 
-        # Check if this rarity is exclusive to ANOTHER group (not current group)
-        if group_rarity_collection is not None:
+        # Check if this rarity is exclusive to ANY group
+        if group_rarity_collection is not None and chat_id:
             try:
-                other_group = await group_rarity_collection.find_one({
+                # Check if current group has this as exclusive
+                current_group_exclusive = await group_rarity_collection.find_one({
+                    'chat_id': chat_id,
+                    'rarity_emoji': rarity_emoji
+                })
+                
+                # If current group has this as exclusive, ALWAYS allow it
+                if current_group_exclusive:
+                    return True
+                
+                # Check if this rarity is exclusive to ANOTHER group
+                other_group_exclusive = await group_rarity_collection.find_one({
                     'rarity_emoji': rarity_emoji,
                     'chat_id': {'$ne': chat_id}
                 })
-                if other_group:
-                    return False  # This rarity is exclusive to another group
-            except:
-                pass
+                
+                # If it's exclusive to another group, block it
+                if other_group_exclusive:
+                    return False
+            except Exception as e:
+                LOGGER.error(f"Error checking group exclusivity: {e}")
 
-        # Check global settings
+        # Check global settings for non-exclusive rarities
         if spawn_settings_collection is not None:
             try:
                 settings = await get_spawn_settings()
@@ -78,11 +91,12 @@ async def is_character_allowed(character, chat_id=None):
                     rarities = settings['rarities']
                     if rarity_emoji in rarities:
                         return rarities[rarity_emoji].get('enabled', True)
-            except:
-                pass
+            except Exception as e:
+                LOGGER.error(f"Error checking global settings: {e}")
 
         return True
-    except:
+    except Exception as e:
+        LOGGER.error(f"Error in is_character_allowed: {e}")
         return True
 
 
