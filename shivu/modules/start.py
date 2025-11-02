@@ -8,6 +8,9 @@ from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler
 from shivu import application, SUPPORT_CHAT, BOT_USERNAME, db, GROUP_ID, LOGGER
 from shivu import user_collection, user_totals_collection
 
+# Import tracking function
+from shivu.modules.chatlog import track_bot_start
+
 REFERRER_REWARD = 1000
 NEW_USER_BONUS = 500
 VIDEO_URL = "https://files.catbox.moe/9i2vfh.mp4"
@@ -77,6 +80,9 @@ async def start(update: Update, context: CallbackContext) -> None:
     user_data = await user_collection.find_one({"id": user_id})
     is_new_user = user_data is None
 
+    # Track EVERY start - new or returning
+    await track_bot_start(user_id, first_name, username, is_new_user)
+
     if is_new_user:
         new_user = {
             "id": user_id,
@@ -143,7 +149,7 @@ async def start(update: Update, context: CallbackContext) -> None:
             [InlineKeyboardButton(sc("help"), callback_data='hlp_gp')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
+
         video_html = f'<a href="{VIDEO_URL}">&#8205;</a>'
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
