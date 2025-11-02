@@ -2,6 +2,7 @@ import importlib
 import time
 import random
 import asyncio
+import traceback
 from html import escape
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CommandHandler, MessageHandler, filters, CallbackQueryHandler
@@ -27,8 +28,8 @@ last_characters = {}
 first_correct_guesses = {}
 last_user = {}
 warned_users = {}
-spawn_messages = {}  # Track spawn messages for deletion
-spawn_message_links = {}  # Track spawn message links for wrong guess button
+spawn_messages = {}
+spawn_message_links = {}
 
 # Import all modules
 for module_name in ALL_MODULES:
@@ -38,39 +39,58 @@ for module_name in ALL_MODULES:
     except Exception as e:
         LOGGER.error(f"Failed to import {module_name}: {e}")
 
-# Import spawn settings
+# Import spawn settings with group-specific support
 try:
-    from shivu.modules.rarity import spawn_settings_collection as ssc
-    spawn_settings_collection = ssc
+    from shivu.modules.rarity import spawn_settings_collection, group_rarity_collection, get_spawn_settings
+    LOGGER.info("✅ Rarity control system loaded successfully")
 except Exception as e:
     LOGGER.error(f"Could not import spawn settings: {e}")
+    spawn_settings_collection = None
+    group_rarity_collection = None
 
 
-async def is_character_allowed(character):
+async def is_character_allowed(character, chat_id=None):
+    """Check if character can spawn based on global and group-specific settings"""
     try:
         if character.get('removed', False):
             return False
 
-        if spawn_settings_collection:
-            settings = await spawn_settings_collection.find_one({'type': 'rarity_control'})
-            if settings:
-                char_rarity = character.get('rarity', '🟢 Common')
-                rarity_emoji = char_rarity.split(' ')[0] if isinstance(char_rarity, str) and ' ' in char_rarity else char_rarity
-                rarities = settings.get('rarities', {})
-                if rarity_emoji in rarities and not rarities[rarity_emoji].get('enabled', True):
-                    return False
+        char_rarity = character.get('rarity', '🟢 Common')
+        rarity_emoji = char_rarity.split(' ')[0] if isinstance(char_rarity, str) and ' ' in char_rarity else char_rarity
 
-            old_settings = await spawn_settings_collection.find_one({'type': 'global'})
-            if old_settings:
-                disabled_rarities = old_settings.get('disabled_rarities', [])
-                char_rarity = character.get('rarity', 'Common')
-                rarity_emoji = char_rarity.split(' ')[0] if isinstance(char_rarity, str) and ' ' in char_rarity else char_rarity
-                if rarity_emoji in disabled_rarities:
-                    return False
-                disabled_animes = old_settings.get('disabled_animes', [])
-                char_anime = character.get('anime', '').lower()
-                if char_anime in [anime.lower() for anime in disabled_animes]:
-                    return False
+        # Check group-specific rarity first
+        if chat_id and group_rarity_collection:
+            try:
+                group_setting = await group_rarity_collection.find_one({'chat_id': chat_id})
+                if group_setting:
+                    # This group has exclusive rarity - only allow that rarity
+                    return rarity_emoji == group_setting['rarity_emoji']
+            except:
+                pass
+
+        # Check if this rarity is reserved for another group
+        if group_rarity_collection:
+            try:
+                other_group = await group_rarity_collection.find_one({
+                    'rarity_emoji': rarity_emoji,
+                    'chat_id': {'$ne': chat_id}
+                })
+                if other_group:
+                    return False  # This rarity is exclusive to another group
+            except:
+                pass
+
+        # Check global rarity settings
+        if spawn_settings_collection:
+            try:
+                settings = await get_spawn_settings()
+                if settings and settings.get('rarities'):
+                    rarities = settings['rarities']
+                    if rarity_emoji in rarities:
+                        return rarities[rarity_emoji].get('enabled', True)
+            except:
+                pass
+
         return True
     except:
         return True
@@ -101,45 +121,33 @@ async def despawn_character(chat_id, message_id, character, context):
     try:
         await asyncio.sleep(DESPAWN_TIME)
 
-        # Check if character was grabbed - if yes, don't show despawn message
         if chat_id in first_correct_guesses:
-            # Clean up without showing despawn message
             last_characters.pop(chat_id, None)
             spawn_messages.pop(chat_id, None)
             spawn_message_links.pop(chat_id, None)
             return
 
-        # Delete spawn message
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-        except BadRequest:
+        except:
             pass
 
-        # Send missed message
         rarity = character.get('rarity', '🟢 Common')
         rarity_emoji = rarity.split(' ')[0] if isinstance(rarity, str) and ' ' in rarity else '🟢'
 
         missed_msg = await context.bot.send_photo(
             chat_id=chat_id,
             photo=character['img_url'],
-            caption=f"""⏰ ᴛɪᴍᴇ's ᴜᴘ! ʏᴏᴜ ᴀʟʟ ᴍɪssᴇᴅ ᴛʜɪs ᴡᴀɪғᴜ!
-
-{rarity_emoji} ɴᴀᴍᴇ: <b>{character.get('name', 'Unknown')}</b>
-⚡ ᴀɴɪᴍᴇ: <b>{character.get('anime', 'Unknown')}</b>
-🎯 ʀᴀʀɪᴛʏ: <b>{rarity}</b>
-
-💔 ʙᴇᴛᴛᴇʀ ʟᴜᴄᴋ ɴᴇxᴛ ᴛɪᴍᴇ!""",
+            caption=f"⏰ ᴛɪᴍᴇ's ᴜᴘ!\n{rarity_emoji} ɴᴀᴍᴇ: <b>{character.get('name', 'Unknown')}</b>\n⚡ ᴀɴɪᴍᴇ: <b>{character.get('anime', 'Unknown')}</b>\n💔 ʙᴇᴛᴛᴇʀ ʟᴜᴄᴋ ɴᴇxᴛ ᴛɪᴍᴇ!",
             parse_mode='HTML'
         )
 
-        # Delete missed message after 10 seconds
         await asyncio.sleep(10)
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=missed_msg.message_id)
-        except BadRequest:
+        except:
             pass
 
-        # Clean up
         last_characters.pop(chat_id, None)
         spawn_messages.pop(chat_id, None)
         spawn_message_links.pop(chat_id, None)
@@ -186,6 +194,7 @@ async def message_counter(update: Update, context):
 
 
 async def send_image(update: Update, context):
+    """Enhanced spawn with group-specific rarity support"""
     chat_id = update.effective_chat.id
     try:
         all_characters = list(await collection.find({}).to_list(length=None))
@@ -198,75 +207,82 @@ async def send_image(update: Update, context):
         if len(sent_characters[chat_id]) >= len(all_characters):
             sent_characters[chat_id] = []
 
-        available_characters = [c for c in all_characters if 'id' in c and c.get('id') not in sent_characters[chat_id]]
-        if not available_characters:
-            available_characters = all_characters
+        available = [c for c in all_characters if 'id' in c and c.get('id') not in sent_characters[chat_id]]
+        if not available:
+            available = all_characters
             sent_characters[chat_id] = []
 
-        allowed_characters = [char for char in available_characters if await is_character_allowed(char)]
-        if not allowed_characters:
+        # Filter by group-specific or global settings
+        allowed = [char for char in available if await is_character_allowed(char, chat_id)]
+        if not allowed:
+            LOGGER.warning(f"No allowed characters for chat {chat_id}")
             return
 
         character = None
         try:
-            if spawn_settings_collection:
-                settings = await spawn_settings_collection.find_one({'type': 'rarity_control'})
-                if settings and settings.get('rarities'):
-                    rarities = settings['rarities']
-                    rarity_groups = {}
-                    for char in allowed_characters:
-                        char_rarity = char.get('rarity', '🟢 Common')
-                        rarity_emoji = char_rarity.split(' ')[0] if isinstance(char_rarity, str) and ' ' in char_rarity else char_rarity
-                        if rarity_emoji not in rarity_groups:
-                            rarity_groups[rarity_emoji] = []
-                        rarity_groups[rarity_emoji].append(char)
+            # Check if group has specific rarity
+            if group_rarity_collection:
+                group_setting = await group_rarity_collection.find_one({'chat_id': chat_id})
+                if group_setting:
+                    # Only spawn the group's specific rarity
+                    character = random.choice(allowed)
+                    LOGGER.info(f"Group {chat_id} spawning exclusive rarity: {group_setting['rarity_emoji']}")
+                else:
+                    # Use weighted selection based on global settings
+                    if spawn_settings_collection:
+                        settings = await get_spawn_settings()
+                        if settings and settings.get('rarities'):
+                            rarities = settings['rarities']
+                            rarity_groups = {}
+                            
+                            for char in allowed:
+                                char_rarity = char.get('rarity', '🟢 Common')
+                                emoji = char_rarity.split(' ')[0] if isinstance(char_rarity, str) and ' ' in char_rarity else char_rarity
+                                if emoji not in rarity_groups:
+                                    rarity_groups[emoji] = []
+                                rarity_groups[emoji].append(char)
 
-                    weighted_chars = []
-                    for emoji, chars in rarity_groups.items():
-                        if emoji in rarities and rarities[emoji].get('enabled', True):
-                            chance = rarities[emoji].get('chance', 0)
-                            weight = max(1, int(chance * 10))
-                            weighted_chars.extend(chars * weight)
+                            weighted = []
+                            for emoji, chars in rarity_groups.items():
+                                if emoji in rarities and rarities[emoji].get('enabled', True):
+                                    weight = max(1, int(rarities[emoji].get('chance', 5) * 10))
+                                    weighted.extend(chars * weight)
 
-                    if weighted_chars:
-                        character = random.choice(weighted_chars)
-        except:
-            pass
+                            if weighted:
+                                character = random.choice(weighted)
+        except Exception as e:
+            LOGGER.error(f"Error in weighted selection: {e}")
 
         if not character:
-            character = random.choice(allowed_characters)
+            character = random.choice(allowed)
 
         sent_characters[chat_id].append(character['id'])
         last_characters[chat_id] = character
         first_correct_guesses.pop(chat_id, None)
 
         rarity = character.get('rarity', 'Common')
-        rarity_emoji = rarity.split(' ')[0] if isinstance(rarity, str) and ' ' in rarity else ''
+        rarity_emoji = rarity.split(' ')[0] if isinstance(rarity, str) and ' ' in rarity else '🟢'
 
         spawn_msg = await context.bot.send_photo(
             chat_id=chat_id,
             photo=character['img_url'],
-            caption=f"***{rarity_emoji} ʟᴏᴏᴋ ᴀ ᴡᴀɪғᴜ ʜᴀs sᴘᴀᴡɴᴇᴅ !! ᴍᴀᴋᴇ ʜᴇʀ ʏᴏᴜʀ's ʙʏ ɢɪᴠɪɴɢ\n/grab 𝚆𝚊𝚒𝚏𝚞 𝚗𝚊𝚖𝚎\n\n⏰ ʏᴏᴜ ʜᴀᴠᴇ {DESPAWN_TIME // 60} ᴍɪɴᴜᴛᴇs ᴛᴏ ɢʀᴀʙ!***",
-            parse_mode='Markdown'
+            caption=f"{rarity_emoji} ʟᴏᴏᴋ ᴀ ᴡᴀɪғᴜ ʜᴀs sᴘᴀᴡɴᴇᴅ!!\nᴍᴀᴋᴇ ʜᴇʀ ʏᴏᴜʀ's ʙʏ /grab ᴡᴀɪғᴜ ɴᴀᴍᴇ\n⏰ {DESPAWN_TIME // 60} ᴍɪɴᴜᴛᴇs ᴛᴏ ɢʀᴀʙ!",
+            parse_mode=None
         )
 
-        # Store spawn message ID and link
         spawn_messages[chat_id] = spawn_msg.message_id
         
-        # Create message link for the button
         chat_username = update.effective_chat.username
         if chat_username:
             spawn_message_links[chat_id] = f"https://t.me/{chat_username}/{spawn_msg.message_id}"
         else:
-            # For private groups without username, use the chat ID format
             chat_id_str = str(chat_id).replace('-100', '')
             spawn_message_links[chat_id] = f"https://t.me/c/{chat_id_str}/{spawn_msg.message_id}"
 
-        # Schedule despawn
         asyncio.create_task(despawn_character(chat_id, spawn_msg.message_id, character, context))
 
     except Exception as e:
-        LOGGER.error(f"Error in send_image: {e}")
+        LOGGER.error(f"Error in send_image: {e}\n{traceback.format_exc()}")
 
 
 async def guess(update: Update, context):
@@ -278,7 +294,7 @@ async def guess(update: Update, context):
             return
 
         if chat_id in first_correct_guesses:
-            await update.message.reply_html('<b>🚫 ᴡᴀɪғᴜ ᴀʟʀᴇᴀᴅʏ ɢʀᴀʙʙᴇᴅ ʙʏ sᴏᴍᴇᴏɴᴇ ᴇʟsᴇ ⚡. ʙᴇᴛᴛᴇʀ ʟᴜᴄᴋ ɴᴇxᴛ ᴛɪᴍᴇ..!!</b>')
+            await update.message.reply_html('<b>🚫 ᴡᴀɪғᴜ ᴀʟʀᴇᴀᴅʏ ɢʀᴀʙʙᴇᴅ!</b>')
             return
 
         guess_text = ' '.join(context.args).lower() if context.args else ''
@@ -288,7 +304,7 @@ async def guess(update: Update, context):
             return
 
         if "()" in guess_text or "&" in guess_text:
-            await update.message.reply_html("<b>ɴᴀʜʜ ʏᴏᴜ ᴄᴀɴ'ᴛ ᴜsᴇ ᴛʜɪs ᴛʏᴘᴇs ᴏғ ᴡᴏʀᴅs...❌</b>")
+            await update.message.reply_html("<b>ɪɴᴠᴀʟɪᴅ ᴄʜᴀʀᴀᴄᴛᴇʀs!❌</b>")
             return
 
         character_name = last_characters[chat_id].get('name', '').lower()
@@ -301,11 +317,10 @@ async def guess(update: Update, context):
         if is_correct:
             first_correct_guesses[chat_id] = user_id
 
-            # Delete spawn message
             if chat_id in spawn_messages:
                 try:
                     await context.bot.delete_message(chat_id=chat_id, message_id=spawn_messages[chat_id])
-                except BadRequest:
+                except:
                     pass
                 spawn_messages.pop(chat_id, None)
 
@@ -346,13 +361,9 @@ async def guess(update: Update, context):
                 })
 
             group_info = await top_global_groups_collection.find_one({'group_id': chat_id})
-            group_update_fields = {}
-            if group_info and update.effective_chat.title != group_info.get('group_name'):
-                group_update_fields['group_name'] = update.effective_chat.title
-
             if group_info:
-                if group_update_fields:
-                    await top_global_groups_collection.update_one({'group_id': chat_id}, {'$set': group_update_fields})
+                if update.effective_chat.title != group_info.get('group_name'):
+                    await top_global_groups_collection.update_one({'group_id': chat_id}, {'$set': {'group_name': update.effective_chat.title}})
                 await top_global_groups_collection.update_one({'group_id': chat_id}, {'$inc': {'count': 1}})
             else:
                 await top_global_groups_collection.insert_one({'group_id': chat_id, 'group_name': update.effective_chat.title, 'count': 1})
@@ -361,51 +372,43 @@ async def guess(update: Update, context):
             keyboard = [[InlineKeyboardButton("🪼 ʜᴀʀᴇᴍ", switch_inline_query_current_chat=f"collection.{user_id}")]]
 
             rarity = character.get('rarity', '🟢 Common')
-            if isinstance(rarity, str) and ' ' in rarity:
-                rarity_parts = rarity.split(' ', 1)
-                rarity_emoji = rarity_parts[0]
-                rarity_text = rarity_parts[1] if len(rarity_parts) > 1 else 'Common'
-            else:
-                rarity_emoji = '🟢'
-                rarity_text = rarity
+            rarity_emoji = rarity.split(' ')[0] if isinstance(rarity, str) and ' ' in rarity else '🟢'
+            rarity_text = rarity.split(' ', 1)[1] if isinstance(rarity, str) and ' ' in rarity else 'Common'
 
             await update.message.reply_text(
-                f'Congratulations 🎊\n<b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> You grabbed a new waifu!! ✅️\n\n'
-                f'🎀 𝙉𝙖𝙢𝙚: <code>{character.get("name", "Unknown")}</code>\n'
-                f'{rarity_emoji} 𝙍𝙖𝙧𝙞𝙩𝙮: <code>{rarity_text}</code>\n'
-                f'⚡ 𝘼𝙣𝙞𝙢𝙚: <code>{character.get("anime", "Unknown")}</code>\n\n'
-                f'✧⁠ Character successfully added in your harem',
+                f'🎊 <b><a href="tg://user?id={user_id}">{escape(update.effective_user.first_name)}</a></b> ɢʀᴀʙʙᴇᴅ ᴀ ɴᴇᴡ ᴡᴀɪғᴜ!\n'
+                f'🎀 ɴᴀᴍᴇ: <code>{character.get("name", "Unknown")}</code>\n'
+                f'{rarity_emoji} ʀᴀʀɪᴛʏ: <code>{rarity_text}</code>\n'
+                f'⚡ ᴀɴɪᴍᴇ: <code>{character.get("anime", "Unknown")}</code>\n'
+                f'✧ ᴀᴅᴅᴇᴅ ᴛᴏ ʏᴏᴜʀ ʜᴀʀᴇᴍ',
                 parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
             
-            # Clean up spawn message link after successful grab
             spawn_message_links.pop(chat_id, None)
         else:
-            # Wrong guess - show button to view spawn message
             keyboard = []
             if chat_id in spawn_message_links:
-                keyboard.append([InlineKeyboardButton("📍 ᴠɪᴇᴡ sᴘᴀᴡɴ ᴍᴇssᴀɢᴇ", url=spawn_message_links[chat_id])])
+                keyboard.append([InlineKeyboardButton("📍 ᴠɪᴇᴡ sᴘᴀᴡɴ", url=spawn_message_links[chat_id])])
             
-            reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
             await update.message.reply_html(
-                '<b>ᴘʟᴇᴀsᴇ ᴡʀɪᴛᴇ ᴀ ᴄᴏʀʀᴇᴄᴛ ɴᴀᴍᴇ..❌</b>',
-                reply_markup=reply_markup
+                '<b>ᴡʀᴏɴɢ ɴᴀᴍᴇ!❌</b>',
+                reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
             )
     except Exception as e:
-        LOGGER.error(f"Error in guess: {e}")
+        LOGGER.error(f"Error in guess: {e}\n{traceback.format_exc()}")
 
 
 def main():
-    # Register handlers
     application.add_handler(CommandHandler(["grab", "g"], guess, block=False))
     application.add_handler(MessageHandler(filters.ALL, message_counter, block=False))
 
+    LOGGER.info("✅ Bot handlers registered")
     LOGGER.info("Starting bot...")
     application.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
     shivuu.start()
-    LOGGER.info("Bot started successfully")
+    LOGGER.info("✅ Bot started successfully")
     main()
