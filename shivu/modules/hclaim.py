@@ -1,11 +1,13 @@
 import asyncio
 from datetime import datetime, timedelta
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackContext
 from shivu import application, user_collection, collection, LOGGER
 import random
 
 claim_lock = {}
+MAIN_GROUP_ID = -1003100468240
+MAIN_GROUP_LINK = "https://t.me/PICK_X_SUPPORT"
 
 async def format_time_delta(delta):
     seconds = delta.total_seconds()
@@ -17,18 +19,32 @@ async def get_unique_characters(user_id, rarities=['🟢 Common', '🟣 Rare', '
     try:
         user_data = await user_collection.find_one({'id': user_id})
         claimed_ids = [c.get('id') for c in user_data.get('characters', [])] if user_data else []
-        
+
         available = []
         async for char in collection.find({'rarity': {'$in': rarities}}):
             if char.get('id') not in claimed_ids:
                 available.append(char)
-        
+
         return [random.choice(available)] if available else []
     except Exception as e:
         LOGGER.error(f"[HCLAIM] Error fetching characters: {e}")
         return []
 
 async def hclaim(update: Update, context: CallbackContext):
+    chat_id = update.effective_chat.id
+    
+    # Check if command is used in the main group
+    if chat_id != MAIN_GROUP_ID:
+        keyboard = [[InlineKeyboardButton("🔗 ᴊᴏɪɴ ᴍᴀɪɴ ɢʀᴏᴜᴘ", url=MAIN_GROUP_LINK)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            "⚠️ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ᴄᴀɴ ᴏɴʟʏ ʙᴇ ᴜsᴇᴅ ɪɴ ᴛʜᴇ ᴍᴀɪɴ ɢʀᴏᴜᴘ!\n\n"
+            "📍 ᴘʟᴇᴀsᴇ ᴊᴏɪɴ ᴏᴜʀ ᴍᴀɪɴ ɢʀᴏᴜᴘ ᴛᴏ ᴜsᴇ ᴛʜɪs ғᴇᴀᴛᴜʀᴇ.",
+            reply_markup=reply_markup
+        )
+        return
+    
     user_id = update.effective_user.id
     first_name = update.effective_user.first_name
     username = update.effective_user.username
@@ -61,7 +77,7 @@ async def hclaim(update: Update, context: CallbackContext):
             return
 
         char = characters[0]
-        
+
         await user_collection.update_one(
             {'id': user_id},
             {
