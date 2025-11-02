@@ -19,7 +19,7 @@ group_user_totals_collection = db['group_user_totalsssssss']
 top_global_groups_collection = db['top_global_groups']
 
 DEFAULT_MESSAGE_FREQUENCY = 70
-DESPAWN_TIME = 180  # 3 minutes (180 seconds)
+DESPAWN_TIME = 180
 
 locks = {}
 message_counts = {}
@@ -39,18 +39,18 @@ for module_name in ALL_MODULES:
     except Exception as e:
         LOGGER.error(f"Failed to import {module_name}: {e}")
 
-# Import spawn settings with group-specific support
+# Import spawn settings
 try:
     from shivu.modules.rarity import spawn_settings_collection, group_rarity_collection, get_spawn_settings
-    LOGGER.info("✅ Rarity control system loaded successfully")
+    LOGGER.info("✅ Rarity system loaded")
 except Exception as e:
-    LOGGER.error(f"Could not import spawn settings: {e}")
+    LOGGER.error(f"Could not import rarity: {e}")
     spawn_settings_collection = None
     group_rarity_collection = None
 
 
 async def is_character_allowed(character, chat_id=None):
-    """Check if character can spawn based on global and group-specific settings"""
+    """Check if character can spawn - Group gets exclusive + global rarities"""
     try:
         if character.get('removed', False):
             return False
@@ -58,17 +58,7 @@ async def is_character_allowed(character, chat_id=None):
         char_rarity = character.get('rarity', '🟢 Common')
         rarity_emoji = char_rarity.split(' ')[0] if isinstance(char_rarity, str) and ' ' in char_rarity else char_rarity
 
-        # Check group-specific rarity first
-        if chat_id and group_rarity_collection is not None:
-            try:
-                group_setting = await group_rarity_collection.find_one({'chat_id': chat_id})
-                if group_setting:
-                    # This group has exclusive rarity - only allow that rarity
-                    return rarity_emoji == group_setting['rarity_emoji']
-            except:
-                pass
-
-        # Check if this rarity is reserved for another group
+        # Check if this rarity is exclusive to ANOTHER group (not current group)
         if group_rarity_collection is not None:
             try:
                 other_group = await group_rarity_collection.find_one({
@@ -80,7 +70,7 @@ async def is_character_allowed(character, chat_id=None):
             except:
                 pass
 
-        # Check global rarity settings
+        # Check global settings
         if spawn_settings_collection is not None:
             try:
                 settings = await get_spawn_settings()
@@ -153,7 +143,7 @@ async def despawn_character(chat_id, message_id, character, context):
         spawn_message_links.pop(chat_id, None)
 
     except Exception as e:
-        LOGGER.error(f"Error in despawn_character: {e}")
+        LOGGER.error(f"Error in despawn: {e}")
 
 
 async def message_counter(update: Update, context):
@@ -194,7 +184,7 @@ async def message_counter(update: Update, context):
 
 
 async def send_image(update: Update, context):
-    """Enhanced spawn with group-specific rarity support"""
+    """Enhanced spawn - Group gets exclusive rarity + all global rarities"""
     chat_id = update.effective_chat.id
     try:
         all_characters = list(await collection.find({}).to_list(length=None))
@@ -212,7 +202,7 @@ async def send_image(update: Update, context):
             available = all_characters
             sent_characters[chat_id] = []
 
-        # Filter by group-specific or global settings
+        # Filter by allowed characters (checks exclusivity and global settings)
         allowed = [char for char in available if await is_character_allowed(char, chat_id)]
         if not allowed:
             LOGGER.warning(f"No allowed characters for chat {chat_id}")
@@ -220,36 +210,69 @@ async def send_image(update: Update, context):
 
         character = None
         try:
-            # Check if group has specific rarity
+            # Check if group has exclusive rarity
             if group_rarity_collection is not None:
                 group_setting = await group_rarity_collection.find_one({'chat_id': chat_id})
+                
                 if group_setting:
-                    # Only spawn the group's specific rarity
-                    character = random.choice(allowed)
-                    LOGGER.info(f"Group {chat_id} spawning exclusive rarity: {group_setting['rarity_emoji']}")
-                else:
-                    # Use weighted selection based on global settings
-                    if spawn_settings_collection is not None:
-                        settings = await get_spawn_settings()
-                        if settings and settings.get('rarities'):
-                            rarities = settings['rarities']
-                            rarity_groups = {}
-                            
-                            for char in allowed:
-                                char_rarity = char.get('rarity', '🟢 Common')
-                                emoji = char_rarity.split(' ')[0] if isinstance(char_rarity, str) and ' ' in char_rarity else char_rarity
-                                if emoji not in rarity_groups:
-                                    rarity_groups[emoji] = []
-                                rarity_groups[emoji].append(char)
+                    # Group has exclusive rarity - add it to spawn pool
+                    exclusive_emoji = group_setting['rarity_emoji']
+                    exclusive_chance = group_setting.get('chance', 10.0)
+                    
+                    # Get global settings for weighted selection
+                    settings = await get_spawn_settings()
+                    if settings and settings.get('rarities'):
+                        rarities = settings['rarities']
+                        
+                        # Group characters by rarity
+                        rarity_groups = {}
+                        for char in allowed:
+                            char_rarity = char.get('rarity', '🟢 Common')
+                            emoji = char_rarity.split(' ')[0] if isinstance(char_rarity, str) and ' ' in char_rarity else char_rarity
+                            if emoji not in rarity_groups:
+                                rarity_groups[emoji] = []
+                            rarity_groups[emoji].append(char)
 
-                            weighted = []
-                            for emoji, chars in rarity_groups.items():
+                        # Build weighted list
+                        weighted = []
+                        
+                        # Add exclusive rarity with its custom chance
+                        if exclusive_emoji in rarity_groups:
+                            weight = max(1, int(exclusive_chance * 10))
+                            weighted.extend(rarity_groups[exclusive_emoji] * weight)
+                        
+                        # Add all other global enabled rarities
+                        for emoji, chars in rarity_groups.items():
+                            if emoji != exclusive_emoji:  # Skip exclusive (already added)
                                 if emoji in rarities and rarities[emoji].get('enabled', True):
                                     weight = max(1, int(rarities[emoji].get('chance', 5) * 10))
                                     weighted.extend(chars * weight)
 
-                            if weighted:
-                                character = random.choice(weighted)
+                        if weighted:
+                            character = random.choice(weighted)
+                            LOGGER.info(f"Chat {chat_id} - Exclusive: {exclusive_emoji} ({exclusive_chance}%) + Global")
+                else:
+                    # No exclusive - use only global weighted selection
+                    settings = await get_spawn_settings()
+                    if settings and settings.get('rarities'):
+                        rarities = settings['rarities']
+                        rarity_groups = {}
+                        
+                        for char in allowed:
+                            char_rarity = char.get('rarity', '🟢 Common')
+                            emoji = char_rarity.split(' ')[0] if isinstance(char_rarity, str) and ' ' in char_rarity else char_rarity
+                            if emoji not in rarity_groups:
+                                rarity_groups[emoji] = []
+                            rarity_groups[emoji].append(char)
+
+                        weighted = []
+                        for emoji, chars in rarity_groups.items():
+                            if emoji in rarities and rarities[emoji].get('enabled', True):
+                                weight = max(1, int(rarities[emoji].get('chance', 5) * 10))
+                                weighted.extend(chars * weight)
+
+                        if weighted:
+                            character = random.choice(weighted)
         except Exception as e:
             LOGGER.error(f"Error in weighted selection: {e}\n{traceback.format_exc()}")
 
