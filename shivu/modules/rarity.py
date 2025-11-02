@@ -1,6 +1,6 @@
 """
 Enhanced rarity.py - Group gets exclusive rarity + all global rarities
-Replace your rarity.py with this
+Fixed version with proper spawn logic
 """
 
 import traceback
@@ -55,17 +55,20 @@ NAME_TO_EMOJI = {v: k for k, v in EMOJI_TO_NAME.items()}
 
 
 async def get_spawn_settings():
+    """Get global spawn settings"""
     try:
         settings = await spawn_settings_collection.find_one({'type': 'rarity_control'})
         if not settings:
             settings = {'type': 'rarity_control', 'rarities': DEFAULT_RARITIES.copy()}
             await spawn_settings_collection.insert_one(settings)
         return settings
-    except:
+    except Exception as e:
+        LOGGER.error(f"Error getting spawn settings: {e}")
         return {'type': 'rarity_control', 'rarities': DEFAULT_RARITIES.copy()}
 
 
 async def update_spawn_settings(rarities):
+    """Update global spawn settings"""
     try:
         await spawn_settings_collection.update_one(
             {'type': 'rarity_control'},
@@ -73,11 +76,22 @@ async def update_spawn_settings(rarities):
             upsert=True
         )
         return True
-    except:
+    except Exception as e:
+        LOGGER.error(f"Error updating spawn settings: {e}")
         return False
 
 
+async def get_group_exclusive(chat_id):
+    """Get exclusive rarity settings for a specific group"""
+    try:
+        return await group_rarity_collection.find_one({'chat_id': chat_id})
+    except Exception as e:
+        LOGGER.error(f"Error getting group exclusive: {e}")
+        return None
+
+
 def normalize_chances(rarities):
+    """Normalize chances to sum to 100%"""
     enabled = {k: v for k, v in rarities.items() if v['enabled']}
     if not enabled:
         return rarities
@@ -89,6 +103,7 @@ def normalize_chances(rarities):
 
 
 def find_rarity_emoji(rarity_input):
+    """Find rarity emoji from input string"""
     rarity_input = rarity_input.lower().strip()
     if rarity_input in DEFAULT_RARITIES:
         return rarity_input
@@ -137,6 +152,26 @@ async def setg_command(update: Update, context: CallbackContext):
         rarity_full = RARITY_MAP[rarity_num]
         rarity_emoji = rarity_full.split(' ')[0]
 
+        # Check if this rarity is already exclusive to another group
+        existing = await group_rarity_collection.find_one({
+            'rarity_emoji': rarity_emoji,
+            'chat_id': {'$ne': chat_id}
+        })
+        
+        if existing:
+            await update.message.reply_text(
+                f"⚠️ Warning: {rarity_emoji} {rarity_full} is already exclusive to chat `{existing['chat_id']}`!\n"
+                f"Setting it for this group will remove it from the other group.",
+                parse_mode='Markdown'
+            )
+
+        # Remove this rarity from any other group
+        await group_rarity_collection.delete_many({
+            'rarity_emoji': rarity_emoji,
+            'chat_id': {'$ne': chat_id}
+        })
+
+        # Set for current group
         await group_rarity_collection.update_one(
             {'chat_id': chat_id},
             {'$set': {
@@ -164,7 +199,7 @@ async def setg_command(update: Update, context: CallbackContext):
 
     except Exception as e:
         LOGGER.error(f"Error in setg: {e}\n{traceback.format_exc()}")
-        await update.message.reply_text("❌ Error!")
+        await update.message.reply_text("❌ Error setting group exclusive!")
 
 
 async def unsetg_command(update: Update, context: CallbackContext):
@@ -230,6 +265,7 @@ async def listg_command(update: Update, context: CallbackContext):
 
 
 async def rview_command(update: Update, context: CallbackContext):
+    """View global rarity settings"""
     try:
         if update.effective_user.id != OWNER_ID:
             await update.message.reply_text("⚠️ Owner only!")
@@ -266,6 +302,7 @@ async def rview_command(update: Update, context: CallbackContext):
 
 
 async def renable_command(update: Update, context: CallbackContext):
+    """Enable a global rarity"""
     try:
         if update.effective_user.id != OWNER_ID:
             return
@@ -280,7 +317,7 @@ async def renable_command(update: Update, context: CallbackContext):
 
         settings = await get_spawn_settings()
         rarities = settings['rarities']
-        
+
         if rarities[emoji]['enabled']:
             await update.message.reply_text(f"ℹ️ {emoji} {rarities[emoji]['name']} already enabled")
             return
@@ -295,6 +332,7 @@ async def renable_command(update: Update, context: CallbackContext):
 
 
 async def rdisable_command(update: Update, context: CallbackContext):
+    """Disable a global rarity"""
     try:
         if update.effective_user.id != OWNER_ID:
             return
@@ -309,7 +347,7 @@ async def rdisable_command(update: Update, context: CallbackContext):
 
         settings = await get_spawn_settings()
         rarities = settings['rarities']
-        
+
         if not rarities[emoji]['enabled']:
             await update.message.reply_text(f"ℹ️ {emoji} {rarities[emoji]['name']} already disabled")
             return
@@ -324,6 +362,7 @@ async def rdisable_command(update: Update, context: CallbackContext):
 
 
 async def rchance_command(update: Update, context: CallbackContext):
+    """Set chance for a global rarity"""
     try:
         if update.effective_user.id != OWNER_ID:
             return
@@ -359,6 +398,7 @@ async def rchance_command(update: Update, context: CallbackContext):
 
 
 async def rnormalize_command(update: Update, context: CallbackContext):
+    """Normalize all chances to sum to 100%"""
     try:
         if update.effective_user.id != OWNER_ID:
             return
@@ -366,10 +406,10 @@ async def rnormalize_command(update: Update, context: CallbackContext):
         settings = await get_spawn_settings()
         rarities = settings['rarities']
         old = sum(r['chance'] for r in rarities.values() if r['enabled'])
-        
+
         rarities = normalize_chances(rarities)
         await update_spawn_settings(rarities)
-        
+
         new = sum(r['chance'] for r in rarities.values() if r['enabled'])
         await update.message.reply_text(f"✅ Normalized!\n`{old:.2f}%` → `{new:.2f}%`", parse_mode='Markdown')
 
@@ -379,11 +419,12 @@ async def rnormalize_command(update: Update, context: CallbackContext):
 
 
 async def rreset_command(update: Update, context: CallbackContext):
+    """Reset to default settings"""
     try:
         if update.effective_user.id != OWNER_ID:
             return
         await update_spawn_settings(DEFAULT_RARITIES.copy())
-        await update.message.reply_text("✅ Reset!")
+        await update.message.reply_text("✅ Reset to default settings!")
     except Exception as e:
         LOGGER.error(f"Error in rreset: {e}")
         await update.message.reply_text("❌ Error!")
@@ -404,4 +445,4 @@ try:
 except Exception as e:
     LOGGER.error(f"❌ Failed to register handlers: {e}")
 
-__all__ = ['spawn_settings_collection', 'group_rarity_collection', 'get_spawn_settings']
+__all__ = ['spawn_settings_collection', 'group_rarity_collection', 'get_spawn_settings', 'get_group_exclusive']
