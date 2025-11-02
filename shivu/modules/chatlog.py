@@ -9,6 +9,24 @@ from shivu import user_collection, shivuu as app, LEAVELOGS, JOINLOGS
 async def lul_message(chat_id: int, message: str):
     await app.send_message(chat_id=chat_id, text=message)
 
+@app.on_message(filters.command("start") & filters.private)
+async def start_command(client: Client, message: Message):
+    user = message.from_user
+    user_mention = user.mention
+    user_id = user.id
+    username = f"@{user.username}" if user.username else "ɴᴏ ᴜsᴇʀɴᴀᴍᴇ"
+    
+    # Log to JOINLOGS
+    start_log = f"˹𝐁ᴏᴛ 𝐒ᴛᴀʀᴛᴇᴅ˼ 🌸\n#BOTSTART\n ᴜsᴇʀ : {user_mention}\n ᴜsᴇʀ ɪᴅ : {user_id}\n ᴜsᴇʀɴᴀᴍᴇ : {username}"
+    await lul_message(JOINLOGS, start_log)
+    
+    # Reply to user
+    await message.reply_text(
+        f"ʜᴇʏ {user_mention}! 👋\n\n"
+        "ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴛʜᴇ ʙᴏᴛ! 🥀\n"
+        "ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ɢʀᴀʙ ʏᴏᴜʀ ғᴀᴠᴏʀɪᴛᴇ ᴡᴀɪғᴜs!"
+    )
+
 @app.on_message(filters.new_chat_members)
 async def on_new_chat_members(client: Client, message: Message):
     if (await client.get_me()).id in [user.id for user in message.new_chat_members]:
@@ -21,7 +39,7 @@ async def on_new_chat_members(client: Client, message: Message):
             chatusername = "ᴩʀɪᴠᴀᴛᴇ ᴄʜᴀᴛ"
         lemda_text = f"˹𝐆ʀᴀʙʙɪɴɢ 𝐘ᴏᴜʀ 𝐖ᴀɪғᴜ˼ 🥀\n#NEWCHAT \n ᴄʜᴀᴛ ᴛɪᴛʟᴇ : {matlabi_jhanto}\n ᴄʜᴀᴛ ɪᴅ : {chat_id}\n ᴄʜᴀᴛ ᴜɴᴀᴍᴇ : {chatusername}\n ᴀᴅᴅᴇᴅ ʙʏ : {added_by}"
         await lul_message(JOINLOGS, lemda_text)
-        
+
 
 @app.on_message(filters.left_chat_member)
 async def on_left_chat_member(_, message: Message):
