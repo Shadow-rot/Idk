@@ -22,7 +22,13 @@ async def track_bot_start(user_id: int, first_name: str, username: str, is_new: 
     try:
         user_mention = f"<a href='tg://user?id={user_id}'>{first_name}</a>"
         username_str = f"@{username}" if username else "ɴᴏ ᴜsᴇʀɴᴀᴍᴇ"
-        status = "ɴᴇᴡ ᴜsᴇʀ" if is_new else "ʀᴇᴛᴜʀɴɪɴɢ"
+        
+        if is_new:
+            # Count total users in database
+            total_users = await user_collection.count_documents({})
+            status = f"ɴᴇᴡ ᴜsᴇʀ #{total_users}"
+        else:
+            status = "ʀᴇᴛᴜʀɴɪɴɢ ᴜsᴇʀ"
         
         start_log = f"˹𝐁ᴏᴛ 𝐒ᴛᴀʀᴛᴇᴅ˼ 🌸\n#BOTSTART\n sᴛᴀᴛᴜs : {status}\n ᴜsᴇʀ : {user_mention}\n ᴜsᴇʀ ɪᴅ : `{user_id}`\n ᴜsᴇʀɴᴀᴍᴇ : {username_str}"
         await lul_message(JOINLOGS, start_log)
