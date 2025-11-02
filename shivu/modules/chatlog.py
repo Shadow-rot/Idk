@@ -15,23 +15,20 @@ async def lul_message(chat_id: int, message: str):
     except Exception as e:
         print(f"Unexpected error sending message: {e}")
 
-@app.on_message(filters.command("start") & filters.private)
-async def start_command(client: Client, message: Message):
-    user = message.from_user
-    user_mention = user.mention
-    user_id = user.id
-    username = f"@{user.username}" if user.username else "ɴᴏ ᴜsᴇʀɴᴀᴍᴇ"
-    
-    # Reply to user first
-    await message.reply_text(
-        f"ʜᴇʏ {user_mention}! 👋\n\n"
-        "ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴛʜᴇ ʙᴏᴛ! 🥀\n"
-        "ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ɢʀᴀʙ ʏᴏᴜʀ ғᴀᴠᴏʀɪᴛᴇ ᴡᴀɪғᴜs!"
-    )
-    
-    # Log to JOINLOGS
-    start_log = f"˹𝐁ᴏᴛ 𝐒ᴛᴀʀᴛᴇᴅ˼ 🌸\n#BOTSTART\n ᴜsᴇʀ : {user_mention}\n ᴜsᴇʀ ɪᴅ : `{user_id}`\n ᴜsᴇʀɴᴀᴍᴇ : {username}"
-    await lul_message(JOINLOGS, start_log)
+
+# Track every bot start
+async def track_bot_start(user_id: int, first_name: str, username: str, is_new: bool):
+    """Log every bot start to JOINLOGS"""
+    try:
+        user_mention = f"<a href='tg://user?id={user_id}'>{first_name}</a>"
+        username_str = f"@{username}" if username else "ɴᴏ ᴜsᴇʀɴᴀᴍᴇ"
+        status = "ɴᴇᴡ ᴜsᴇʀ" if is_new else "ʀᴇᴛᴜʀɴɪɴɢ"
+        
+        start_log = f"˹𝐁ᴏᴛ 𝐒ᴛᴀʀᴛᴇᴅ˼ 🌸\n#BOTSTART\n sᴛᴀᴛᴜs : {status}\n ᴜsᴇʀ : {user_mention}\n ᴜsᴇʀ ɪᴅ : `{user_id}`\n ᴜsᴇʀɴᴀᴍᴇ : {username_str}"
+        await lul_message(JOINLOGS, start_log)
+    except Exception as e:
+        print(f"Failed to track bot start: {e}")
+
 
 @app.on_message(filters.new_chat_members)
 async def on_new_chat_members(client: Client, message: Message):
