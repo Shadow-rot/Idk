@@ -59,7 +59,7 @@ async def is_character_allowed(character, chat_id=None):
         rarity_emoji = char_rarity.split(' ')[0] if isinstance(char_rarity, str) and ' ' in char_rarity else char_rarity
 
         # Check group-specific rarity first
-        if chat_id and group_rarity_collection:
+        if chat_id and group_rarity_collection is not None:
             try:
                 group_setting = await group_rarity_collection.find_one({'chat_id': chat_id})
                 if group_setting:
@@ -69,7 +69,7 @@ async def is_character_allowed(character, chat_id=None):
                 pass
 
         # Check if this rarity is reserved for another group
-        if group_rarity_collection:
+        if group_rarity_collection is not None:
             try:
                 other_group = await group_rarity_collection.find_one({
                     'rarity_emoji': rarity_emoji,
@@ -81,7 +81,7 @@ async def is_character_allowed(character, chat_id=None):
                 pass
 
         # Check global rarity settings
-        if spawn_settings_collection:
+        if spawn_settings_collection is not None:
             try:
                 settings = await get_spawn_settings()
                 if settings and settings.get('rarities'):
@@ -221,7 +221,7 @@ async def send_image(update: Update, context):
         character = None
         try:
             # Check if group has specific rarity
-            if group_rarity_collection:
+            if group_rarity_collection is not None:
                 group_setting = await group_rarity_collection.find_one({'chat_id': chat_id})
                 if group_setting:
                     # Only spawn the group's specific rarity
@@ -229,7 +229,7 @@ async def send_image(update: Update, context):
                     LOGGER.info(f"Group {chat_id} spawning exclusive rarity: {group_setting['rarity_emoji']}")
                 else:
                     # Use weighted selection based on global settings
-                    if spawn_settings_collection:
+                    if spawn_settings_collection is not None:
                         settings = await get_spawn_settings()
                         if settings and settings.get('rarities'):
                             rarities = settings['rarities']
@@ -251,7 +251,7 @@ async def send_image(update: Update, context):
                             if weighted:
                                 character = random.choice(weighted)
         except Exception as e:
-            LOGGER.error(f"Error in weighted selection: {e}")
+            LOGGER.error(f"Error in weighted selection: {e}\n{traceback.format_exc()}")
 
         if not character:
             character = random.choice(allowed)
