@@ -1,7 +1,9 @@
-from pymongo import TEXT
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
-from shivu import application, collection
+from shivu import application, db
+
+# Get the correct collection
+collection = db['anime_characters_lol']
 
 RARITY_MAP = {
     1: "🟢 Common",
