@@ -226,38 +226,63 @@ async def send_image(update: Update, context):
                         
                         # Group characters by rarity
                         rarity_groups = {}
+                        exclusive_chars = []
+                        
                         for char in allowed:
                             char_rarity = char.get('rarity', '🟢 Common')
                             emoji = char_rarity.split(' ')[0] if isinstance(char_rarity, str) and ' ' in char_rarity else char_rarity
-                            if emoji not in rarity_groups:
-                                rarity_groups[emoji] = []
-                            rarity_groups[emoji].append(char)
+                            
+                            if emoji == exclusive_emoji:
+                                exclusive_chars.append(char)
+                            else:
+                                if emoji not in rarity_groups:
+                                    rarity_groups[emoji] = []
+                                rarity_groups[emoji].append(char)
 
-                        # Build weighted list
-                        weighted = []
+                        # Build weighted pools using proper probability distribution
+                        weighted_pools = []
                         
-                        # Add exclusive rarity with its custom chance
-                        if exclusive_emoji in rarity_groups:
-                            weight = max(1, int(exclusive_chance * 10))
-                            weighted.extend(rarity_groups[exclusive_emoji] * weight)
+                        # Add exclusive rarity pool
+                        if exclusive_chars:
+                            weighted_pools.append({
+                                'chars': exclusive_chars,
+                                'chance': exclusive_chance,
+                                'emoji': exclusive_emoji
+                            })
                         
                         # Add all other global enabled rarities
                         for emoji, chars in rarity_groups.items():
-                            if emoji != exclusive_emoji:  # Skip exclusive (already added)
-                                if emoji in rarities and rarities[emoji].get('enabled', True):
-                                    weight = max(1, int(rarities[emoji].get('chance', 5) * 10))
-                                    weighted.extend(chars * weight)
-
-                        if weighted:
-                            character = random.choice(weighted)
-                            LOGGER.info(f"Chat {chat_id} - Exclusive: {exclusive_emoji} ({exclusive_chance}%) + Global")
+                            if emoji in rarities and rarities[emoji].get('enabled', True):
+                                weighted_pools.append({
+                                    'chars': chars,
+                                    'chance': rarities[emoji].get('chance', 5),
+                                    'emoji': emoji
+                                })
+                        
+                        # Calculate total chance and select rarity
+                        if weighted_pools:
+                            total_chance = sum(pool['chance'] for pool in weighted_pools)
+                            rand = random.uniform(0, total_chance)
+                            
+                            cumulative = 0
+                            selected_pool = None
+                            for pool in weighted_pools:
+                                cumulative += pool['chance']
+                                if rand <= cumulative:
+                                    selected_pool = pool
+                                    break
+                            
+                            if selected_pool and selected_pool['chars']:
+                                character = random.choice(selected_pool['chars'])
+                                LOGGER.info(f"Chat {chat_id} spawned {selected_pool['emoji']} (chance: {selected_pool['chance']:.2f}%)")
                 else:
                     # No exclusive - use only global weighted selection
                     settings = await get_spawn_settings()
                     if settings and settings.get('rarities'):
                         rarities = settings['rarities']
-                        rarity_groups = {}
                         
+                        # Group characters by rarity
+                        rarity_groups = {}
                         for char in allowed:
                             char_rarity = char.get('rarity', '🟢 Common')
                             emoji = char_rarity.split(' ')[0] if isinstance(char_rarity, str) and ' ' in char_rarity else char_rarity
@@ -265,14 +290,32 @@ async def send_image(update: Update, context):
                                 rarity_groups[emoji] = []
                             rarity_groups[emoji].append(char)
 
-                        weighted = []
+                        # Build weighted pools
+                        weighted_pools = []
                         for emoji, chars in rarity_groups.items():
                             if emoji in rarities and rarities[emoji].get('enabled', True):
-                                weight = max(1, int(rarities[emoji].get('chance', 5) * 10))
-                                weighted.extend(chars * weight)
-
-                        if weighted:
-                            character = random.choice(weighted)
+                                weighted_pools.append({
+                                    'chars': chars,
+                                    'chance': rarities[emoji].get('chance', 5),
+                                    'emoji': emoji
+                                })
+                        
+                        # Select rarity based on chances
+                        if weighted_pools:
+                            total_chance = sum(pool['chance'] for pool in weighted_pools)
+                            rand = random.uniform(0, total_chance)
+                            
+                            cumulative = 0
+                            selected_pool = None
+                            for pool in weighted_pools:
+                                cumulative += pool['chance']
+                                if rand <= cumulative:
+                                    selected_pool = pool
+                                    break
+                            
+                            if selected_pool and selected_pool['chars']:
+                                character = random.choice(selected_pool['chars'])
+                                LOGGER.info(f"Chat {chat_id} spawned {selected_pool['emoji']} (chance: {selected_pool['chance']:.2f}%)")
         except Exception as e:
             LOGGER.error(f"Error in weighted selection: {e}\n{traceback.format_exc()}")
 
