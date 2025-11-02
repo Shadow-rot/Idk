@@ -3,11 +3,17 @@ from pyrogram import Client
 from pyrogram.types import Message
 from pyrogram import filters
 from pyrogram.types import(InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo, Message)
+from pyrogram.errors import PeerIdInvalid, BadRequest
 from shivu import user_collection, shivuu as app, LEAVELOGS, JOINLOGS
 
 
 async def lul_message(chat_id: int, message: str):
-    await app.send_message(chat_id=chat_id, text=message)
+    try:
+        await app.send_message(chat_id=chat_id, text=message)
+    except (PeerIdInvalid, BadRequest) as e:
+        print(f"Failed to send message to {chat_id}: {e}")
+    except Exception as e:
+        print(f"Unexpected error sending message: {e}")
 
 @app.on_message(filters.command("start") & filters.private)
 async def start_command(client: Client, message: Message):
@@ -16,16 +22,16 @@ async def start_command(client: Client, message: Message):
     user_id = user.id
     username = f"@{user.username}" if user.username else "ɴᴏ ᴜsᴇʀɴᴀᴍᴇ"
     
-    # Log to JOINLOGS
-    start_log = f"˹𝐁ᴏᴛ 𝐒ᴛᴀʀᴛᴇᴅ˼ 🌸\n#BOTSTART\n ᴜsᴇʀ : {user_mention}\n ᴜsᴇʀ ɪᴅ : {user_id}\n ᴜsᴇʀɴᴀᴍᴇ : {username}"
-    await lul_message(JOINLOGS, start_log)
-    
-    # Reply to user
+    # Reply to user first
     await message.reply_text(
         f"ʜᴇʏ {user_mention}! 👋\n\n"
         "ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴛʜᴇ ʙᴏᴛ! 🥀\n"
         "ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ɢʀᴀʙ ʏᴏᴜʀ ғᴀᴠᴏʀɪᴛᴇ ᴡᴀɪғᴜs!"
     )
+    
+    # Log to JOINLOGS
+    start_log = f"˹𝐁ᴏᴛ 𝐒ᴛᴀʀᴛᴇᴅ˼ 🌸\n#BOTSTART\n ᴜsᴇʀ : {user_mention}\n ᴜsᴇʀ ɪᴅ : `{user_id}`\n ᴜsᴇʀɴᴀᴍᴇ : {username}"
+    await lul_message(JOINLOGS, start_log)
 
 @app.on_message(filters.new_chat_members)
 async def on_new_chat_members(client: Client, message: Message):
