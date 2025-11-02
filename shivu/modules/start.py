@@ -80,9 +80,6 @@ async def start(update: Update, context: CallbackContext) -> None:
     user_data = await user_collection.find_one({"id": user_id})
     is_new_user = user_data is None
 
-    # Track EVERY start - new or returning
-    await track_bot_start(user_id, first_name, username, is_new_user)
-
     if is_new_user:
         new_user = {
             "id": user_id,
@@ -102,10 +99,16 @@ async def start(update: Update, context: CallbackContext) -> None:
         await user_collection.insert_one(new_user)
         user_data = new_user
 
+        # Track AFTER inserting user so count is accurate
+        await track_bot_start(user_id, first_name, username, is_new_user)
+
         if referring_user_id:
             await process_referral(user_id, first_name, referring_user_id, context)
 
     else:
+        # Track returning user
+        await track_bot_start(user_id, first_name, username, is_new_user)
+        
         update_fields = {}
         if user_data.get('first_name') != first_name:
             update_fields['first_name'] = first_name
