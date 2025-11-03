@@ -4,6 +4,7 @@ from pyrogram.enums import ParseMode
 from shivu import shivuu, SUPPORT_CHAT, user_collection, collection
 import os
 import math
+import asyncio
 from datetime import datetime
 
 def sc(text):
@@ -89,16 +90,64 @@ async def profile(client, message):
     m = await message.reply_text(sc("loading..."))
     
     try:
-        u = await shivuu.get_users(tid)
-        s = await get_stats(tid)
+        # Fetch data concurrently
+        u, s = await asyncio.gather(
+            shivuu.get_users(tid),
+            get_stats(tid)
+        )
         
         if not s:
-            return await m.edit(f"<blockquote>{sc('user not found')}</blockquote>", parse_mode=ParseMode.HTML)
+            await m.edit(f"<blockquote>{sc('user not found')}</blockquote>", parse_mode=ParseMode.HTML)
+            await asyncio.sleep(120)  # 2 minutes
+            await m.delete()
+            return
         
         name = sc(u.first_name)
         uname = u.username or sc("none")
         
+        # Build caption
+        cap = f"""<blockquote expandable>{sc('hunter license v2.0')}
+{sc('profile')}
+{sc('name')}: {name}
+{sc('id')}: <code>{tid}</code>
+{sc('username')}: @{uname}
 
+{sc('collection')}
+{sc('owned')}: <code>{s['total']:,}</code>
+{sc('unique')}: <code>{s['unique']}</code> / <code>{s['db_total']}</code>
+{sc('complete')}: <code>{s['completion']:.1f}%</code>
+{sc('rank')}: <code>#{s['rank']}</code>
+
+{sc('finance')}
+{sc('wallet')}: <code>{s['wallet']:,}</code>
+{sc('bank')}: <code>{s['bank']:,}</code>
+{sc('total')}: <code>{s['wealth']:,}</code>
+{sc('rank')}: <code>#{s['wealth_rank']}</code>"""
+        
+        if s['loan'] > 0:
+            cap += f"\n{sc('loan')}: <code>{s['loan']:,}</code>"
+            if s['loan_days'] > 0:
+                cap += f" ({s['loan_days']}ᴅ)"
+        
+        cap += f"""
+
+{sc('game')}
+{sc('level')}: <code>{s['lvl']}</code> / <code>100</code>
+{sc('rank')}: <code>{s['tier']}</code>
+{sc('xp')}: <code>{s['xp']:,}</code>
+{sc('next')}: <code>{s['need_xp']:,}</code>
+{sc('tokens')}: <code>{s['tokens']:,}</code>
+
+{sc('pass')}
+{sc('tier')}: <code>{s['p_name']}</code>"""
+        
+        if s['p_days'] is not None and s['p_days'] > 0:
+            cap += f" ({s['p_days']}ᴅ)"
+        
+        cap += f"""
+{sc('mult')}: <code>{s['p_mul']}</code>
+{sc('claims')}: <code>{s['p_claims']}</code> / <code>6</code>
+{sc('streak')}: <code>{s['p_streak']}</code></blockquote>"""
         
         # Buttons
         kb = InlineKeyboardMarkup([
@@ -114,21 +163,33 @@ async def profile(client, message):
         if photo:
             try:
                 p = await shivuu.download_media(photo)
-                await message.reply_photo(p, caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
+                info_msg = await message.reply_photo(p, caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
                 await m.delete()
                 os.remove(p)
             except:
+                info_msg = await message.reply_photo("https://files.catbox.moe/z8fhwx.jpg", caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
                 await m.delete()
-                await message.reply_photo("https://files.catbox.moe/z8fhwx.jpg", caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
         else:
+            info_msg = await message.reply_photo("https://files.catbox.moe/z8fhwx.jpg", caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
             await m.delete()
-            await message.reply_photo("https://files.catbox.moe/z8fhwx.jpg", caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
+        
+        # Auto-delete after 2 minutes
+        await asyncio.sleep(120)
+        try:
+            await info_msg.delete()
+        except:
+            pass
     
     except Exception as e:
         print(f"sinfo error: {e}")
         import traceback
         traceback.print_exc()
         await m.edit(f"<blockquote>{sc('error')}</blockquote>", parse_mode=ParseMode.HTML)
+        await asyncio.sleep(120)
+        try:
+            await m.delete()
+        except:
+            pass
 
 @shivuu.on_callback_query(filters.regex(r"^si_"))
 async def sinfo_cb(client, cq):
@@ -199,8 +260,11 @@ async def sinfo_cb(client, cq):
                 [InlineKeyboardButton(sc("support"), url=f"https://t.me/{SUPPORT_CHAT}")]
             ])
             
-            await cq.edit_message_caption(caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
-            await cq.answer(sc("refreshed"))
+            try:
+                await cq.edit_message_caption(caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
+                await cq.answer(sc("refreshed"))
+            except Exception as e:
+                await cq.answer(sc("refresh failed"), show_alert=True)
         
         elif act == "b":  # Balance
             cap = f"""<blockquote expandable>{sc('financial system')}
@@ -217,8 +281,11 @@ async def sinfo_cb(client, cq):
             
             cap += f"\n\n{sc('use /bal for menu')}</blockquote>"
             
-            await cq.edit_message_caption(caption=cap, reply_markup=back, parse_mode=ParseMode.HTML)
-            await cq.answer()
+            try:
+                await cq.edit_message_caption(caption=cap, reply_markup=back, parse_mode=ParseMode.HTML)
+                await cq.answer()
+            except:
+                await cq.answer(sc("error"), show_alert=True)
         
         elif act == "g":  # Games
             prog = min(100, int((s['xp'] / (((s['lvl']) ** 2) * 100)) * 100)) if s['lvl'] < 100 else 100
@@ -239,8 +306,11 @@ async def sinfo_cb(client, cq):
 /sbet /roll /gamble
 /basket /dart /stour /riddle</blockquote>"""
             
-            await cq.edit_message_caption(caption=cap, reply_markup=back, parse_mode=ParseMode.HTML)
-            await cq.answer()
+            try:
+                await cq.edit_message_caption(caption=cap, reply_markup=back, parse_mode=ParseMode.HTML)
+                await cq.answer()
+            except:
+                await cq.answer(sc("error"), show_alert=True)
         
         elif act == "c":  # Collection
             prog = int(s['completion'])
@@ -263,8 +333,11 @@ async def sinfo_cb(client, cq):
                 [InlineKeyboardButton(sc("back"), callback_data=f"si_r_{tid}"), InlineKeyboardButton(sc("view"), switch_inline_query_current_chat=f"collection.{tid}")]
             ])
             
-            await cq.edit_message_caption(caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
-            await cq.answer()
+            try:
+                await cq.edit_message_caption(caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
+                await cq.answer()
+            except:
+                await cq.answer(sc("error"), show_alert=True)
         
         elif act == "p":  # Pass
             cap = f"""<blockquote expandable>{sc('pass system')}
@@ -281,8 +354,11 @@ async def sinfo_cb(client, cq):
 
 {sc('use /pass for details')}</blockquote>"""
             
-            await cq.edit_message_caption(caption=cap, reply_markup=back, parse_mode=ParseMode.HTML)
-            await cq.answer()
+            try:
+                await cq.edit_message_caption(caption=cap, reply_markup=back, parse_mode=ParseMode.HTML)
+                await cq.answer()
+            except:
+                await cq.answer(sc("error"), show_alert=True)
     
     except Exception as e:
         print(f"callback error: {e}")
