@@ -1,5 +1,6 @@
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.enums import ParseMode
 from shivu import shivuu, SUPPORT_CHAT, user_collection, collection
 import os
 import math
@@ -38,7 +39,7 @@ async def get_stats(uid):
     wallet = u.get('balance', 0)
     bank = u.get('bank', 0)
     wealth = wallet + bank
-    wealth_rank = await user_collection.count_documents({'balance': {'$gt': wealth}}) + 1
+    wealth_rank = await user_collection.count_documents({'$expr': {'$gt': [{'$add': ['$balance', '$bank']}, wealth]}}) + 1
     
     # Loan
     loan = u.get('loan_amount', 0)
@@ -92,7 +93,7 @@ async def profile(client, message):
         s = await get_stats(tid)
         
         if not s:
-            return await m.edit(f"<blockquote>{sc('user not found')}</blockquote>", parse_mode="HTML")
+            return await m.edit(f"<blockquote>{sc('user not found')}</blockquote>", parse_mode=ParseMode.HTML)
         
         name = sc(u.first_name)
         uname = u.username or sc("none")
@@ -156,21 +157,21 @@ async def profile(client, message):
         if photo:
             try:
                 p = await shivuu.download_media(photo)
-                await message.reply_photo(p, caption=cap, reply_markup=kb, parse_mode="HTML")
+                await message.reply_photo(p, caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
                 await m.delete()
                 os.remove(p)
             except:
                 await m.delete()
-                await message.reply_photo("https://files.catbox.moe/z8fhwx.jpg", caption=cap, reply_markup=kb, parse_mode="HTML")
+                await message.reply_photo("https://files.catbox.moe/z8fhwx.jpg", caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
         else:
             await m.delete()
-            await message.reply_photo("https://files.catbox.moe/z8fhwx.jpg", caption=cap, reply_markup=kb, parse_mode="HTML")
+            await message.reply_photo("https://files.catbox.moe/z8fhwx.jpg", caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
     
     except Exception as e:
         print(f"sinfo error: {e}")
         import traceback
         traceback.print_exc()
-        await m.edit(f"<blockquote>{sc('error')}</blockquote>", parse_mode="HTML")
+        await m.edit(f"<blockquote>{sc('error')}</blockquote>", parse_mode=ParseMode.HTML)
 
 @shivuu.on_callback_query(filters.regex(r"^si_"))
 async def sinfo_cb(client, cq):
@@ -242,7 +243,7 @@ async def sinfo_cb(client, cq):
                 [InlineKeyboardButton(sc("support"), url=f"https://t.me/{SUPPORT_CHAT}")]
             ])
             
-            await cq.edit_message_caption(cap, reply_markup=kb, parse_mode="HTML")
+            await cq.edit_message_caption(caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
             await cq.answer(sc("refreshed"))
         
         elif act == "b":  # Balance
@@ -261,7 +262,7 @@ async def sinfo_cb(client, cq):
             
             cap += f"</blockquote>\n\n<blockquote>{sc('use /bal for menu')}</blockquote>"
             
-            await cq.edit_message_caption(cap, reply_markup=back, parse_mode="HTML")
+            await cq.edit_message_caption(caption=cap, reply_markup=back, parse_mode=ParseMode.HTML)
             await cq.answer()
         
         elif act == "g":  # Games
@@ -284,7 +285,7 @@ async def sinfo_cb(client, cq):
 /sbet /roll /gamble
 /basket /dart /stour /riddle</blockquote>"""
             
-            await cq.edit_message_caption(cap, reply_markup=back, parse_mode="HTML")
+            await cq.edit_message_caption(caption=cap, reply_markup=back, parse_mode=ParseMode.HTML)
             await cq.answer()
         
         elif act == "c":  # Collection
@@ -309,7 +310,7 @@ async def sinfo_cb(client, cq):
                 [InlineKeyboardButton(sc("back"), callback_data=f"si_r_{tid}"), InlineKeyboardButton(sc("view"), switch_inline_query_current_chat=f"collection.{tid}")]
             ])
             
-            await cq.edit_message_caption(cap, reply_markup=kb, parse_mode="HTML")
+            await cq.edit_message_caption(caption=cap, reply_markup=kb, parse_mode=ParseMode.HTML)
             await cq.answer()
         
         elif act == "p":  # Pass
@@ -328,9 +329,11 @@ async def sinfo_cb(client, cq):
 
 <blockquote>{sc('use /pass for details')}</blockquote>"""
             
-            await cq.edit_message_caption(cap, reply_markup=back, parse_mode="HTML")
+            await cq.edit_message_caption(caption=cap, reply_markup=back, parse_mode=ParseMode.HTML)
             await cq.answer()
     
     except Exception as e:
         print(f"callback error: {e}")
+        import traceback
+        traceback.print_exc()
         await cq.answer(sc("error"), show_alert=True)
