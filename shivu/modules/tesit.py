@@ -5,6 +5,7 @@ from shivu import shivuu
 import os
 import time
 import asyncio
+from pathlib import Path
 
 def sc(text):
     """Small caps converter"""
@@ -37,8 +38,8 @@ class Progress:
     
     async def progress_callback(self, current, total):
         now = time.time()
-        # Update every 2 seconds to avoid flood
-        if now - self.last_update < 2:
+        # Update every 3 seconds to avoid flood
+        if now - self.last_update < 3:
             return
         
         self.last_update = now
@@ -149,78 +150,58 @@ async def rename_file(client: Client, message: Message):
             parse_mode=ParseMode.HTML
         )
         
-        # Small delay to let the message update
-        await asyncio.sleep(0.5)
+        # Small delay
+        await asyncio.sleep(0.3)
         
-        # Get original attributes for better upload
+        # Get original attributes
         caption = replied.caption if replied.caption else None
         
         # Create progress tracker for upload
         upload_progress = Progress(status_msg, sc('uploading'))
         upload_start = time.time()
         
-        # Upload based on media type with optimized settings
-        upload_kwargs = {
-            'caption': caption,
-            'parse_mode': ParseMode.HTML if caption else None,
-            'progress': upload_progress.progress_callback
-        }
-        
+        # Upload based on media type
         if replied.document:
-            # Preserve document attributes
-            thumb = getattr(media, 'thumbs', [None])[0]
-            upload_kwargs['thumb'] = thumb
-            upload_kwargs['file_name'] = new_filename
-            
             new_msg = await message.reply_document(
                 document=downloaded_file,
-                **upload_kwargs
+                caption=caption,
+                file_name=new_filename,
+                parse_mode=ParseMode.HTML if caption else None,
+                progress=upload_progress.progress_callback
             )
             
         elif replied.video:
-            # Preserve video attributes
-            upload_kwargs.update({
-                'duration': getattr(media, 'duration', 0),
-                'width': getattr(media, 'width', 0),
-                'height': getattr(media, 'height', 0),
-                'supports_streaming': True,
-                'file_name': new_filename
-            })
-            
-            # Get thumbnail if exists
-            thumb = getattr(media, 'thumbs', [None])[0]
-            if thumb:
-                upload_kwargs['thumb'] = thumb
-            
             new_msg = await message.reply_video(
                 video=downloaded_file,
-                **upload_kwargs
+                caption=caption,
+                duration=getattr(media, 'duration', 0),
+                width=getattr(media, 'width', 0),
+                height=getattr(media, 'height', 0),
+                supports_streaming=True,
+                file_name=new_filename,
+                parse_mode=ParseMode.HTML if caption else None,
+                progress=upload_progress.progress_callback
             )
             
         elif replied.audio:
-            # Preserve audio attributes
-            upload_kwargs.update({
-                'duration': getattr(media, 'duration', 0),
-                'performer': getattr(media, 'performer', None),
-                'title': getattr(media, 'title', None),
-                'file_name': new_filename
-            })
-            
-            thumb = getattr(media, 'thumbs', [None])[0]
-            if thumb:
-                upload_kwargs['thumb'] = thumb
-            
             new_msg = await message.reply_audio(
                 audio=downloaded_file,
-                **upload_kwargs
+                caption=caption,
+                duration=getattr(media, 'duration', 0),
+                performer=getattr(media, 'performer', None),
+                title=getattr(media, 'title', None),
+                file_name=new_filename,
+                parse_mode=ParseMode.HTML if caption else None,
+                progress=upload_progress.progress_callback
             )
             
         elif replied.animation:
-            upload_kwargs['file_name'] = new_filename
-            
             new_msg = await message.reply_animation(
                 animation=downloaded_file,
-                **upload_kwargs
+                caption=caption,
+                file_name=new_filename,
+                parse_mode=ParseMode.HTML if caption else None,
+                progress=upload_progress.progress_callback
             )
             
         else:  # photo
@@ -284,7 +265,7 @@ async def rename_file(client: Client, message: Message):
         # Clean up downloaded file
         if downloaded_file:
             try:
-                await asyncio.sleep(1)  # Brief delay before cleanup
+                await asyncio.sleep(1)
                 if os.path.exists(downloaded_file):
                     os.remove(downloaded_file)
             except Exception as e:
