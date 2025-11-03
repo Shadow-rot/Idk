@@ -98,50 +98,7 @@ async def profile(client, message):
         name = sc(u.first_name)
         uname = u.username or sc("none")
         
-        # Build caption
-        cap = f"""<blockquote expandable>{sc('hunter license v2.0')}</blockquote>
 
-<blockquote expandable>{sc('profile')}
-{sc('name')}: {name}
-{sc('id')}: <code>{tid}</code>
-{sc('username')}: @{uname}</blockquote>
-
-<blockquote expandable>{sc('collection')}
-{sc('owned')}: <code>{s['total']:,}</code>
-{sc('unique')}: <code>{s['unique']}</code> / <code>{s['db_total']}</code>
-{sc('complete')}: <code>{s['completion']:.1f}%</code>
-{sc('rank')}: <code>#{s['rank']}</code></blockquote>
-
-<blockquote expandable>{sc('finance')}
-{sc('wallet')}: <code>{s['wallet']:,}</code>
-{sc('bank')}: <code>{s['bank']:,}</code>
-{sc('total')}: <code>{s['wealth']:,}</code>
-{sc('rank')}: <code>#{s['wealth_rank']}</code>"""
-        
-        if s['loan'] > 0:
-            cap += f"\n{sc('loan')}: <code>{s['loan']:,}</code>"
-            if s['loan_days'] > 0:
-                cap += f" ({s['loan_days']}ᴅ)"
-        
-        cap += f"""</blockquote>
-
-<blockquote expandable>{sc('game')}
-{sc('level')}: <code>{s['lvl']}</code> / <code>100</code>
-{sc('rank')}: <code>{s['tier']}</code>
-{sc('xp')}: <code>{s['xp']:,}</code>
-{sc('next')}: <code>{s['need_xp']:,}</code>
-{sc('tokens')}: <code>{s['tokens']:,}</code></blockquote>
-
-<blockquote expandable>{sc('pass')}
-{sc('tier')}: <code>{s['p_name']}</code>"""
-        
-        if s['p_days'] is not None and s['p_days'] > 0:
-            cap += f" ({s['p_days']}ᴅ)"
-        
-        cap += f"""
-{sc('mult')}: <code>{s['p_mul']}</code>
-{sc('claims')}: <code>{s['p_claims']}</code> / <code>6</code>
-{sc('streak')}: <code>{s['p_streak']}</code></blockquote>"""
         
         # Buttons
         kb = InlineKeyboardMarkup([
@@ -192,20 +149,19 @@ async def sinfo_cb(client, cq):
             name = sc(u.first_name)
             uname = u.username or sc("none")
             
-            cap = f"""<blockquote expandable>{sc('hunter license v2.0')}</blockquote>
-
-<blockquote expandable>{sc('profile')}
+            cap = f"""<blockquote expandable>{sc('hunter license v2.0')}
+{sc('profile')}
 {sc('name')}: {name}
 {sc('id')}: <code>{tid}</code>
-{sc('username')}: @{uname}</blockquote>
+{sc('username')}: @{uname}
 
-<blockquote expandable>{sc('collection')}
+{sc('collection')}
 {sc('owned')}: <code>{s['total']:,}</code>
 {sc('unique')}: <code>{s['unique']}</code> / <code>{s['db_total']}</code>
 {sc('complete')}: <code>{s['completion']:.1f}%</code>
-{sc('rank')}: <code>#{s['rank']}</code></blockquote>
+{sc('rank')}: <code>#{s['rank']}</code>
 
-<blockquote expandable>{sc('finance')}
+{sc('finance')}
 {sc('wallet')}: <code>{s['wallet']:,}</code>
 {sc('bank')}: <code>{s['bank']:,}</code>
 {sc('total')}: <code>{s['wealth']:,}</code>
@@ -216,16 +172,16 @@ async def sinfo_cb(client, cq):
                 if s['loan_days'] > 0:
                     cap += f" ({s['loan_days']}ᴅ)"
             
-            cap += f"""</blockquote>
+            cap += f"""
 
-<blockquote expandable>{sc('game')}
+{sc('game')}
 {sc('level')}: <code>{s['lvl']}</code> / <code>100</code>
 {sc('rank')}: <code>{s['tier']}</code>
 {sc('xp')}: <code>{s['xp']:,}</code>
 {sc('next')}: <code>{s['need_xp']:,}</code>
-{sc('tokens')}: <code>{s['tokens']:,}</code></blockquote>
+{sc('tokens')}: <code>{s['tokens']:,}</code>
 
-<blockquote expandable>{sc('pass')}
+{sc('pass')}
 {sc('tier')}: <code>{s['p_name']}</code>"""
             
             if s['p_days'] is not None and s['p_days'] > 0:
@@ -247,9 +203,8 @@ async def sinfo_cb(client, cq):
             await cq.answer(sc("refreshed"))
         
         elif act == "b":  # Balance
-            cap = f"""<blockquote expandable>{sc('financial system')}</blockquote>
-
-<blockquote expandable>{sc('account')}
+            cap = f"""<blockquote expandable>{sc('financial system')}
+{sc('account')}
 {sc('wallet')}: <code>{s['wallet']:,}</code>
 {sc('bank')}: <code>{s['bank']:,}</code>
 {sc('total')}: <code>{s['wealth']:,}</code>
@@ -260,7 +215,7 @@ async def sinfo_cb(client, cq):
                 if s['loan_days'] > 0:
                     cap += f"\n{sc('due')}: <code>{s['loan_days']}</code> {sc('days')}"
             
-            cap += f"</blockquote>\n\n<blockquote>{sc('use /bal for menu')}</blockquote>"
+            cap += f"\n\n{sc('use /bal for menu')}</blockquote>"
             
             await cq.edit_message_caption(caption=cap, reply_markup=back, parse_mode=ParseMode.HTML)
             await cq.answer()
@@ -269,9 +224,8 @@ async def sinfo_cb(client, cq):
             prog = min(100, int((s['xp'] / (((s['lvl']) ** 2) * 100)) * 100)) if s['lvl'] < 100 else 100
             bar = '█' * (prog // 10) + '░' * (10 - prog // 10)
             
-            cap = f"""<blockquote expandable>{sc('game matrix')}</blockquote>
-
-<blockquote expandable>{sc('stats')}
+            cap = f"""<blockquote expandable>{sc('game matrix')}
+{sc('stats')}
 {sc('level')}: <code>{s['lvl']}</code> / <code>100</code>
 {sc('rank')}: <code>{s['tier']}</code>
 {sc('xp')}: <code>{s['xp']:,}</code>
@@ -279,9 +233,9 @@ async def sinfo_cb(client, cq):
 {sc('tokens')}: <code>{s['tokens']:,}</code>
 
 {sc('progress')}
-{bar} <code>{prog}%</code></blockquote>
+{bar} <code>{prog}%</code>
 
-<blockquote>{sc('games')}
+{sc('games')}
 /sbet /roll /gamble
 /basket /dart /stour /riddle</blockquote>"""
             
@@ -292,9 +246,8 @@ async def sinfo_cb(client, cq):
             prog = int(s['completion'])
             bar = '█' * (prog // 10) + '░' * (10 - prog // 10)
             
-            cap = f"""<blockquote expandable>{sc('collection system')}</blockquote>
-
-<blockquote expandable>{sc('database')}
+            cap = f"""<blockquote expandable>{sc('collection system')}
+{sc('database')}
 {sc('owned')}: <code>{s['total']:,}</code>
 {sc('unique')}: <code>{s['unique']}</code>
 {sc('total')}: <code>{s['db_total']}</code>
@@ -302,9 +255,9 @@ async def sinfo_cb(client, cq):
 {sc('rank')}: <code>#{s['rank']}</code>
 
 {sc('progress')}
-{bar} <code>{prog}%</code></blockquote>
+{bar} <code>{prog}%</code>
 
-<blockquote>{sc('use /harem to view')}</blockquote>"""
+{sc('use /harem to view')}</blockquote>"""
             
             kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton(sc("back"), callback_data=f"si_r_{tid}"), InlineKeyboardButton(sc("view"), switch_inline_query_current_chat=f"collection.{tid}")]
@@ -314,9 +267,8 @@ async def sinfo_cb(client, cq):
             await cq.answer()
         
         elif act == "p":  # Pass
-            cap = f"""<blockquote expandable>{sc('pass system')}</blockquote>
-
-<blockquote expandable>{sc('membership')}
+            cap = f"""<blockquote expandable>{sc('pass system')}
+{sc('membership')}
 {sc('tier')}: <code>{s['p_name']}</code>"""
             
             if s['p_days'] is not None and s['p_days'] > 0:
@@ -325,9 +277,9 @@ async def sinfo_cb(client, cq):
             cap += f"""
 {sc('mult')}: <code>{s['p_mul']}</code>
 {sc('claims')}: <code>{s['p_claims']}</code> / <code>6</code>
-{sc('streak')}: <code>{s['p_streak']}</code> {sc('weeks')}</blockquote>
+{sc('streak')}: <code>{s['p_streak']}</code> {sc('weeks')}
 
-<blockquote>{sc('use /pass for details')}</blockquote>"""
+{sc('use /pass for details')}</blockquote>"""
             
             await cq.edit_message_caption(caption=cap, reply_markup=back, parse_mode=ParseMode.HTML)
             await cq.answer()
