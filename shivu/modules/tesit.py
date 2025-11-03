@@ -4,6 +4,7 @@ from pyrogram.enums import ParseMode
 from shivu import shivuu
 import os
 import time
+import asyncio
 
 def sc(text):
     """Small caps converter"""
@@ -18,10 +19,51 @@ def format_size(size_bytes):
         size_bytes /= 1024.0
     return f"{size_bytes:.2f} TB"
 
+def time_formatter(seconds):
+    """Format seconds to readable time"""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    elif seconds < 3600:
+        return f"{int(seconds // 60)}m {int(seconds % 60)}s"
+    else:
+        return f"{int(seconds // 3600)}h {int((seconds % 3600) // 60)}m"
+
+class Progress:
+    def __init__(self, message, action):
+        self.message = message
+        self.action = action
+        self.last_update = 0
+        self.start_time = time.time()
+    
+    async def progress_callback(self, current, total):
+        now = time.time()
+        # Update every 2 seconds to avoid flood
+        if now - self.last_update < 2:
+            return
+        
+        self.last_update = now
+        percentage = current * 100 / total
+        speed = current / (now - self.start_time)
+        eta = (total - current) / speed if speed > 0 else 0
+        
+        try:
+            await self.message.edit_text(
+                f"<blockquote>\n"
+                f"<b>{self.action}</b>\n"
+                f"{sc('progress')}: <code>{percentage:.1f}%</code>\n"
+                f"{sc('size')}: <code>{format_size(current)}</code> / <code>{format_size(total)}</code>\n"
+                f"{sc('speed')}: <code>{format_size(speed)}/s</code>\n"
+                f"{sc('eta')}: <code>{time_formatter(eta)}</code>\n"
+                f"</blockquote>",
+                parse_mode=ParseMode.HTML
+            )
+        except:
+            pass
+
 @shivuu.on_message(filters.command("rename"))
 async def rename_file(client: Client, message: Message):
     """
-    Rename files up to 2GB
+    Rename files up to 2GB with optimized speed
     Usage: Reply to a file with /rename <new_filename>
     """
     
@@ -81,113 +123,172 @@ async def rename_file(client: Client, message: Message):
     
     # Send processing message
     status_msg = await message.reply_text(
-        f"<blockquote>\n{sc('processing')}\n{sc('downloading file...')}\n</blockquote>",
+        f"<blockquote>\n{sc('starting download...')}\n</blockquote>",
         parse_mode=ParseMode.HTML
     )
+    
+    downloaded_file = None
     
     try:
         start_time = time.time()
         
-        # Download the file
+        # Create progress tracker for download
+        download_progress = Progress(status_msg, sc('downloading'))
+        
+        # Download with progress
         downloaded_file = await replied.download(
             file_name=new_filename,
-            progress=lambda current, total: None  # You can add progress callback here
+            progress=download_progress.progress_callback
         )
         
         download_time = time.time() - start_time
         
-        # Update status
+        # Update status for upload
         await status_msg.edit_text(
-            f"<blockquote>\n{sc('uploading')}\n{sc('uploading renamed file...')}\n</blockquote>",
+            f"<blockquote>\n{sc('starting upload...')}\n</blockquote>",
             parse_mode=ParseMode.HTML
         )
         
-        # Get file caption
-        caption = replied.caption if replied.caption else f"<b>{sc('renamed by bot')}</b>"
+        # Small delay to let the message update
+        await asyncio.sleep(0.5)
         
-        # Upload the renamed file
+        # Get original attributes for better upload
+        caption = replied.caption if replied.caption else None
+        
+        # Create progress tracker for upload
+        upload_progress = Progress(status_msg, sc('uploading'))
         upload_start = time.time()
         
+        # Upload based on media type with optimized settings
+        upload_kwargs = {
+            'caption': caption,
+            'parse_mode': ParseMode.HTML if caption else None,
+            'progress': upload_progress.progress_callback
+        }
+        
         if replied.document:
+            # Preserve document attributes
+            thumb = getattr(media, 'thumbs', [None])[0]
+            upload_kwargs['thumb'] = thumb
+            upload_kwargs['file_name'] = new_filename
+            
             new_msg = await message.reply_document(
                 document=downloaded_file,
-                caption=caption,
-                parse_mode=ParseMode.HTML,
-                progress=lambda current, total: None
+                **upload_kwargs
             )
+            
         elif replied.video:
+            # Preserve video attributes
+            upload_kwargs.update({
+                'duration': getattr(media, 'duration', 0),
+                'width': getattr(media, 'width', 0),
+                'height': getattr(media, 'height', 0),
+                'supports_streaming': True,
+                'file_name': new_filename
+            })
+            
+            # Get thumbnail if exists
+            thumb = getattr(media, 'thumbs', [None])[0]
+            if thumb:
+                upload_kwargs['thumb'] = thumb
+            
             new_msg = await message.reply_video(
                 video=downloaded_file,
-                caption=caption,
-                parse_mode=ParseMode.HTML,
-                progress=lambda current, total: None
+                **upload_kwargs
             )
+            
         elif replied.audio:
+            # Preserve audio attributes
+            upload_kwargs.update({
+                'duration': getattr(media, 'duration', 0),
+                'performer': getattr(media, 'performer', None),
+                'title': getattr(media, 'title', None),
+                'file_name': new_filename
+            })
+            
+            thumb = getattr(media, 'thumbs', [None])[0]
+            if thumb:
+                upload_kwargs['thumb'] = thumb
+            
             new_msg = await message.reply_audio(
                 audio=downloaded_file,
-                caption=caption,
-                parse_mode=ParseMode.HTML,
-                progress=lambda current, total: None
+                **upload_kwargs
             )
+            
         elif replied.animation:
+            upload_kwargs['file_name'] = new_filename
+            
             new_msg = await message.reply_animation(
                 animation=downloaded_file,
-                caption=caption,
-                parse_mode=ParseMode.HTML,
-                progress=lambda current, total: None
+                **upload_kwargs
             )
+            
         else:  # photo
             new_msg = await message.reply_photo(
                 photo=downloaded_file,
                 caption=caption,
-                parse_mode=ParseMode.HTML
+                parse_mode=ParseMode.HTML if caption else None
             )
         
         upload_time = time.time() - upload_start
         total_time = time.time() - start_time
         
+        # Calculate average speed
+        avg_speed = file_size / total_time if total_time > 0 else 0
+        
         # Delete status message
         await status_msg.delete()
         
         # Send success message
-        await message.reply_text(
+        success_msg = await message.reply_text(
             f"<blockquote expandable>\n"
-            f"{sc('rename complete')}\n\n"
-            f"<b>{sc('details')}</b>\n"
+            f"<b>{sc('rename complete')}</b>\n\n"
             f"{sc('filename')}: <code>{new_filename}</code>\n"
             f"{sc('size')}: <code>{format_size(file_size)}</code>\n"
-            f"{sc('download time')}: <code>{download_time:.2f}s</code>\n"
-            f"{sc('upload time')}: <code>{upload_time:.2f}s</code>\n"
-            f"{sc('total time')}: <code>{total_time:.2f}s</code>\n"
+            f"{sc('download')}: <code>{time_formatter(download_time)}</code>\n"
+            f"{sc('upload')}: <code>{time_formatter(upload_time)}</code>\n"
+            f"{sc('total')}: <code>{time_formatter(total_time)}</code>\n"
+            f"{sc('avg speed')}: <code>{format_size(avg_speed)}/s</code>\n"
             f"</blockquote>",
             parse_mode=ParseMode.HTML
         )
         
-        # Clean up downloaded file
+        # Auto-delete success message after 30 seconds
+        await asyncio.sleep(30)
         try:
-            os.remove(downloaded_file)
+            await success_msg.delete()
         except:
             pass
-    
+        
     except Exception as e:
+        error_msg = str(e)
         print(f"Rename error: {e}")
         import traceback
         traceback.print_exc()
         
-        await status_msg.edit_text(
-            f"<blockquote>\n"
-            f"{sc('error occurred')}\n"
-            f"{sc('details')}: <code>{str(e)}</code>\n"
-            f"</blockquote>",
-            parse_mode=ParseMode.HTML
-        )
-        
-        # Clean up if file exists
         try:
-            if 'downloaded_file' in locals() and os.path.exists(downloaded_file):
-                os.remove(downloaded_file)
+            await status_msg.edit_text(
+                f"<blockquote>\n"
+                f"<b>{sc('error occurred')}</b>\n"
+                f"{sc('details')}: <code>{error_msg[:100]}</code>\n"
+                f"</blockquote>",
+                parse_mode=ParseMode.HTML
+            )
         except:
-            pass
+            await message.reply_text(
+                f"<blockquote>\n{sc('an error occurred')}\n</blockquote>",
+                parse_mode=ParseMode.HTML
+            )
+    
+    finally:
+        # Clean up downloaded file
+        if downloaded_file:
+            try:
+                await asyncio.sleep(1)  # Brief delay before cleanup
+                if os.path.exists(downloaded_file):
+                    os.remove(downloaded_file)
+            except Exception as e:
+                print(f"Cleanup error: {e}")
 
 
 @shivuu.on_message(filters.command("renamehelp"))
@@ -195,14 +296,19 @@ async def rename_help(client: Client, message: Message):
     """Show rename command help"""
     await message.reply_text(
         f"<blockquote expandable>\n"
-        f"{sc('file renamer help')}\n\n"
+        f"<b>{sc('file renamer help')}</b>\n\n"
         f"<b>{sc('command')}</b>\n"
         f"<code>/rename newname.ext</code>\n\n"
         f"<b>{sc('how to use')}</b>\n"
         f"1. {sc('upload or forward a file')}\n"
         f"2. {sc('reply to that file')}\n"
         f"3. {sc('type')} <code>/rename newname.ext</code>\n"
-        f"4. {sc('bot will download and upload with new name')}\n\n"
+        f"4. {sc('bot will process with progress')}\n\n"
+        f"<b>{sc('features')}</b>\n"
+        f"• {sc('real-time progress tracking')}\n"
+        f"• {sc('speed and eta display')}\n"
+        f"• {sc('preserves media attributes')}\n"
+        f"• {sc('optimized for speed')}\n\n"
         f"<b>{sc('supported files')}</b>\n"
         f"• {sc('documents')} (.pdf, .zip, .apk, {sc('etc')})\n"
         f"• {sc('videos')} (.mp4, .mkv, .avi, {sc('etc')})\n"
@@ -211,7 +317,7 @@ async def rename_help(client: Client, message: Message):
         f"• {sc('animations')} (.gif, {sc('etc')})\n\n"
         f"<b>{sc('limitations')}</b>\n"
         f"• {sc('max file size')}: <code>2 GB</code>\n"
-        f"• {sc('processing time depends on file size')}\n\n"
+        f"• {sc('speed depends on server and file size')}\n\n"
         f"<b>{sc('examples')}</b>\n"
         f"<code>/rename movie.mp4</code>\n"
         f"<code>/rename document.pdf</code>\n"
